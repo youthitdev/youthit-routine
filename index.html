@@ -350,18 +350,41 @@ input:focus { outline: none; border-color: #2E33BC; }
         <div class="scroll-body">
 
           <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">오늘 인증 현황</div><span style="font-size:11px;background:#f5f5f5;padding:3px 9px;border-radius:10px;color:#666;" id="kTodayDate"></span></div>
-            <div id="kTodayCertList"></div>
+            <div class="section-hd">
+              <div class="section-hd-title">진행 중인 루틴</div>
+              <span style="font-size:11px;background:#f5f5f5;padding:3px 9px;border-radius:10px;color:#666;" id="kTodayDate"></span>
+            </div>
+            <div id="kActiveRoutineList"></div>
           </div>
           <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">진행 중인 루틴</div></div>
-            <div id="kActiveRoutineList"></div>
+            <div class="section-hd"><div class="section-hd-title">오늘 인증 현황</div></div>
+            <div id="kTodayCertList"></div>
           </div>
         </div>
       </div>
 
       <div class="tab-page" id="kpage-routine">
-        <div style="padding:12px 16px 24px;" id="kRoutineMgr"></div>
+        <div style="display:flex;align-items:center;padding-top:12px;gap:0;">
+          <div class="filter-bar" id="kRoutineFilterBar" style="padding-top:0;flex:1;overflow-x:auto;">
+            <div class="chip active" onclick="kFilterRoutine('all',this)">전체</div>
+            <div class="chip" onclick="kFilterRoutine('active',this)">진행 중</div>
+            <div class="chip" onclick="kFilterRoutine('recruit',this)">모집 중</div>
+            <div class="chip" onclick="kFilterRoutine('done',this)">완료</div>
+          </div>
+          <button onclick="openOverlay('createRoutineOverlay')" style="flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
+            <i class="ti ti-plus" style="font-size:20px;color:#2E33BC;"></i>
+          </button>
+        </div>
+        <div class="routine-grid" id="kRoutineGrid"></div>
+      </div>
+
+      <div class="tab-page" id="kpage-review">
+        <div style="padding:12px 16px 8px;display:flex;gap:8px;" id="kReviewFilterBar">
+          <div class="chip active" onclick="kFilterReview('all',this)">전체</div>
+          <div class="chip" onclick="kFilterReview('notice',this)">공지</div>
+          <div class="chip" onclick="kFilterReview('review',this)">후기</div>
+        </div>
+        <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="kReviewFeed"></div>
       </div>
 
       <div class="tab-page" id="kpage-my">
@@ -374,6 +397,28 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="kJoinDate"></span> 가입</div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
+          </div>
+
+          <div style="background:#2E33BC;border-radius:16px;padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:13px;font-weight:600;color:white;" id="kMyLevelBadge"></span>
+              <span style="font-size:11px;color:rgba(255,255,255,0.7);" id="kMyLevelNext"></span>
+            </div>
+            <div style="height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
+              <div id="kMyLevelBar" style="height:100%;background:#83CA00;border-radius:2px;width:0%;transition:width 0.4s;"></div>
+            </div>
+          </div>
+
+          <div class="stats-grid-4">
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🧑</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyYouth">0</span><span style="font-size:11px;color:#888;">함께한 청소년</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-hd"><div class="section-hd-title">내 인증글</div></div>
+            <div id="kMyCertFeed" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:8px;"></div>
           </div>
 
           <div class="section-card">
@@ -404,6 +449,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="kkutjjangNav" style="display:none;contents;">
       <div class="nav-item active" id="knav-home" onclick="kSwitchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴관리</span></div>
+      <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>후기</span></div>
       <div class="nav-item" id="knav-my" onclick="kSwitchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
   </nav>
@@ -423,6 +469,12 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
       <button onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
         <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
+      </button>
+    </div>
+    <!-- 끗짱도 인증 가능 -->
+    <div id="kCertFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
+      <button onclick="alert('끗짱도 인증할 수 있어요!')" style="width:100%;padding:14px;background:#2E33BC;color:white;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(46,51,188,0.3);display:flex;align-items:center;justify-content:center;gap:8px;">
+        <i class="ti ti-camera" style="font-size:18px;"></i> 나도 인증하기
       </button>
     </div>
   </div>
@@ -671,7 +723,8 @@ function kSwitchTab(tab) {
   document.getElementById('kpage-'+tab).classList.add('active');
   document.getElementById('knav-'+tab).classList.add('active');
   if (tab==='home') kRenderHome();
-  else if (tab==='routine') kRenderRoutineMgr();
+  else if (tab==='routine') kRenderRoutineTab();
+  else if (tab==='review') kRenderReviewTab('all');
   else if (tab==='my') kRenderMy();
 }
 
@@ -1136,14 +1189,15 @@ function kRenderHome(){
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   const active=state.routines.filter(r=>r.status==='active');
 
-  // 진행중 루틴 (상단)
-  document.getElementById('kActiveRoutineList').innerHTML = active.length > 0
-    ? active.map(r=>`
-      <div class="rmr" onclick="kSwitchTab('routine')">
-        <div class="rmr-top"><span class="rmr-name">${r.emoji} ${r.title}</span><span class="s-active">진행 중</span></div>
-        <div class="rmr-meta">${r.people}명 참여 · ${r.period}</div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
-      </div>`).join('')
+  // 진행중 루틴 (1개만 표시)
+  const firstActive = active.length > 0 ? active[0] : null;
+  document.getElementById('kActiveRoutineList').innerHTML = firstActive
+    ? `<div class="rmr" onclick="kSwitchTab('routine')">
+        <div class="rmr-top"><span class="rmr-name">${firstActive.emoji} ${firstActive.title}</span><span class="s-active">진행 중</span></div>
+        <div class="rmr-meta">${firstActive.people}명 참여 · ${firstActive.period}</div>
+        <div class="progress-wrap"><div class="progress-bar" style="width:${firstActive.progress}%"></div></div>
+        ${active.length > 1 ? `<div style="font-size:11px;color:#888;margin-top:6px;text-align:right;">외 ${active.length-1}개 루틴 진행 중 <i class="ti ti-chevron-right" style="font-size:11px;"></i></div>` : ''}
+      </div>`
     : `<div style="padding:20px 16px;text-align:center;font-size:13px;color:#aaa;">진행 중인 루틴이 없어요</div>`;
 
   // 오늘 인증 현황 (하단)
@@ -1159,32 +1213,88 @@ function kRenderHome(){
 let selectedEmoji='🌱',createHasPhoto=false;
 const EMOJIS=['🌱','🌿','🌳','🌞','🏃','📚','💧','🍳','🎵','✍️','🧘','🚶'];
 
-function kRenderRoutineMgr(){
-  const active=state.routines.filter(r=>r.status==='active');
-  const done=state.routines.filter(r=>r.status==='done');
-  let h=`<button class="add-btn" onclick="openCreateRoutine()"><i class="ti ti-plus" style="font-size:16px;"></i> 새 루틴 만들기</button>`;
-  if(active.length>0){
-    const r=active[0];
-    const certGoal=Math.floor(21*2/3);
-    const achievers=r.participants.filter(p=>p.cert>=certGoal).length;
-    const rate=r.participants.length?Math.round(achievers/r.participants.length*100):0;
-    h+=`<div style="background:#fff;border-radius:16px;border:0.5px solid #e8e8e8;padding:14px;margin-bottom:10px;">
-      <div style="font-size:15px;font-weight:600;color:#111;">${r.emoji} ${r.title}</div>
-      <div style="font-size:12px;color:#888;margin-top:3px;">${r.period} · ${r.people}명 참여</div>
-    </div>
-    <div style="background:#EAF3DE;border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (목표의 2/3 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
+let kCurrentFilter = 'all';
+
+function kRenderRoutineTab() {
+  document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelector('#kRoutineFilterBar .chip').classList.add('active');
+  kCurrentFilter = 'all';
+  kFilterRoutine('all', null);
+}
+
+function kFilterRoutine(type, el) {
+  kCurrentFilter = type;
+  if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+  const filtered = type==='all' ? state.routines : state.routines.filter(r=>r.status===type);
+  document.getElementById('kRoutineGrid').innerHTML = filtered.map(r => {
+    const isDone = r.status==='done';
+    const isActive = r.status==='active';
+    const cardBg = isDone?'#f0f0f0':'#fff';
+    const cardBorder = isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
+    const cardBorderWidth = isActive?'1.5px':'0.5px';
+    const titleColor = isDone?'#aaa':'#111';
+    const statusLabel = isActive?'진행 중':r.status==='recruit'?'모집 중':'완료';
+    const badgeBg = isActive?'#2E33BC':r.status==='recruit'?'#E6F1FB':'#e0e0e0';
+    const badgeColor = isActive?'#fff':r.status==='recruit'?'#185FA5':'#aaa';
+
+    // 진행중이면 인증 피드 오버레이로, 아니면 상세로
+    const clickFn = isActive ? `openKRoutineFeed(${r.id})` : `openKRoutineDetail(${r.id})`;
+
+    return `<div class="routine-card" onclick="${clickFn}"
+      style="background:${cardBg};border:${cardBorderWidth} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:4px;">
+        <div style="font-size:13px;font-weight:600;color:${titleColor};line-height:1.3;">${isDone?'✓ ':''}${r.emoji} ${r.title}</div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${badgeBg};color:${badgeColor};white-space:nowrap;font-weight:500;">${statusLabel}</span>
+      </div>
+      <div style="font-size:11px;color:${isDone?'#bbb':'#888'};margin-bottom:5px;">${r.period}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
+        <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openKRoutineFeed(routineId) {
+  // 끗짱이 루틴 피드 볼 때 - 인증 현황 + 완주율
+  const r = state.routines.find(x=>x.id===routineId);
+  document.getElementById('rdSub').textContent = r.period + ' · ' + r.people + '명 참여';
+  document.getElementById('rdTitle').textContent = r.emoji + ' ' + r.title;
+  const certGoal = Math.floor(21*2/3);
+  const achievers = r.participants.filter(p=>p.cert>=certGoal).length;
+  const rate = r.participants.length ? Math.round(achievers/r.participants.length*100) : 0;
+  const colors = ['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
+  document.getElementById('rdBody').innerHTML = `
+    <div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (목표의 2/3 이상)</div>
+      <div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
     </div>
-    <div style="font-size:12px;font-weight:500;color:#888;margin-bottom:8px;">전체 인증글</div>
-    <div class="feed-grid">${r.participants.map((p,i)=>{const c=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];return p.todayDone?`<div class="feed-item" style="background:${c[i%4]};" onclick="openCertDetail(${r.id},'${p.name}')"><div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div></div>`:`<div class="feed-item" style="background:#e8e8e8;"><i class="ti ti-camera-off" style="font-size:22px;color:rgba(0,0,0,0.3);"></i><div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:2px 6px;font-size:10px;color:white;">미인증</div></div>`;}).join('')}</div>`;
-  }
-  if(done.length>0){
-    h+=`<div style="margin-top:16px;background:#fff;border-radius:16px;border:0.5px solid #e8e8e8;overflow:hidden;"><div style="padding:14px 16px;font-size:14px;font-weight:600;color:#111;">완료된 루틴</div>`;
-    h+=done.map(r=>`<div class="rmr"><div class="rmr-top"><span class="rmr-name">${r.emoji} ${r.title}</span><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#888;">완료</span></div><div class="rmr-meta">${r.people}명 완주 · ${r.period}</div></div>`).join('');
-    h+=`</div>`;
-  }
-  document.getElementById('kRoutineMgr').innerHTML=h;
+    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">전체 인증글</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;">
+      ${r.participants.map((p,i)=>p.todayDone
+        ?`<div class="feed-item" style="background:${colors[i%4]};" onclick="openCertDetail(${r.id},'${p.name}')">
+            <div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div>
+           </div>`
+        :`<div class="feed-item" style="background:#e8e8e8;">
+            <i class="ti ti-camera-off" style="font-size:22px;color:rgba(0,0,0,0.3);"></i>
+            <div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:2px 6px;font-size:10px;color:white;">미인증</div>
+           </div>`).join('')}
+    </div>`;
+  openOverlay('routineDetailOverlay');
+}
+
+function openKRoutineDetail(routineId) {
+  const r = state.routines.find(x=>x.id===routineId);
+  document.getElementById('rdSub').textContent = r.tag;
+  document.getElementById('rdTitle').textContent = r.emoji + ' ' + r.title;
+  document.getElementById('rdBody').innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
+      <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.people}명 참여</div>
+    </div>
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
+  openOverlay('routineDetailOverlay');
 }
 
 function openCreateRoutine(){
@@ -1232,6 +1342,31 @@ function kRenderMy(){
   document.getElementById('kAvatar').textContent=state.kkutjjang.name[0];
   document.getElementById('kMyName').textContent=state.kkutjjang.name;
   document.getElementById('kJoinDate').textContent=state.kkutjjang.joinDate;
+
+  // 수치 복원
+  document.getElementById('kMyRoutine').textContent=s.routineCount;
+  document.getElementById('kMyCert').textContent=s.totalCert;
+  document.getElementById('kMyYouth').textContent=s.totalYouth;
+  document.getElementById('kMyRate').textContent=s.avgRate+'%';
+  document.getElementById('kMyLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
+  document.getElementById('kMyLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
+  setTimeout(()=>{ if(document.getElementById('kMyLevelBar')) document.getElementById('kMyLevelBar').style.width=lv.pct+'%'; }, 100);
+
+  // 내 인증글 (CERT_FEED에서 끗짱도 참여자로 포함)
+  const myCerts = CERT_FEED.slice(0,4); // 샘플: 전체 인증글 중 일부
+  const colors = ['#B5D4F4','#C0DD97','#FAC775','#F4C0D1','#B5D4F4','#C0DD97'];
+  document.getElementById('kMyCertFeed').innerHTML = myCerts.length > 0
+    ? myCerts.map((c,i)=>`
+        <div onclick="openCertFeedDetail(${c.id})" style="border-radius:10px;overflow:hidden;border:0.5px solid #e8e8e8;cursor:pointer;background:#fff;">
+          <div style="aspect-ratio:1;background:${colors[i%6]};display:flex;align-items:center;justify-content:center;position:relative;">
+            <i class="ti ti-photo" style="font-size:24px;color:rgba(0,0,0,0.15);"></i>
+            <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:5px 7px;">
+              <div style="font-size:10px;color:white;font-weight:500;">${c.day}</div>
+            </div>
+          </div>
+          <div style="padding:6px 8px;font-size:11px;color:#666;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${c.text}</div>
+        </div>`).join('')
+    : `<div style="padding:24px;text-align:center;font-size:13px;color:#aaa;grid-column:span 2;">아직 작성한 인증글이 없어요</div>`;
 
   document.getElementById('kReviewCount').textContent=state.reviews.length+'명';
   document.getElementById('kReviewList').innerHTML=state.reviews.slice(0,2).map(rv=>`
