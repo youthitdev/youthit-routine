@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>한끗루틴</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2E33BC" id="themeColor">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="한끗루틴">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -720,6 +726,8 @@ function applyRole(role) {
   const headerColor = isYouth ? '#83CA00' : '#FF006C';
   document.getElementById('mainHeader').style.background = headerColor;
   document.getElementById('mainNav').style.borderTopColor = headerColor + '33';
+  // PWA 테마 색상도 변경
+  document.getElementById('themeColor').content = headerColor;
   if(isYouth) { renderHome(); renderSwitchBtn(); }
   else { kRenderHome(); kRenderSwitchBtn(); }
 }
@@ -1591,6 +1599,15 @@ if(state.currentRole) {
   document.getElementById('mainContent').style.display='';
   document.getElementById('mainNav').style.display='';
   applyRole(state.currentRole);
+}
+</script>
+<script>
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('SW 등록 완료:', reg.scope))
+      .catch(err => console.log('SW 등록 실패:', err));
+  });
 }
 </script>
 </body>
