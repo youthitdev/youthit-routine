@@ -630,14 +630,14 @@ const CERT_FEED = [
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[]},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
-    {id:1,status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
-    {id:2,status:'recruit',title:'독서 한 페이지',emoji:'📚',period:'7.1–7.31',tag:'학습',people:8,maxPeople:15,progress:0,desc:'매일 책 한 페이지 이상 읽고 짧게 소감 남기기.',todayCert:false,certCount:0,avgRate:0,participants:[]},
-    {id:3,status:'recruit',title:'저녁 산책 2주',emoji:'🚶',period:'7.5–7.19',tag:'건강',people:6,maxPeople:10,progress:0,desc:'매일 저녁 15분 이상 바깥에서 걷기.',todayCert:false,certCount:0,avgRate:0,participants:[]},
-    {id:4,status:'active',title:'하루 한 끼 직접 차리기',emoji:'🍳',period:'6.15–7.5',tag:'생활',people:4,maxPeople:10,progress:38,desc:'매일 한 끼는 직접 만들어 먹기.',todayCert:false,certCount:24,avgRate:75,participants:[{name:'서연',day:'8일째',cert:7,todayDone:false},{name:'나연',day:'8일째',cert:6,todayDone:false}]},
-    {id:5,status:'done',title:'물 2L 마시기',emoji:'💧',period:'5.1–5.31',tag:'건강',people:19,maxPeople:20,progress:100,desc:'하루 물 2L 마시기 챌린지.',todayCert:false,certCount:487,avgRate:83,participants:[]},
+    {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
+    {id:2,applicants:[],status:'recruit',title:'독서 한 페이지',emoji:'📚',period:'7.1–7.31',tag:'학습',people:8,maxPeople:15,progress:0,desc:'매일 책 한 페이지 이상 읽고 짧게 소감 남기기.',todayCert:false,certCount:0,avgRate:0,participants:[]},
+    {id:3,status:'recruit',title:'저녁 산책 2주',emoji:'🚶',period:'7.5–7.19',tag:'건강',people:6,maxPeople:10,progress:0,desc:'매일 저녁 15분 이상 바깥에서 걷기.',todayCert:false,certCount:0,avgRate:0,participants:[],applicants:[{name:'준서',date:'오늘'},{name:'민지',date:'어제'}]},
+    {id:4,applicants:[],status:'active',title:'하루 한 끼 직접 차리기',emoji:'🍳',period:'6.15–7.5',tag:'생활',people:4,maxPeople:10,progress:38,desc:'매일 한 끼는 직접 만들어 먹기.',todayCert:false,certCount:24,avgRate:75,participants:[{name:'서연',day:'8일째',cert:7,todayDone:false},{name:'나연',day:'8일째',cert:6,todayDone:false}]},
+    {id:5,applicants:[],status:'done',title:'물 2L 마시기',emoji:'💧',period:'5.1–5.31',tag:'건강',people:19,maxPeople:20,progress:100,desc:'하루 물 2L 마시기 챌린지.',todayCert:false,certCount:487,avgRate:83,participants:[]},
   ],
   posts: [
     {id:1,type:'notice',title:'6월 한끗루틴 시작 안내',content:'안녕하세요! 6월 한끗루틴이 시작됩니다. 많은 참여 부탁드려요.',author:'운영진',date:'6월 10일',likes:5,liked:false},
@@ -991,7 +991,17 @@ function openRoutineDetail(id) {
   </div>
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
-  if(r.status==='recruit') body+=`<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;"><i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요</div><button class="primary-btn" onclick="joinRoutine(${r.id})">참여 신청하기</button>`;
+  const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
+  if(r.status==='recruit') body+=`
+    <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
+      <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
+    </div>
+    ${isPending
+      ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:14px;color:#888;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <i class="ti ti-clock" style="font-size:16px;color:#aaa;"></i> 승인 대기 중이에요
+        </div>`
+      : `<button class="primary-btn" onclick="joinRoutine(${r.id})">참여 신청하기</button>`
+    }`;
   else if(r.status==='done') body+=`
     <div style="text-align:center;padding:16px 0 8px;">
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
@@ -1003,9 +1013,23 @@ function openRoutineDetail(id) {
   openOverlay('routineDetailOverlay');
 }
 function joinRoutine(id) {
-  const r=state.routines.find(x=>x.id===id);
-  r.status='active'; r.progress=0; r.todayCert=false;
-  save(); alert(r.title+' 참여 신청 완료!'); closeOverlay('routineDetailOverlay'); renderRoutine();
+  const r = state.routines.find(x=>x.id===id);
+  if(!state.youth.pendingRoutines) state.youth.pendingRoutines=[];
+  if(!r.applicants) r.applicants=[];
+  // 이미 신청했는지 확인
+  if(state.youth.pendingRoutines.includes(id)) return;
+  // 신청 처리
+  state.youth.pendingRoutines.push(id);
+  r.applicants.push({name:state.youth.name, date:'방금', status:'pending'});
+  save();
+  closeOverlay('routineDetailOverlay');
+  // 승인 대기 안내
+  document.getElementById('rdBody').innerHTML='';
+  renderRoutine();
+  // 안내 팝업
+  setTimeout(()=>{
+    alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.');
+  }, 300);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1303,7 +1327,10 @@ function kFilterRoutine(type,el) {
       <div style="font-size:11px;color:${isDone?'#bbb':'#888'};margin-bottom:5px;">${r.period}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
-        <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
+        <div style="display:flex;align-items:center;gap:5px;">
+          ${pendingCount>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;">신청 ${pendingCount}</span>`:''}
+          <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1331,10 +1358,70 @@ function openKRoutineFeed(routineId) {
 }
 function openKRoutineDetail(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
-  document.getElementById('rdSub').textContent=r.tag;
+  document.getElementById('rdSub').textContent=r.tag+' · '+r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
-  document.getElementById('rdBody').innerHTML=`<div style="font-size:14px;color:#111;line-height:1.6;">${r.desc}</div>`;
+  const applicants = r.applicants||[];
+  const pending = applicants.filter(a=>a.status==='pending');
+  const approved = applicants.filter(a=>a.status==='approved');
+  const rejected = applicants.filter(a=>a.status==='rejected');
+  document.getElementById('rdBody').innerHTML=`
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>
+    <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
+      신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>
+    </div>
+    ${applicants.length===0
+      ? `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 신청자가 없어요</div>`
+      : `${pending.length>0?`
+        <div style="font-size:11px;font-weight:500;color:#856404;background:#FFF3CD;padding:4px 10px;border-radius:8px;margin-bottom:8px;display:inline-block;">⏳ 승인 대기 ${pending.length}명</div>`:''}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${applicants.map(a=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:12px;background:${a.status==='approved'?'#EAF3DE':a.status==='rejected'?'#f5f5f5':'#fff'};border:0.5px solid ${a.status==='approved'?'#83CA00':a.status==='rejected'?'#e0e0e0':'#e8e8e8'};border-radius:12px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:500;color:${a.status==='rejected'?'#aaa':'#111'};">${a.name}</div>
+                <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
+              </div>
+              ${a.status==='pending'?`
+                <button onclick="approveApplicant(${routineId},'${a.name}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
+                <button onclick="rejectApplicant(${routineId},'${a.name}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
+              :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>`
+              :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
+            </div>`).join('')}
+        </div>`}`;
   openOverlay('routineDetailOverlay');
+}
+
+function approveApplicant(routineId, name) {
+  const r = state.routines.find(x=>x.id===routineId);
+  const a = r.applicants.find(x=>x.name===name);
+  if(!a) return;
+  a.status = 'approved';
+  r.people = (r.applicants.filter(x=>x.status==='approved')).length;
+  // 청소년 pendingRoutines에서 제거하고 active로 전환 (같은 기기 테스트용)
+  if(state.youth.name===name) {
+    state.youth.pendingRoutines = (state.youth.pendingRoutines||[]).filter(id=>id!==routineId);
+    r.status = 'active';
+    r.progress = 0;
+    r.todayCert = false;
+    if(!r.participants) r.participants=[];
+    r.participants.push({name, day:'1일째', cert:0, todayDone:false});
+  }
+  save();
+  openKRoutineDetail(routineId);
+  kRenderRoutineTab();
+}
+
+function rejectApplicant(routineId, name) {
+  const r = state.routines.find(x=>x.id===routineId);
+  const a = r.applicants.find(x=>x.name===name);
+  if(!a) return;
+  a.status = 'rejected';
+  // 청소년 pendingRoutines에서도 제거
+  if(state.youth.name===name) {
+    state.youth.pendingRoutines = (state.youth.pendingRoutines||[]).filter(id=>id!==routineId);
+  }
+  save();
+  openKRoutineDetail(routineId);
 }
 function openKCertDetail(rid,name) {
   const r=state.routines.find(x=>x.id===rid);
