@@ -249,10 +249,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="section-hd"><div class="section-hd-title">참여 중인 루틴</div></div>
             <div id="activeRoutinesList"></div>
           </div>
-          <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">다른 친구들 후기</div></div>
-            <div id="homeReviews"></div>
-          </div>
+
         </div>
       </div>
 
@@ -364,6 +361,16 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
           </div>
+          <div style="background:#2E33BC;border-radius:16px;padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:13px;font-weight:600;color:white;" id="kMyLevelBadge"></span>
+              <span style="font-size:11px;color:rgba(255,255,255,0.7);" id="kMyLevelNext"></span>
+            </div>
+            <div style="height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
+              <div id="kMyLevelBar" style="height:100%;background:#83CA00;border-radius:2px;width:0%;transition:width 0.4s;"></div>
+            </div>
+          </div>
+
           <div class="stats-grid-4">
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
@@ -713,19 +720,7 @@ function renderHome() {
     </div>`;
   }).join('');
 
-  document.getElementById('homeReviews').innerHTML = state.posts.filter(p=>p.type==='review').slice(0,3).map(p=>`
-    <div class="review-item-sm" onclick="openPostDetail(${p.id})" style="cursor:pointer;">
-      <div class="sm-avatar">${p.author[0]}</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:500;color:#111;">${p.author}</div>
-        <div style="font-size:12px;color:#666;margin-top:2px;line-height:1.4;">${p.content}</div>
-        <div style="font-size:11px;color:#aaa;margin-top:3px;">${p.date}</div>
-      </div>
-      <div class="heart-btn" onclick="event.stopPropagation();toggleLike(${p.id})">
-        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:16px;color:${p.liked?'#FF006C':'#ccc'};"></i>
-        <span style="font-size:10px;color:#aaa;">${p.likes}</span>
-      </div>
-    </div>`).join('');
+
 }
 
 function openPostDetail(id) {
@@ -1054,26 +1049,27 @@ function kRenderHome(){
   document.getElementById('kGreeting').textContent=state.kkutjjang.name+' 끗짱님';
   document.getElementById('kLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('kLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
-  document.getElementById('kLevelBar').style.width=lv.pct+'%';
-  document.getElementById('kRoutineCount').textContent=s.routineCount;
-  document.getElementById('kCertCount').textContent=s.totalCert;
-  document.getElementById('kYouthCount').textContent=s.totalYouth;
-  document.getElementById('kCompleteRate').textContent=s.avgRate+'%';
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   const active=state.routines.filter(r=>r.status==='active');
-  document.getElementById('kTodayCertList').innerHTML=active.flatMap(r=>r.participants.map(p=>`
+
+  // 진행중 루틴 (상단)
+  document.getElementById('kActiveRoutineList').innerHTML = active.length > 0
+    ? active.map(r=>`
+      <div class="rmr" onclick="kSwitchTab('routine')">
+        <div class="rmr-top"><span class="rmr-name">${r.emoji} ${r.title}</span><span class="s-active">진행 중</span></div>
+        <div class="rmr-meta">${r.people}명 참여 · ${r.period}</div>
+        <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
+      </div>`).join('')
+    : `<div style="padding:20px 16px;text-align:center;font-size:13px;color:#aaa;">진행 중인 루틴이 없어요</div>`;
+
+  // 오늘 인증 현황 (하단)
+  document.getElementById('kTodayCertList').innerHTML = active.flatMap(r=>r.participants.map(p=>`
     <div class="youth-row" onclick="openCertDetail(${r.id},'${p.name}')">
       <div class="youth-avatar">${p.name[0]}</div>
       <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.title} · ${p.day}</div></div>
       <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
     </div>`)).join('');
-  document.getElementById('kActiveRoutineList').innerHTML=active.map(r=>`
-    <div class="rmr" onclick="kSwitchTab('routine')">
-      <div class="rmr-top"><span class="rmr-name">${r.emoji} ${r.title}</span><span class="s-active">진행 중</span></div>
-      <div class="rmr-meta">${r.people}명 · ${r.period} · 완주율 ${r.avgRate}%</div>
-      <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
-    </div>`).join('');
 }
 
 // ── 끗짱 루틴관리 ───────────────────────────────────────────
@@ -1149,7 +1145,7 @@ function openCertDetail(rid,name){
 
 // ── 끗짱 MY ────────────────────────────────────────────────
 function kRenderMy(){
-  const s=kStats();
+  const s=kStats(), lv=getKLevel(s.routineCount);
   document.getElementById('kAvatar').textContent=state.kkutjjang.name[0];
   document.getElementById('kMyName').textContent=state.kkutjjang.name;
   document.getElementById('kJoinDate').textContent=state.kkutjjang.joinDate;
@@ -1157,6 +1153,9 @@ function kRenderMy(){
   document.getElementById('kMyCert').textContent=s.totalCert;
   document.getElementById('kMyYouth').textContent=s.totalYouth;
   document.getElementById('kMyRate').textContent=s.avgRate+'%';
+  document.getElementById('kMyLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
+  document.getElementById('kMyLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
+  setTimeout(()=>{ document.getElementById('kMyLevelBar').style.width=lv.pct+'%'; }, 100);
   document.getElementById('kReviewCount').textContent=state.reviews.length+'명';
   document.getElementById('kReviewList').innerHTML=state.reviews.slice(0,2).map(rv=>`
     <div class="review-card-item">
