@@ -254,13 +254,41 @@ input:focus { outline: none; border-color: #2E33BC; }
       </div>
 
       <div class="tab-page" id="page-routine">
-        <div class="filter-bar" id="routineFilterBar" style="padding-top:12px;">
-          <div class="chip active" onclick="filterRoutine('all',this)">전체</div>
-          <div class="chip" onclick="filterRoutine('active',this)">참여 중</div>
-          <div class="chip" onclick="filterRoutine('recruit',this)">모집 중</div>
-          <div class="chip" onclick="filterRoutine('done',this)">완료</div>
+        <div style="display:flex;align-items:center;padding-top:12px;gap:0;">
+          <div class="filter-bar" id="routineFilterBar" style="padding-top:0;flex:1;overflow-x:auto;">
+            <div class="chip active" onclick="filterRoutine('all',this)">전체</div>
+            <div class="chip" onclick="filterRoutine('active',this)">참여 중</div>
+            <div class="chip" onclick="filterRoutine('recruit',this)">모집 중</div>
+            <div class="chip" onclick="filterRoutine('done',this)">완료</div>
+          </div>
+          <button onclick="toggleSearch()" id="searchToggleBtn" style="flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <i class="ti ti-search" style="font-size:20px;color:#888;" id="searchIcon"></i>
+          </button>
         </div>
+
+        <!-- 검색창 (평소엔 숨김) -->
+        <div id="searchBarWrap" style="display:none;padding:0 16px 8px;">
+          <div style="display:flex;align-items:center;gap:8px;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+            <i class="ti ti-search" style="font-size:16px;color:#aaa;flex-shrink:0;"></i>
+            <input type="text" id="routineSearchInput"
+              placeholder="루틴 이름 또는 닉네임 검색"
+              oninput="handleSearch()"
+              style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;color:#111;outline:none;">
+            <button onclick="clearSearch()" id="searchClearBtn" style="display:none;background:none;border:none;cursor:pointer;padding:0;">
+              <i class="ti ti-x" style="font-size:16px;color:#aaa;"></i>
+            </button>
+          </div>
+          <div id="searchResultCount" style="font-size:11px;color:#888;margin-top:6px;padding-left:4px;display:none;"></div>
+        </div>
+
         <div class="routine-grid" id="routineGrid"></div>
+
+        <!-- 검색 결과 없음 -->
+        <div id="searchEmpty" style="display:none;padding:48px 16px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">🔍</div>
+          <div style="font-size:14px;color:#888;">검색 결과가 없어요</div>
+          <div style="font-size:12px;color:#ccc;margin-top:4px;">다른 키워드로 검색해보세요</div>
+        </div>
       </div>
 
       <div class="tab-page" id="page-cert">
@@ -320,21 +348,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="kkutjjangTabs" style="display:none;">
       <div class="tab-page active" id="kpage-home">
         <div class="scroll-body">
-          <div class="greeting-card">
-            <div style="font-size:11px;opacity:0.75;margin-bottom:2px;">안녕하세요,</div>
-            <div style="font-size:17px;font-weight:600;margin-bottom:6px;" id="kGreeting"></div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <span style="background:rgba(255,255,255,0.2);border-radius:12px;padding:3px 10px;font-size:11px;color:white;" id="kLevelBadge"></span>
-              <span style="font-size:11px;color:rgba(255,255,255,0.65);" id="kLevelNext"></span>
-            </div>
-            <div class="level-bar-wrap"><div class="k-level-bar" id="kLevelBar" style="width:0%"></div></div>
-            <div class="stats-2x2">
-              <div class="stat-pill"><div class="stat-pill-val" id="kRoutineCount">0</div><div class="stat-pill-label">운영한 루틴 수</div></div>
-              <div class="stat-pill"><div class="stat-pill-val" id="kCertCount">0</div><div class="stat-pill-label">총 인증 수</div></div>
-              <div class="stat-pill"><div class="stat-pill-val" id="kYouthCount">0</div><div class="stat-pill-label">함께한 청소년</div></div>
-              <div class="stat-pill"><div class="stat-pill-val" id="kCompleteRate">0%</div><div class="stat-pill-label">평균 완주율</div></div>
-            </div>
-          </div>
+
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">오늘 인증 현황</div><span style="font-size:11px;background:#f5f5f5;padding:3px 9px;border-radius:10px;color:#666;" id="kTodayDate"></span></div>
             <div id="kTodayCertList"></div>
@@ -361,22 +375,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
           </div>
-          <div style="background:#2E33BC;border-radius:16px;padding:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-              <span style="font-size:13px;font-weight:600;color:white;" id="kMyLevelBadge"></span>
-              <span style="font-size:11px;color:rgba(255,255,255,0.7);" id="kMyLevelNext"></span>
-            </div>
-            <div style="height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
-              <div id="kMyLevelBar" style="height:100%;background:#83CA00;border-radius:2px;width:0%;transition:width 0.4s;"></div>
-            </div>
-          </div>
 
-          <div class="stats-grid-4">
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🧑</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyYouth">0</span><span style="font-size:11px;color:#888;">함께한 청소년</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
-          </div>
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">함께한 청소년 후기</div><span style="font-size:12px;color:#888;" id="kReviewCount"></span></div>
             <div id="kReviewList"></div>
@@ -747,9 +746,13 @@ function toggleLike(id) { const p=state.posts.find(x=>x.id===id); p.liked=!p.lik
 
 // ── 청소년 루틴 탭 ──────────────────────────────────────────
 function renderRoutine() {
+  searchOpen = false;
+  currentFilterType = 'all';
   document.querySelectorAll('#routineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#routineFilterBar .chip').classList.add('active');
-  filterRoutine('all', null);
+  const wrap = document.getElementById('searchBarWrap');
+  if(wrap) wrap.style.display = 'none';
+  renderRoutineGrid('all', '');
 }
 // 인증 피드 데이터 (타임스탬프 포함, 24시간 내 표시)
 const now = Date.now();
@@ -774,15 +777,87 @@ function isWithin24h(ts) { return Date.now() - ts < 24 * 3600000; }
 
 let currentFeedRoutineId = null;
 
+// ── 검색 ────────────────────────────────────────────────────
+let searchOpen = false;
+let currentFilterType = 'all';
+
+function toggleSearch() {
+  searchOpen = !searchOpen;
+  const wrap = document.getElementById('searchBarWrap');
+  const icon = document.getElementById('searchIcon');
+  const btn = document.getElementById('searchToggleBtn');
+  wrap.style.display = searchOpen ? '' : 'none';
+  icon.style.color = searchOpen ? '#2E33BC' : '#888';
+  btn.style.background = searchOpen ? '#f0f1fb' : 'none';
+  btn.style.borderRadius = searchOpen ? '10px' : '0';
+  if (searchOpen) {
+    document.getElementById('routineSearchInput').focus();
+  } else {
+    clearSearch();
+  }
+}
+
+function handleSearch() {
+  const q = document.getElementById('routineSearchInput').value.trim();
+  const clearBtn = document.getElementById('searchClearBtn');
+  clearBtn.style.display = q ? '' : 'none';
+  renderRoutineGrid(currentFilterType, q);
+}
+
+function clearSearch() {
+  document.getElementById('routineSearchInput').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  document.getElementById('searchResultCount').style.display = 'none';
+  renderRoutineGrid(currentFilterType, '');
+}
+
 function filterRoutine(type, el) {
   if(el){document.querySelectorAll('#routineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-  const filtered = type === 'all' ? state.routines : state.routines.filter(r=>r.status===type);
-  document.getElementById('routineGrid').innerHTML = filtered.map(r => {
+  currentFilterType = type;
+  if(el){document.querySelectorAll('#routineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+  const q = document.getElementById('routineSearchInput') ? document.getElementById('routineSearchInput').value.trim() : '';
+  renderRoutineGrid(type, q);
+}
+
+function renderRoutineGrid(type, q='') {
+  const base = type === 'all' ? state.routines : state.routines.filter(r=>r.status===type);
+
+  // 검색 필터
+  let filtered = base;
+  if (q) {
+    const lq = q.toLowerCase();
+    // 루틴 이름 매칭
+    const byTitle = base.filter(r => r.title.toLowerCase().includes(lq));
+    // 닉네임 매칭 → 해당 루틴 찾기
+    const byNick = base.filter(r =>
+      CERT_FEED.some(c => c.routineId === r.id && c.name.toLowerCase().includes(lq))
+    );
+    filtered = [...new Set([...byTitle, ...byNick])];
+  }
+
+  const empty = document.getElementById('searchEmpty');
+  const grid = document.getElementById('routineGrid');
+  const countEl = document.getElementById('searchResultCount');
+
+  if (q && filtered.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    countEl.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+
+  if (q) {
+    countEl.style.display = '';
+    countEl.textContent = `"${q}" 검색 결과 ${filtered.length}개`;
+  } else {
+    countEl.style.display = 'none';
+  }
+
+  grid.innerHTML = filtered.map(r => {
     const isDone = r.status === 'done';
     const isActive = r.status === 'active';
     const isRecruit = r.status === 'recruit';
-
-    // 상태별 스타일
     const cardBg = isDone ? '#f0f0f0' : '#fff';
     const cardBorder = isDone ? '#e0e0e0' : isActive ? '#2E33BC' : '#e8e8e8';
     const cardBorderWidth = isActive ? '1.5px' : '0.5px';
@@ -790,16 +865,27 @@ function filterRoutine(type, el) {
     const tagBg = isDone ? '#e8e8e8' : '#f5f5f5';
     const tagColor = isDone ? '#aaa' : '#666';
     const peopleColor = isDone ? '#bbb' : '#888';
-
-    // 상태 배지
     const statusLabel = isActive ? '참여 중' : isRecruit ? '모집 중' : '완료';
     const badgeBg = isActive ? '#2E33BC' : isRecruit ? '#E6F1FB' : '#e0e0e0';
     const badgeColor = isActive ? '#fff' : isRecruit ? '#185FA5' : '#aaa';
 
+    // 검색어 하이라이트
+    const highlight = (text) => q
+      ? text.replace(new RegExp(`(${q})`, 'gi'), '<mark style="background:#FFF176;border-radius:2px;padding:0 1px;">$1</mark>')
+      : text;
+
+    // 닉네임 매칭된 경우 표시
+    const matchedNicks = q ? CERT_FEED
+      .filter(c => c.routineId===r.id && c.name.toLowerCase().includes(q.toLowerCase()))
+      .map(c=>c.name) : [];
+    const nickHtml = matchedNicks.length > 0
+      ? `<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${matchedNicks.map(n=>`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:10px;">${highlight(n)}</span>`).join('')}</div>`
+      : '';
+
     return `<div class="routine-card" onclick="${isActive ? `openRoutineFeed(${r.id})` : `openRoutineDetail(${r.id})`}"
       style="background:${cardBg};border:${cardBorderWidth} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:4px;">
-        <div style="font-size:13px;font-weight:600;color:${titleColor};line-height:1.3;">${isDone ? '✓ ' : ''}${r.emoji} ${r.title}</div>
+        <div style="font-size:13px;font-weight:600;color:${titleColor};line-height:1.3;">${isDone?'✓ ':''}${r.emoji} ${highlight(r.title)}</div>
         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${badgeBg};color:${badgeColor};white-space:nowrap;font-weight:500;">${statusLabel}</span>
       </div>
       <div style="font-size:11px;color:${isDone?'#bbb':'#888'};margin-bottom:5px;">${r.period}</div>
@@ -807,9 +893,9 @@ function filterRoutine(type, el) {
         <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${tagBg};color:${tagColor};">${r.tag}</span>
         <span style="font-size:11px;color:${peopleColor};">${r.people}명</span>
       </div>
+      ${nickHtml}
     </div>`;
   }).join('');
-}
 
 function openRoutineFeed(routineId) {
   currentFeedRoutineId = routineId;
