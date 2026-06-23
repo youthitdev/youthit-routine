@@ -896,6 +896,7 @@ function renderRoutineGrid(type, q='') {
       ${nickHtml}
     </div>`;
   }).join('');
+}
 
 function openRoutineFeed(routineId) {
   currentFeedRoutineId = routineId;
@@ -1131,8 +1132,6 @@ async function openReport(){
 
 // ── 끗짱 홈 ────────────────────────────────────────────────
 function kRenderHome(){
-  const s=kStats(),lv=getKLevel(s.routineCount);
-
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   const active=state.routines.filter(r=>r.status==='active');
@@ -1233,13 +1232,7 @@ function kRenderMy(){
   document.getElementById('kAvatar').textContent=state.kkutjjang.name[0];
   document.getElementById('kMyName').textContent=state.kkutjjang.name;
   document.getElementById('kJoinDate').textContent=state.kkutjjang.joinDate;
-  document.getElementById('kMyRoutine').textContent=s.routineCount;
-  document.getElementById('kMyCert').textContent=s.totalCert;
-  document.getElementById('kMyYouth').textContent=s.totalYouth;
-  document.getElementById('kMyRate').textContent=s.avgRate+'%';
-  document.getElementById('kMyLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
-  document.getElementById('kMyLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
-  setTimeout(()=>{ document.getElementById('kMyLevelBar').style.width=lv.pct+'%'; }, 100);
+
   document.getElementById('kReviewCount').textContent=state.reviews.length+'명';
   document.getElementById('kReviewList').innerHTML=state.reviews.slice(0,2).map(rv=>`
     <div class="review-card-item">
