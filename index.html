@@ -676,20 +676,77 @@ function renderHome() {
   document.getElementById('homeLevelBadge').textContent = `${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('homeCertCount').textContent = state.youth.certCount;
   document.getElementById('homeCommCount').textContent = state.youth.commCount;
+
   const active = state.routines.filter(r=>r.status==='active');
-  document.getElementById('activeRoutinesList').innerHTML = active.map(r=>`
-    <div class="routine-progress-row">
-      <div class="rpr-top"><div style="font-size:14px;font-weight:500;color:#111;">${r.title}</div>
-        <span class="cert-tag ${r.todayCert?'cert-done':'cert-none'}">${r.todayCert?'오늘 인증 ✓':'오늘 미인증'}</span></div>
+  document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
+    // 해당 루틴의 오늘 인증글 (24시간 내)
+    const todayCerts = CERT_FEED.filter(c => c.routineId === r.id && isWithin24h(c.ts));
+    const previewHtml = todayCerts.length > 0 ? `
+      <div style="margin-top:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:6px;">오늘 인증한 친구들 👀</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;">
+          ${todayCerts.slice(0,4).map(c=>`
+            <div onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="flex-shrink:0;width:64px;cursor:pointer;">
+              <div style="width:64px;height:64px;border-radius:10px;background:${c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+                <i class="ti ti-photo" style="font-size:20px;color:rgba(0,0,0,0.15);"></i>
+                <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.45));padding:3px 5px;">
+                  <div style="font-size:9px;color:white;font-weight:500;">${c.name}</div>
+                </div>
+              </div>
+            </div>`).join('')}
+          ${todayCerts.length > 4 ? `
+            <div onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="flex-shrink:0;width:64px;height:64px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <div style="font-size:12px;color:#888;font-weight:500;">+${todayCerts.length-4}</div>
+            </div>` : ''}
+        </div>
+      </div>` : `
+      <div style="margin-top:8px;font-size:11px;color:#ccc;">아직 오늘 인증한 친구가 없어요</div>`;
+
+    return `<div class="routine-progress-row" onclick="openRoutineFeed(${r.id})" style="cursor:pointer;">
+      <div class="rpr-top">
+        <div style="font-size:14px;font-weight:500;color:#111;">${r.emoji} ${r.title}</div>
+        <span class="cert-tag ${r.todayCert?'cert-done':'cert-none'}">${r.todayCert?'오늘 인증 ✓':'오늘 미인증'}</span>
+      </div>
       <div style="font-size:11px;color:#aaa;">${r.period} · ${r.people}명 참여</div>
       <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
-    </div>`).join('');
+      ${previewHtml}
+    </div>`;
+  }).join('');
+
   document.getElementById('homeReviews').innerHTML = state.posts.filter(p=>p.type==='review').slice(0,3).map(p=>`
-    <div class="review-item-sm">
+    <div class="review-item-sm" onclick="openPostDetail(${p.id})" style="cursor:pointer;">
       <div class="sm-avatar">${p.author[0]}</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${p.author}</div><div style="font-size:12px;color:#666;margin-top:2px;line-height:1.4;">${p.content}</div><div style="font-size:11px;color:#aaa;margin-top:3px;">${p.date}</div></div>
-      <div class="heart-btn" onclick="toggleLike(${p.id})"><i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:16px;color:${p.liked?'#FF006C':'#ccc'};"></i><span style="font-size:10px;color:#aaa;">${p.likes}</span></div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;color:#111;">${p.author}</div>
+        <div style="font-size:12px;color:#666;margin-top:2px;line-height:1.4;">${p.content}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:3px;">${p.date}</div>
+      </div>
+      <div class="heart-btn" onclick="event.stopPropagation();toggleLike(${p.id})">
+        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:16px;color:${p.liked?'#FF006C':'#ccc'};"></i>
+        <span style="font-size:10px;color:#aaa;">${p.likes}</span>
+      </div>
     </div>`).join('');
+}
+
+function openPostDetail(id) {
+  const p = state.posts.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('rdSub').textContent = p.type==='notice' ? '공지' : '후기';
+  document.getElementById('rdTitle').textContent = p.title;
+  document.getElementById('rdBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;">${p.author[0]}</div>
+      <div><div style="font-size:13px;font-weight:500;color:#111;">${p.author}</div><div style="font-size:11px;color:#aaa;">${p.date}</div></div>
+    </div>
+    <div style="font-size:15px;font-weight:600;color:#111;margin-bottom:12px;">${p.title}</div>
+    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:20px;">${p.content}</div>
+    <div style="display:flex;align-items:center;gap:16px;padding-top:14px;border-top:0.5px solid #f0f0f0;">
+      <div onclick="toggleLike(${p.id});this.querySelector('i').className='ti ti-heart-filled';this.querySelector('i').style.color='#FF006C';" style="display:flex;align-items:center;gap:5px;font-size:14px;color:#666;cursor:pointer;">
+        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:20px;color:${p.liked?'#FF006C':'#ccc'};"></i>
+        <span>${p.likes}</span>
+      </div>
+    </div>`;
+  openOverlay('routineDetailOverlay');
 }
 function toggleLike(id) { const p=state.posts.find(x=>x.id===id); p.liked=!p.liked; p.likes+=p.liked?1:-1; if(p.liked)state.youth.commCount++; save(); renderHome(); }
 
