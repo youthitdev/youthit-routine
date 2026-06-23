@@ -229,7 +229,7 @@ input:focus { outline: none; border-color: #2E33BC; }
           <div class="chip" onclick="filterComm('review',this)">후기</div>
         </div>
         <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="postList"></div>
-        <button onclick="openSheet('writeSheetBg')" style="position:fixed;bottom:80px;right:calc(50% - 195px + 16px);width:48px;height:48px;border-radius:50%;background:#2E33BC;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(46,51,188,0.3);z-index:99;">
+        <button onclick="openCommWriteWithRoutine(null,'review')" style="position:fixed;bottom:80px;right:calc(50% - 195px + 16px);width:48px;height:48px;border-radius:50%;background:#2E33BC;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(46,51,188,0.3);z-index:99;">
           <i class="ti ti-plus" style="font-size:22px;color:white;"></i>
         </button>
       </div>
@@ -525,14 +525,25 @@ input:focus { outline: none; border-color: #2E33BC; }
     </div>
   </div>
 
-  <!-- 바텀시트: 글쓰기 -->
+  <!-- 바텀시트: 완료 루틴 선택 -->
   <div class="sheet-bg" id="writeSheetBg" onclick="closeSheet('writeSheetBg')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
-      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">후기 작성</div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:4px;">어떤 루틴에 대해 쓸까요?</div>
+      <div style="font-size:13px;color:#888;margin-bottom:16px;">완료한 루틴을 선택해주세요</div>
+      <div id="doneRoutineList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+    </div>
+  </div>
+
+  <!-- 바텀시트: 후기 작성 -->
+  <div class="sheet-bg" id="reviewWriteSheetBg" onclick="closeSheet('reviewWriteSheetBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:13px;color:#2E33BC;font-weight:500;margin-bottom:4px;" id="reviewWriteRoutineName"></div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">후기 남기기 ✍️</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="postTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
-      <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="postContent" rows="4" placeholder="어떤 루틴을 하면서 어땠는지 적어주세요."></textarea></div>
-      <button class="primary-btn" onclick="submitPost()">게시하기</button>
+      <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="postContent" rows="4" placeholder="루틴을 하면서 어땠는지 솔직하게 적어주세요."></textarea></div>
+      <button class="primary-btn" onclick="submitPost()">후기 게시하기</button>
     </div>
   </div>
 
@@ -964,7 +975,13 @@ function openRoutineDetail(id) {
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
   if(r.status==='recruit') body+=`<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;"><i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요</div><button class="primary-btn" onclick="joinRoutine(${r.id})">참여 신청하기</button>`;
-  else if(r.status==='done') body+=`<div style="text-align:center;padding:24px;color:#888;font-size:14px;">완료된 루틴이에요.<br>함께한 ${r.people}명, 수고했어요!</div>`;
+  else if(r.status==='done') body+=`
+    <div style="text-align:center;padding:16px 0 8px;">
+      <div style="font-size:32px;margin-bottom:8px;">🏅</div>
+      <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
+    </div>
+    <button class="primary-btn" onclick="closeOverlay('routineDetailOverlay');openCommWriteWithRoutine(${r.id},'review')" style="margin-bottom:10px;">✍️ 후기 남기기</button>
+    <button onclick="closeOverlay('routineDetailOverlay');openLetterOverlay(${r.id},'${r.title}')" style="width:100%;padding:14px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">💌 끗짱에게 편지 쓰기</button>`;
   document.getElementById('rdBody').innerHTML=body;
   openOverlay('routineDetailOverlay');
 }
@@ -1070,12 +1087,46 @@ function togglePostLike(id) {
   if(p.liked) state.youth.commCount++;
   save(); renderComm(commFilter);
 }
+function openCommWriteWithRoutine(routineId, type) {
+  // 완료 루틴 목록으로 글쓰기 시트 열기 (특정 루틴 선택된 상태로)
+  if(routineId) {
+    const r = state.routines.find(x=>x.id===routineId);
+    if(type==='review') {
+      document.getElementById('reviewWriteRoutineName').textContent = r.emoji+' '+r.title;
+      document.getElementById('postTitle').value='';
+      document.getElementById('postContent').value='';
+      openSheet('reviewWriteSheetBg');
+    } else if(type==='letter') {
+      openLetterOverlay(routineId, r.title);
+    }
+    return;
+  }
+  // 완료 루틴 목록 보여주기
+  const done = state.routines.filter(r=>r.status==='done');
+  if(done.length===0) {
+    alert('아직 완료한 루틴이 없어요. 루틴을 완주한 후 후기를 남길 수 있어요!');
+    return;
+  }
+  document.getElementById('doneRoutineList').innerHTML = done.map(r=>`
+    <div style="background:#f5f5f7;border-radius:14px;padding:14px;">
+      <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:10px;">${r.emoji} ${r.title}</div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px;">${r.period}</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeSheet('writeSheetBg');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:10px;background:#2E33BC;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기 남기기</button>
+        <button onclick="closeSheet('writeSheetBg');openCommWriteWithRoutine(${r.id},'letter')" style="flex:1;padding:10px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지 쓰기</button>
+      </div>
+    </div>`).join('');
+  openSheet('writeSheetBg');
+}
+
 function submitPost() {
   const t=document.getElementById('postTitle').value.trim();
   const c=document.getElementById('postContent').value.trim();
   if(!t||!c){alert('제목과 내용을 입력해주세요.');return;}
   state.posts.unshift({id:Date.now(),type:'review',title:t,content:c,author:state.youth.name,date:'방금',likes:0,liked:false});
-  save(); closeSheet('writeSheetBg');
+  save();
+  closeSheet('writeSheetBg');
+  closeSheet('reviewWriteSheetBg');
   document.getElementById('postTitle').value='';
   document.getElementById('postContent').value='';
   renderComm(commFilter);
