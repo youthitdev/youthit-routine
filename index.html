@@ -419,13 +419,10 @@ input:focus { outline: none; border-color: #2E33BC; }
     </div>
     <div class="overlay-body">
       <div>
-        <div class="field-label">오늘의 인증 사진 <span class="required">* 필수</span></div>
-        <div class="photo-upload" id="certPhotoUpload" onclick="document.getElementById('certPhotoInput').click()">
-          <i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i>
-          <div style="font-size:13px;color:#aaa;">사진을 추가해주세요</div>
-          <div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 인증이 불가해요</div>
-        </div>
-        <input type="file" id="certPhotoInput" accept="image/*" style="display:none;" onchange="handleCertPhoto(event)">
+        <div class="field-label">오늘의 인증 사진 <span class="required">* 필수</span> <span style="font-size:11px;color:#888;font-weight:400;">최대 5장</span></div>
+        <div id="certPhotoGrid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:6px;"></div>
+        <input type="file" id="certPhotoInput" accept="image/*" multiple style="display:none;" onchange="handleCertPhotos(event)">
+        <div id="certPhotoRequired" style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;margin-top:4px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 인증이 불가해요</div>
       </div>
       <div>
         <div class="field-label">오늘 어땠어요? <span class="required">* 필수</span></div>
@@ -835,7 +832,13 @@ function renderRoutineGrid(type, q) {
 
   const hl=(text)=>q?text.replace(new RegExp(`(${q})`, 'gi'),'<mark style="background:#FFF176;border-radius:2px;padding:0 1px;">$1</mark>'):text;
 
-  grid.innerHTML = filtered.map(r=>{
+  // 참여중 루틴 항상 상단 고정
+  const sorted = [...filtered].sort((a,b) => {
+    if(a.status==='active' && b.status!=='active') return -1;
+    if(a.status!=='active' && b.status==='active') return 1;
+    return 0;
+  });
+  grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
     const cardBg=isDone?'#f0f0f0':'#fff';
     const cardBorder=isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
@@ -1008,11 +1011,9 @@ function renderCert() {
 }
 function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title); }
 function openCertForm(id,title) {
-  currentCertId=id; certHasPhoto=false;
+  currentCertId=id; certHasPhoto=false; certPhotos=[];
   document.getElementById('certFormTitle').textContent=title;
-  const u=document.getElementById('certPhotoUpload');
-  u.className='photo-upload';
-  u.innerHTML=`<i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">사진을 추가해주세요</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 인증이 불가해요</div>`;
+  renderCertPhotoGrid();
   document.getElementById('certMemo').value='';
   document.getElementById('certCharCount').textContent='0';
   document.getElementById('certCountHint').textContent='최소 15자 이상 작성해주세요';
@@ -1020,17 +1021,50 @@ function openCertForm(id,title) {
   document.getElementById('certSubmitBtn').disabled=true;
   openOverlay('certFormOverlay');
 }
-function handleCertPhoto(e) {
-  const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    certHasPhoto=true;
-    const el=document.getElementById('certPhotoUpload');
-    el.className='photo-upload has-photo';
-    el.innerHTML=`<img class="photo-prev-img" src="${ev.target.result}"><div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);border-radius:20px;padding:4px 10px;font-size:11px;color:white;">변경</div>`;
-    checkCertBtn();
-  };
-  r.readAsDataURL(f);
+let certPhotos = [];
+
+function handleCertPhotos(e) {
+  const files = Array.from(e.target.files);
+  const remaining = 5 - certPhotos.length;
+  const toAdd = files.slice(0, remaining);
+  toAdd.forEach(file => {
+    const r = new FileReader();
+    r.onload = ev => {
+      certPhotos.push(ev.target.result);
+      certHasPhoto = certPhotos.length > 0;
+      renderCertPhotoGrid();
+      checkCertBtn();
+    };
+    r.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function renderCertPhotoGrid() {
+  const grid = document.getElementById('certPhotoGrid');
+  const req = document.getElementById('certPhotoRequired');
+  let html = certPhotos.map((src, i) => `
+    <div style="aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;">
+      <img src="${src}" style="width:100%;height:100%;object-fit:cover;">
+      <button onclick="removeCertPhoto(${i})" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ti-x" style="font-size:11px;color:white;"></i>
+      </button>
+    </div>`).join('');
+  if(certPhotos.length < 5) {
+    html += `<div onclick="document.getElementById('certPhotoInput').click()" style="aspect-ratio:1;border-radius:10px;border:1.5px dashed #ccc;background:#f9f9f9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;">
+      <i class="ti ti-plus" style="font-size:20px;color:#aaa;"></i>
+      <span style="font-size:10px;color:#aaa;">${certPhotos.length}/5</span>
+    </div>`;
+  }
+  grid.innerHTML = html;
+  req.style.display = certPhotos.length > 0 ? 'none' : 'flex';
+}
+
+function removeCertPhoto(idx) {
+  certPhotos.splice(idx, 1);
+  certHasPhoto = certPhotos.length > 0;
+  renderCertPhotoGrid();
+  checkCertBtn();
 }
 function updateCertCount() {
   const v=document.getElementById('certMemo').value.length;
