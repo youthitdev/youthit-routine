@@ -216,11 +216,6 @@ input:focus { outline: none; border-color: #2E33BC; }
         </div>
       </div>
 
-      <!-- 인증 -->
-      <div class="tab-page" id="page-cert">
-        <div style="padding:16px;display:flex;flex-direction:column;gap:8px;" id="certList"></div>
-      </div>
-
       <!-- 커뮤니티 -->
       <div class="tab-page" id="page-comm">
         <div style="display:flex;gap:8px;padding:12px 16px 8px;" id="commFilter">
@@ -374,7 +369,6 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="youthNav" style="display:contents;">
       <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="nav-routine" onclick="switchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
-      <div class="nav-item" id="nav-cert" onclick="switchTab('cert')"><i class="ti ti-camera"></i><span>인증</span></div>
       <div class="nav-item" id="nav-comm" onclick="switchTab('comm')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="nav-my" onclick="switchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
@@ -477,6 +471,15 @@ input:focus { outline: none; border-color: #2E33BC; }
       <button class="primary-btn" id="letterSubmitBtn" disabled onclick="submitLetter()">편지 보내기 💌</button>
       <button onclick="closeOverlay('letterOverlay')" style="width:100%;padding:12px;background:none;border:none;font-size:14px;color:#aaa;cursor:pointer;">나중에 쓸게요</button>
     </div>
+  </div>
+
+  <!-- 편지 전체보기 -->
+  <div class="overlay" id="letterAllOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('letterAllOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">받은 편지 💌</div></div>
+    </div>
+    <div class="overlay-body" id="letterAllBody"></div>
   </div>
 
   <!-- 편지 상세 -->
@@ -739,7 +742,6 @@ function switchTab(tab) {
   document.getElementById('nav-'+tab).classList.add('active');
   if(tab==='home') renderHome();
   else if(tab==='routine') renderRoutine();
-  else if(tab==='cert') renderCert();
   else if(tab==='comm') renderComm('all');
   else if(tab==='my') renderMy();
 }
@@ -1267,7 +1269,13 @@ function kRenderRoutineTab() {
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
   const filtered=type==='all'?state.routines:state.routines.filter(r=>r.status===type);
-  document.getElementById('kRoutineGrid').innerHTML=filtered.map(r=>{
+  // 진행중 루틴 항상 상단 고정
+  const kSorted = [...filtered].sort((a,b)=>{
+    if(a.status==='active' && b.status!=='active') return -1;
+    if(a.status!=='active' && b.status==='active') return 1;
+    return 0;
+  });
+  document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active';
     const cardBg=isDone?'#f0f0f0':'#fff';
     const cardBorder=isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
@@ -1472,9 +1480,11 @@ function kRenderMy() {
 
   // 받은 편지
   const letters=state.letters||[];
-  document.getElementById('kLetterCount').textContent=`${letters.length}통`;
+  const unread = letters.filter(l=>!l.opened).length;
+  document.getElementById('kLetterCount').textContent=`${letters.length}통${unread>0?' · NEW '+unread:''}`;
+  const showLetters = letters.slice(0,2);
   document.getElementById('kLetterList').innerHTML=letters.length>0
-    ?letters.map(l=>`
+    ?showLetters.map(l=>`
       <div onclick="openLetter(${l.id})" style="padding:14px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;background:${l.opened?'#fff':'#f0f1fb'};">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${l.from[0]}</div>
@@ -1484,10 +1494,26 @@ function kRenderMy() {
         </div>
         <div style="font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
       </div>`).join('')
+      +(letters.length>2?`<div class="more-btn" onclick="openAllLetters()">편지 더보기 (${letters.length}통) <i class="ti ti-chevron-right" style="font-size:13px;"></i></div>`:'')
     :`<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 받은 편지가 없어요</div>`;
 
   kRenderSwitchBtn();
 }
+function openAllLetters() {
+  const letters = state.letters || [];
+  document.getElementById('letterAllBody').innerHTML = letters.map(l=>`
+    <div onclick="openLetter(${l.id})" style="background:${l.opened?'#fff':'#f0f1fb'};border:0.5px solid ${l.opened?'#e8e8e8':'#2E33BC'};border-radius:16px;padding:14px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${l.from[0]}</div>
+        <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${l.from} <span style="font-size:11px;color:#888;font-weight:400;">· ${l.routine}</span></div></div>
+        ${!l.opened?'<span style="background:#FF006C;color:white;font-size:10px;padding:2px 7px;border-radius:10px;">NEW</span>':''}
+        <span style="font-size:11px;color:#aaa;">${l.date}</span>
+      </div>
+      <div style="font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
+    </div>`).join('');
+  openOverlay('letterAllOverlay');
+}
+
 function openLetter(id) {
   const l=state.letters.find(x=>x.id===id);
   if(!l) return;
