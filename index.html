@@ -318,6 +318,9 @@ input:focus { outline: none; border-color: #2E33BC; }
           <div class="chip" onclick="kFilterReview('review',this)">후기</div>
         </div>
         <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="kReviewFeed"></div>
+        <button onclick="openSheet('kWriteSheetBg')" style="position:fixed;bottom:80px;right:calc(50% - 195px + 16px);width:48px;height:48px;border-radius:50%;background:#2E33BC;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(46,51,188,0.3);z-index:99;">
+          <i class="ti ti-plus" style="font-size:22px;color:white;"></i>
+        </button>
       </div>
 
       <!-- 끗짱 MY -->
@@ -343,22 +346,16 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
           </div>
 
-          <div class="stats-grid-4">
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🧑</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyYouth">0</span><span style="font-size:11px;color:#888;">함께한 청소년</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
-          </div>
-
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">💌 받은 편지</div><span style="font-size:12px;color:#888;" id="kLetterCount"></span></div>
             <div id="kLetterList"></div>
           </div>
 
-          <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">함께한 청소년 후기</div><span style="font-size:12px;color:#888;" id="kReviewCount"></span></div>
-            <div id="kReviewList"></div>
-            <div class="more-btn" onclick="openOverlay('reviewAllOverlay')">후기 더보기 <i class="ti ti-chevron-right" style="font-size:13px;"></i></div>
+          <div class="stats-grid-4">
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🧑</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyYouth">0</span><span style="font-size:11px;color:#888;">함께한 청소년</span></div>
+            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
           </div>
 
           <div class="menu-card">
@@ -384,7 +381,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="kkutjjangNav" style="display:none;contents;">
       <div class="nav-item active" id="knav-home" onclick="kSwitchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴관리</span></div>
-      <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>후기</span></div>
+      <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="knav-my" onclick="kSwitchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
   </nav>
@@ -536,6 +533,17 @@ input:focus { outline: none; border-color: #2E33BC; }
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="postTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="postContent" rows="4" placeholder="어떤 루틴을 하면서 어땠는지 적어주세요."></textarea></div>
       <button class="primary-btn" onclick="submitPost()">게시하기</button>
+    </div>
+  </div>
+
+  <!-- 끗짱 글쓰기 바텀시트 -->
+  <div class="sheet-bg" id="kWriteSheetBg" onclick="closeSheet('kWriteSheetBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
+      <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
+      <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
+      <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
     </div>
   </div>
 
@@ -1346,6 +1354,22 @@ function toggleKPostLike(id) {
 }
 
 // ════════════════════════════════════════════════════════
+// 끗짱 커뮤니티 글쓰기
+// ════════════════════════════════════════════════════════
+function kSubmitPost() {
+  const t = document.getElementById('kPostTitle').value.trim();
+  const c = document.getElementById('kPostContent').value.trim();
+  if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
+  state.posts.unshift({id:Date.now(),type:'review',title:t,content:c,author:state.kkutjjang.name,date:'방금',likes:0,liked:false});
+  save();
+  closeSheet('kWriteSheetBg');
+  document.getElementById('kPostTitle').value='';
+  document.getElementById('kPostContent').value='';
+  kResetReviewFilter();
+  kRenderReviewTab('all');
+}
+
+// ════════════════════════════════════════════════════════
 // 끗짱 MY
 // ════════════════════════════════════════════════════════
 function kRenderMy() {
@@ -1376,26 +1400,6 @@ function kRenderMy() {
         <div style="font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
       </div>`).join('')
     :`<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 받은 편지가 없어요</div>`;
-
-  // 후기
-  document.getElementById('kReviewCount').textContent=state.reviews.length+'명';
-  document.getElementById('kReviewList').innerHTML=state.reviews.slice(0,2).map(rv=>`
-    <div style="padding:12px 16px;border-top:0.5px solid #f0f0f0;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
-        <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${rv.name[0]}</div>
-        <div style="font-size:13px;font-weight:500;color:#111;">${rv.name}</div>
-        <div style="font-size:11px;color:#888;margin-left:auto;">${rv.routine}</div>
-      </div>
-      <div style="font-size:13px;color:#111;line-height:1.6;background:#f5f5f7;border-radius:10px;padding:10px 12px;">${rv.text}</div>
-      <div style="font-size:11px;color:#aaa;margin-top:6px;">${rv.date}</div>
-    </div>`).join('');
-
-  document.getElementById('reviewAllBody').innerHTML=state.reviews.map(rv=>`
-    <div style="background:#fff;border-radius:16px;border:0.5px solid #e8e8e8;padding:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${rv.name[0]}</div><div style="font-size:13px;font-weight:500;color:#111;">${rv.name}</div><div style="font-size:11px;color:#888;margin-left:auto;">${rv.routine}</div></div>
-      <div style="font-size:13px;color:#111;line-height:1.6;background:#f5f5f7;border-radius:10px;padding:10px 12px;">${rv.text}</div>
-      <div style="font-size:11px;color:#aaa;margin-top:6px;">${rv.date}</div>
-    </div>`).join('');
 
   kRenderSwitchBtn();
 }
