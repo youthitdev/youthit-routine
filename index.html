@@ -1046,9 +1046,7 @@ async function openReport(){
 // ── 끗짱 홈 ────────────────────────────────────────────────
 function kRenderHome(){
   const s=kStats(),lv=getKLevel(s.routineCount);
-  document.getElementById('kGreeting').textContent=state.kkutjjang.name+' 끗짱님';
-  document.getElementById('kLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
-  document.getElementById('kLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
+
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   const active=state.routines.filter(r=>r.status==='active');
