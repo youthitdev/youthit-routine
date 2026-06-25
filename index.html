@@ -622,12 +622,22 @@ input:focus { outline: none; border-color: #2E33BC; }
 // ════════════════════════════════════════════════════════
 const now = Date.now(), H = 3600000;
 const CERT_FEED = [
-  {id:1,routineId:1,name:'지민',day:'14일째',text:'오늘도 6시에 일어났어요! 스트레칭하고 나니 개운해요.',ts:now-2*H,likes:5,liked:false,comments:3,color:'#B5D4F4'},
-  {id:2,routineId:1,name:'현우',day:'14일째',text:'3일 연속이에요. 생각보다 어렵지 않아요!',ts:now-4*H,likes:8,liked:false,comments:2,color:'#C0DD97'},
-  {id:3,routineId:4,name:'서연',day:'8일째',text:'계란 후라이 처음 만들었어요. 뿌듯!',ts:now-6*H,likes:12,liked:false,comments:4,color:'#FAC775'},
-  {id:4,routineId:1,name:'나연',day:'12일째',text:'오늘 할 일 3가지 적고 나니 하루가 더 알차요.',ts:now-10*H,likes:6,liked:false,comments:1,color:'#F4C0D1'},
-  {id:5,routineId:4,name:'준서',day:'6일째',text:'라면이라도 직접 끓여먹었어요 ㅋㅋ',ts:now-15*H,likes:9,liked:false,comments:2,color:'#B5D4F4'},
-  {id:6,routineId:1,name:'민지',day:'10일째',text:'스트레칭 5분이 이제 습관이 됐어요.',ts:now-20*H,likes:7,liked:false,comments:3,color:'#C0DD97'},
+  {id:1,routineId:1,name:'지민',day:'14일째',text:'오늘도 6시에 일어났어요! 스트레칭하고 나니 개운해요.',ts:now-2*H,likes:5,liked:false,color:'#B5D4F4',comments:[
+    {id:1,author:'현우',text:'대박 👍 나도 해야겠다!',ts:now-1*H},
+    {id:2,author:'서연',text:'짱이다 💪',ts:now-30*60000},
+  ]},
+  {id:2,routineId:1,name:'현우',day:'14일째',text:'3일 연속이에요. 생각보다 어렵지 않아요!',ts:now-4*H,likes:8,liked:false,color:'#C0DD97',comments:[
+    {id:1,author:'지민',text:'오 대단해요!',ts:now-3*H},
+  ]},
+  {id:3,routineId:4,name:'서연',day:'8일째',text:'계란 후라이 처음 만들었어요. 뿌듯!',ts:now-6*H,likes:12,liked:false,color:'#FAC775',comments:[
+    {id:1,author:'나연',text:'맛있겠다 ㅋㅋ',ts:now-5*H},
+    {id:2,author:'준서',text:'요리 고수!',ts:now-4*H},
+  ]},
+  {id:4,routineId:1,name:'나연',day:'12일째',text:'오늘 할 일 3가지 적고 나니 하루가 더 알차요.',ts:now-10*H,likes:6,liked:false,color:'#F4C0D1',comments:[]},
+  {id:5,routineId:4,name:'준서',day:'6일째',text:'라면이라도 직접 끓여먹었어요 ㅋㅋ',ts:now-15*H,likes:9,liked:false,color:'#B5D4F4',comments:[
+    {id:1,author:'서연',text:'라면도 요리죠 ㅎㅎ',ts:now-14*H},
+  ]},
+  {id:6,routineId:1,name:'민지',day:'10일째',text:'스트레칭 5분이 이제 습관이 됐어요.',ts:now-20*H,likes:7,liked:false,color:'#C0DD97',comments:[]},
 ];
 
 const DEFAULT = {
@@ -934,7 +944,7 @@ function openRoutineFeed(routineId) {
                   <span id="feedLike_${c.id}">${c.likes}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;">
-                  <i class="ti ti-message-circle" style="font-size:13px;"></i>${c.comments}
+                  <i class="ti ti-message-circle" style="font-size:13px;"></i>${(c.comments||[]).length}
                 </div>
                 <span style="font-size:10px;color:#ccc;margin-left:auto;">${timeAgo(c.ts)}</span>
               </div>
@@ -964,24 +974,81 @@ function toggleCertLike(id) {
   });
 }
 function openCertFeedDetail(id) {
-  const c=CERT_FEED.find(x=>x.id===id);
-  const r=state.routines.find(x=>x.id===c.routineId);
-  document.getElementById('rdSub').textContent=r.title+' · '+c.day;
-  document.getElementById('rdTitle').textContent=c.name;
-  document.getElementById('rdBody').innerHTML=`
-    <div style="background:${c.color};border-radius:16px;height:220px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;"><i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i></div>
+  const c = CERT_FEED.find(x=>x.id===id);
+  const r = state.routines.find(x=>x.id===c.routineId);
+  document.getElementById('rdSub').textContent = r.title+' · '+c.day;
+  document.getElementById('rdTitle').textContent = c.name;
+  renderCertDetail(id);
+  openOverlay('routineDetailOverlay');
+}
+
+function renderCertDetail(id) {
+  const c = CERT_FEED.find(x=>x.id===id);
+  const comments = c.comments||[];
+  document.getElementById('rdBody').innerHTML = `
+    <div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
+      <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
+    </div>
     <div style="font-size:14px;color:#111;line-height:1.7;margin-bottom:6px;">${c.text}</div>
-    <div style="font-size:12px;color:#aaa;margin-bottom:20px;">${timeAgo(c.ts)}</div>
-    <div style="display:flex;align-items:center;gap:16px;">
-      <div onclick="toggleCertLike(${c.id})" style="display:flex;align-items:center;gap:5px;font-size:14px;color:#666;cursor:pointer;">
-        <i class="ti ti-heart${c.liked?'-filled':''}" id="rdHeart_${c.id}" style="font-size:20px;color:${c.liked?'#FF006C':'#ccc'};"></i>
-        <span id="rdLike_${c.id}">${c.likes}</span>
+    <div style="font-size:12px;color:#aaa;margin-bottom:16px;">${timeAgo(c.ts)}</div>
+
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:16px;">
+      <div onclick="toggleCertLike(${c.id})" style="display:flex;align-items:center;gap:6px;font-size:14px;color:#666;cursor:pointer;">
+        <i class="ti ti-heart${c.liked?'-filled':''}" id="rdHeart_${c.id}" style="font-size:22px;color:${c.liked?'#FF006C':'#ccc'};"></i>
+        <span id="rdLike_${c.id}" style="font-size:14px;color:#666;">${c.likes}</span>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:14px;color:#666;">
-        <i class="ti ti-message-circle" style="font-size:20px;color:#ccc;"></i>${c.comments}
+      <div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#666;">
+        <i class="ti ti-message-circle" style="font-size:22px;color:#aaa;"></i>
+        <span>${comments.length}</span>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:12px;">댓글 ${comments.length}개</div>
+
+    <div id="commentList_${c.id}" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      ${comments.map(cm=>`
+        <div style="display:flex;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+          <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+            <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
+            <div style="font-size:13px;color:#333;line-height:1.5;">${cm.text}</div>
+            <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
+          </div>
+        </div>`).join('')}
+      ${comments.length===0?'<div style="text-align:center;padding:12px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요!</div>':''}
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${state.youth.name[0]}</div>
+      <div style="flex:1;display:flex;gap:6px;align-items:center;background:#f5f5f7;border-radius:24px;padding:6px 12px;">
+        <input type="text" id="commentInput_${c.id}" placeholder="응원 댓글을 남겨보세요..." maxlength="100"
+          style="flex:1;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
+          onkeydown="if(event.key==='Enter')submitComment(${c.id})">
+        <button onclick="submitComment(${c.id})" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;">
+          <i class="ti ti-send" style="font-size:18px;color:#2E33BC;"></i>
+        </button>
       </div>
     </div>`;
-  openOverlay('routineDetailOverlay');
+}
+
+function submitComment(certId) {
+  const input = document.getElementById('commentInput_'+certId);
+  const text = input.value.trim();
+  if(!text) return;
+  const c = CERT_FEED.find(x=>x.id===certId);
+  if(!c.comments) c.comments=[];
+  c.comments.push({
+    id: Date.now(),
+    author: state.youth.name,
+    text,
+    ts: Date.now()
+  });
+  state.youth.commCount++;
+  save();
+  renderCertDetail(certId);
+  // 피드 카운트 업데이트
+  const li = document.getElementById('feedLike_'+certId);
+  if(li) li.textContent = c.likes;
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
