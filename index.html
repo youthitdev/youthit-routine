@@ -937,6 +937,9 @@ function openRoutineFeed(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
   document.getElementById('feedOverlaySub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('feedOverlayTitle').textContent=r.emoji+' '+r.title;
+  // 역할 색상 헤더에 직접 적용
+  const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
+  document.querySelector('#routineFeedOverlay .overlay-hd').style.background = roleColor;
   const certs=CERT_FEED.filter(c=>c.routineId===routineId&&isWithin24h(c.ts));
   let html=certs.length===0
     ?`<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;">아직 오늘 인증한 친구가 없어요.<br>첫 번째로 인증해볼까요?</div>`
@@ -1800,6 +1803,10 @@ const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay
 
 function openOverlay(id) {
   document.getElementById(id).classList.add('open');
+  // 역할 색상 헤더에 적용
+  const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
+  const hd = document.querySelector('#'+id+' .overlay-hd');
+  if(hd) hd.style.background = roleColor;
   if(DEPTH3_OVERLAYS.includes(id)) {
     document.getElementById('mainNav').style.display = 'none';
   }
