@@ -1793,13 +1793,26 @@ function submitLetter() {
 // ════════════════════════════════════════════════════════
 // 공통 오버레이/시트
 // ════════════════════════════════════════════════════════
-function openOverlay(id) { document.getElementById(id).classList.add('open'); }
+// 3뎁스 오버레이 목록 (탭 숨김)
+const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay'];
+
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+  if(DEPTH3_OVERLAYS.includes(id)) {
+    document.getElementById('mainNav').style.display = 'none';
+  }
+}
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
   if(id==='routineDetailOverlay') {
     const bar=document.getElementById('rdCommentBar');
     if(bar) bar.style.display='none';
     currentCertDetailId=null;
+  }
+  // 3뎁스 오버레이 닫힐 때 탭 복원 (다른 3뎁스 오버레이가 없을 때만)
+  if(DEPTH3_OVERLAYS.includes(id)) {
+    const anyOpen = DEPTH3_OVERLAYS.some(oid => oid!==id && document.getElementById(oid)?.classList.contains('open'));
+    if(!anyOpen) document.getElementById('mainNav').style.display = '';
   }
 }
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
