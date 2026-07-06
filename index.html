@@ -156,6 +156,26 @@ input:focus { outline: none; border-color: #2E33BC; }
 .ob-next-btn { width: 100%; max-width: 327px; padding: 15px; background: #2E33BC; color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; }
 .ob-skip { font-size: 13px; color: #aaa; cursor: pointer; padding: 4px 12px; }
 
+/* 완주 축하 화면 */
+.complete-scr { position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateX(390px); width: 100%; max-width: 390px; height: 100%; background: linear-gradient(160deg, #1a1e8a 0%, #2E33BC 50%, #4B50D4 100%); z-index: 400; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.35s ease; overflow: hidden; padding: 32px 24px; }
+.complete-scr.open { transform: translateX(-50%) translateX(0); }
+.confetti-wrap { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti-piece { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confettiFall linear infinite; }
+@keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+.badge-wrap { position: relative; margin-bottom: 24px; }
+.badge-glow { position: absolute; inset: -16px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); animation: badgePulse 2s ease-in-out infinite; }
+@keyframes badgePulse { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.15);opacity:1} }
+.badge-circle { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #FFD700, #FFA500); display: flex; align-items: center; justify-content: center; font-size: 52px; box-shadow: 0 8px 32px rgba(255,180,0,0.5), 0 0 0 6px rgba(255,215,0,0.3); position: relative; z-index: 1; }
+.badge-ribbon { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); background: #FFD700; color: #7A4F00; font-size: 10px; font-weight: 700; padding: 3px 12px; border-radius: 10px; white-space: nowrap; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+.complete-title { font-size: 26px; font-weight: 800; color: white; text-align: center; letter-spacing: -0.5px; margin-bottom: 6px; }
+.complete-routine-name { font-size: 16px; color: rgba(255,255,255,0.85); text-align: center; margin-bottom: 24px; }
+.complete-stats { display: flex; gap: 12px; margin-bottom: 28px; }
+.complete-stat { background: rgba(255,255,255,0.15); border-radius: 14px; padding: 12px 18px; text-align: center; backdrop-filter: blur(4px); }
+.complete-stat-val { font-size: 22px; font-weight: 700; color: white; }
+.complete-stat-label { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+.complete-btn-primary { width: 100%; max-width: 280px; padding: 15px; background: white; color: #2E33BC; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
+.complete-btn-secondary { padding: 8px 24px; background: none; border: none; font-size: 14px; color: rgba(255,255,255,0.5); cursor: pointer; }
+
 /* AI 로딩 */
 .loading-dots { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 16px 0; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #2E33BC; animation: pulse 1.2s infinite; }
@@ -665,13 +685,31 @@ input:focus { outline: none; border-color: #2E33BC; }
   </div>
 
   <!-- 완료 화면: 루틴 완주 -->
-  <div class="success-scr" id="completeSuccess">
-    <div style="font-size:56px;margin-bottom:8px;">🏅</div>
-    <div style="font-size:22px;font-weight:700;color:#111;" id="completeRoutineName"></div>
-    <div style="font-size:15px;color:#888;margin-top:4px;">완주했어요!</div>
-    <div style="font-size:13px;color:#aaa;text-align:center;line-height:1.6;margin-top:8px;">함께한 끗짱에게<br>소감을 전해볼까요?</div>
-    <button class="primary-btn" style="width:auto;padding:12px 32px;margin-top:8px;" onclick="openLetterFromComplete()">💌 편지 쓰기</button>
-    <button onclick="closeCompleteSuccess()" style="padding:8px 24px;background:none;border:none;font-size:14px;color:#aaa;cursor:pointer;">나중에 쓸게요</button>
+  <div class="complete-scr" id="completeSuccess">
+    <div class="confetti-wrap" id="confettiWrap"></div>
+    <div class="badge-wrap">
+      <div class="badge-glow"></div>
+      <div class="badge-circle" id="completeBadgeEmoji">🏅</div>
+      <div class="badge-ribbon">완주 배지 획득!</div>
+    </div>
+    <div class="complete-title">완주 축하해요! 🎉</div>
+    <div class="complete-routine-name" id="completeRoutineName"></div>
+    <div class="complete-stats">
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="completeDays">21</div>
+        <div class="complete-stat-label">총 일수</div>
+      </div>
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="completeCerts">0</div>
+        <div class="complete-stat-label">인증 횟수</div>
+      </div>
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="completeRate">0%</div>
+        <div class="complete-stat-label">완주율</div>
+      </div>
+    </div>
+    <button class="complete-btn-primary" onclick="openLetterFromComplete()">💌 끗짱에게 편지 쓰기</button>
+    <button class="complete-btn-secondary" onclick="closeCompleteSuccess()">나중에 쓸게요</button>
   </div>
 
   <!-- 완료 화면: 루틴 등록 -->
@@ -1810,10 +1848,35 @@ let currentLetterRoutineId=null;
 function openCompleteSuccess(routineId) {
   currentLetterRoutineId=routineId;
   const r=state.routines.find(x=>x.id===routineId);
-  document.getElementById('completeRoutineName').textContent=r?`${r.emoji} ${r.title}`:'';
+  if(r) {
+    document.getElementById('completeBadgeEmoji').textContent=r.emoji||'🏅';
+    document.getElementById('completeRoutineName').textContent=`${r.emoji} ${r.title}`;
+    // 기간 계산
+    let days=21;
+    if(r.period){const parts=r.period.split('–');if(parts.length===2){const[s,e]=parts;const y=new Date().getFullYear();const sd=new Date(`${y}.${s.trim()}`),ed=new Date(`${y}.${e.trim()}`);if(!isNaN(sd)&&!isNaN(ed))days=Math.round((ed-sd)/86400000)+1;}}
+    document.getElementById('completeDays').textContent=days;
+    document.getElementById('completeCerts').textContent=r.certCount||0;
+    const rate=days>0?Math.round(((r.certCount||0)/days)*100):0;
+    document.getElementById('completeRate').textContent=Math.min(rate,100)+'%';
+  }
+  spawnConfetti();
   document.getElementById('completeSuccess').classList.add('open');
 }
-function closeCompleteSuccess() { document.getElementById('completeSuccess').classList.remove('open'); }
+function closeCompleteSuccess() {
+  document.getElementById('completeSuccess').classList.remove('open');
+  document.getElementById('confettiWrap').innerHTML='';
+}
+function spawnConfetti() {
+  const wrap=document.getElementById('confettiWrap');
+  wrap.innerHTML='';
+  const colors=['#FFD700','#FF6B6B','#4ECDC4','#83CA00','#FF006C','#fff','#FFA500','#A78BFA'];
+  for(let i=0;i<60;i++){
+    const el=document.createElement('div');
+    el.className='confetti-piece';
+    el.style.cssText=`left:${Math.random()*100}%;background:${colors[i%colors.length]};animation-duration:${2+Math.random()*3}s;animation-delay:${Math.random()*2}s;width:${6+Math.random()*6}px;height:${6+Math.random()*6}px;border-radius:${Math.random()>0.5?'50%':'2px'};`;
+    wrap.appendChild(el);
+  }
+}
 function openLetterFromComplete() {
   closeCompleteSuccess();
   const r=state.routines.find(x=>x.id===currentLetterRoutineId);
