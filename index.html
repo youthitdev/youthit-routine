@@ -140,6 +140,18 @@ input:focus { outline: none; border-color: #2E33BC; }
 .preview-rcard { background: #2E33BC; border-radius: 16px; padding: 14px; }
 .char-end { display: flex; justify-content: flex-end; font-size: 11px; color: #aaa; margin-top: 3px; }
 
+/* 스플래시 */
+.ys-splash { position: absolute; inset: 0; background: #2E7BEE; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 700; gap: 20px; transition: opacity 0.4s ease; }
+.ys-splash.hide { opacity: 0; pointer-events: none; }
+.ys-logo-wrap { position: relative; width: 100px; height: 100px; }
+.ys-ring { width: 100px; height: 100px; border-radius: 50%; border: 17px solid white; position: absolute; inset: 0; }
+.ys-arm { position: absolute; inset: 0; transform-origin: 50px 50px; animation: ysArm 1.2s cubic-bezier(0.5,0,0.3,1) forwards; }
+.ys-dot { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; border-radius: 50%; background: #FFD700; animation: ysDotPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 1.15s both; }
+@keyframes ysArm { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes ysDotPop { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.6); } 70% { transform: translateX(-50%) scale(0.85); } 100% { transform: translateX(-50%) scale(1); } }
+.ys-name { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
+.ys-sub { font-size: 13px; color: rgba(255,255,255,0.7); text-align: center; line-height: 1.7; }
+
 /* 온보딩 */
 .onboarding { position: absolute; inset: 0; background: #fff; z-index: 600; display: flex; flex-direction: column; overflow: hidden; }
 .onboarding.hide { display: none; }
@@ -186,6 +198,18 @@ input:focus { outline: none; border-color: #2E33BC; }
 </head>
 <body>
 <div class="app" id="app">
+
+  <!-- 스플래시 -->
+  <div class="ys-splash" id="ysSplash">
+    <div class="ys-logo-wrap">
+      <div class="ys-ring"></div>
+      <div class="ys-arm">
+        <div class="ys-dot"></div>
+      </div>
+    </div>
+    <div class="ys-name">Youth-it</div>
+    <div class="ys-sub">한 끗 한 끗을 쌓아<br>나다움을 찾는 시간</div>
+  </div>
 
   <!-- 온보딩 -->
   <div class="onboarding" id="onboardingScreen">
@@ -1966,6 +1990,12 @@ function obFinish() {
   localStorage.setItem('hankkut_onboarding_done', '1');
   document.getElementById('onboardingScreen').classList.add('hide');
 }
+
+// 스플래시 — 항상 표시, 2초 후 자동 제거
+setTimeout(() => {
+  document.getElementById('ysSplash').classList.add('hide');
+  setTimeout(() => document.getElementById('ysSplash').remove(), 400);
+}, 2000);
 
 // 온보딩 표시 여부 체크
 if(localStorage.getItem('hankkut_onboarding_done')) {
