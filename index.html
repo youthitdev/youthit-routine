@@ -140,6 +140,22 @@ input:focus { outline: none; border-color: #2E33BC; }
 .preview-rcard { background: #2E33BC; border-radius: 16px; padding: 14px; }
 .char-end { display: flex; justify-content: flex-end; font-size: 11px; color: #aaa; margin-top: 3px; }
 
+/* 온보딩 */
+.onboarding { position: absolute; inset: 0; background: #fff; z-index: 600; display: flex; flex-direction: column; overflow: hidden; }
+.onboarding.hide { display: none; }
+.ob-slides { display: flex; width: 400%; flex: 1; transition: transform 0.35s ease; }
+.ob-slide { width: 25%; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px 0; text-align: center; }
+.ob-illust { font-size: 80px; margin-bottom: 24px; line-height: 1; }
+.ob-title { font-size: 22px; font-weight: 700; color: #111; margin-bottom: 12px; letter-spacing: -0.5px; }
+.ob-desc { font-size: 15px; color: #666; line-height: 1.7; }
+.ob-highlight { color: #2E33BC; font-weight: 600; }
+.ob-bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: 24px 24px calc(40px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.ob-dots { display: flex; gap: 6px; }
+.ob-dot { width: 6px; height: 6px; border-radius: 3px; background: #e0e0e0; transition: all 0.3s; }
+.ob-dot.active { width: 20px; background: #2E33BC; }
+.ob-next-btn { width: 100%; max-width: 327px; padding: 15px; background: #2E33BC; color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.ob-skip { font-size: 13px; color: #aaa; cursor: pointer; padding: 4px 12px; }
+
 /* AI 로딩 */
 .loading-dots { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 16px 0; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #2E33BC; animation: pulse 1.2s infinite; }
@@ -150,6 +166,42 @@ input:focus { outline: none; border-color: #2E33BC; }
 </head>
 <body>
 <div class="app" id="app">
+
+  <!-- 온보딩 -->
+  <div class="onboarding" id="onboardingScreen">
+    <div class="ob-slides" id="obSlides">
+      <div class="ob-slide">
+        <div class="ob-illust">🌱</div>
+        <div class="ob-title">매일 한 끗씩,<br>함께 만드는 루틴</div>
+        <div class="ob-desc">작은 습관 하나가 하루를 바꿔요.<br><span class="ob-highlight">한끗루틴</span>에서 21일 챌린지를<br>함께 시작해봐요.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-illust">🧑‍🤝‍🧑</div>
+        <div class="ob-title">청소년과 끗짱,<br>함께하는 구조</div>
+        <div class="ob-desc"><span class="ob-highlight">청소년</span>은 루틴에 참여하고 인증해요.<br><span class="ob-highlight">끗짱</span>은 루틴을 만들고<br>청소년들을 응원해줘요.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-illust">📸</div>
+        <div class="ob-title">사진 + 글로<br>오늘을 기록해요</div>
+        <div class="ob-desc">매일 인증 사진과 15자 이상의 소감을<br>남기면 완료!<br>서로의 기록을 보며 함께 성장해요.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-illust">🤖</div>
+        <div class="ob-title">AI가 내 루틴을<br>분석해드려요</div>
+        <div class="ob-desc">꾸준히 기록하면 AI가<br>나만의 루틴 리포트와<br>책 추천을 해줘요.</div>
+      </div>
+    </div>
+    <div class="ob-bottom">
+      <div class="ob-dots">
+        <div class="ob-dot active" id="obDot0"></div>
+        <div class="ob-dot" id="obDot1"></div>
+        <div class="ob-dot" id="obDot2"></div>
+        <div class="ob-dot" id="obDot3"></div>
+      </div>
+      <button class="ob-next-btn" id="obNextBtn" onclick="obNext()">다음</button>
+      <div class="ob-skip" id="obSkip" onclick="obFinish()">건너뛰기</div>
+    </div>
+  </div>
 
   <!-- 로그인 -->
   <div class="splash" id="splashScreen">
@@ -1826,6 +1878,36 @@ function closeOverlay(id) {
 }
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+
+// ════════════════════════════════════════════════════════
+// 온보딩
+// ════════════════════════════════════════════════════════
+let obIdx = 0;
+const OB_TOTAL = 4;
+
+function obNext() {
+  if(obIdx < OB_TOTAL - 1) {
+    obIdx++;
+    document.getElementById('obSlides').style.transform = `translateX(-${obIdx * 25}%)`;
+    for(let i=0;i<OB_TOTAL;i++) document.getElementById('obDot'+i).classList.toggle('active', i===obIdx);
+    if(obIdx === OB_TOTAL - 1) {
+      document.getElementById('obNextBtn').textContent = '시작하기 🚀';
+      document.getElementById('obSkip').style.visibility = 'hidden';
+    }
+  } else {
+    obFinish();
+  }
+}
+
+function obFinish() {
+  localStorage.setItem('hankkut_onboarding_done', '1');
+  document.getElementById('onboardingScreen').classList.add('hide');
+}
+
+// 온보딩 표시 여부 체크
+if(localStorage.getItem('hankkut_onboarding_done')) {
+  document.getElementById('onboardingScreen').classList.add('hide');
+}
 
 // ════════════════════════════════════════════════════════
 // 초기화
