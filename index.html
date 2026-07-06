@@ -188,6 +188,10 @@ input:focus { outline: none; border-color: #2E33BC; }
 .complete-btn-primary { width: 100%; max-width: 280px; padding: 15px; background: white; color: #2E33BC; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
 .complete-btn-secondary { padding: 8px 24px; background: none; border: none; font-size: 14px; color: rgba(255,255,255,0.5); cursor: pointer; }
 
+/* 나다움 토스트 */
+.nadaeum-toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-20px); background: #111; color: white; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 20px; z-index: 999; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; white-space: nowrap; }
+.nadaeum-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* AI 로딩 */
 .loading-dots { display: flex; gap: 4px; align-items: center; justify-content: center; padding: 16px 0; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #2E33BC; animation: pulse 1.2s infinite; }
@@ -198,6 +202,9 @@ input:focus { outline: none; border-color: #2E33BC; }
 </head>
 <body>
 <div class="app" id="app">
+
+  <!-- 나다움 토스트 -->
+  <div class="nadaeum-toast" id="nadaeumToast"></div>
 
   <!-- 스플래시 -->
   <div class="ys-splash" id="ysSplash">
@@ -285,6 +292,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div style="display:flex;gap:16px;">
               <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">📸 <span id="homeCertCount">0</span>회</div>
               <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">💬 <span id="homeCommCount">0</span>회</div>
+              <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">✨ <span class="nadaeum-val">0N</span></div>
             </div>
           </div>
           <div class="section-card">
@@ -347,6 +355,15 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입</div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openSheet('editProfileBg')"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
+          </div>
+          <div style="background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px;">내 나다움 포인트</div>
+              <div style="font-size:24px;font-weight:700;color:white;"><span class="nadaeum-val">0N</span></div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">인증 +10N · 댓글 +1N<br>후기 +30N</div>
+            </div>
           </div>
           <div class="stats-grid-3">
             <div class="stat-card"><span style="font-size:18px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label">총 인증 수</span></div>
@@ -772,7 +789,7 @@ const CERT_FEED = [
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[]},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,nadaeumToday:{date:'',certs:0,comments:0},nadaeumReviews:[]},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
     {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
@@ -910,6 +927,7 @@ function renderHome() {
   document.getElementById('homeLevelBadge').textContent = `${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('homeCertCount').textContent = state.youth.certCount;
   document.getElementById('homeCommCount').textContent = state.youth.commCount;
+  renderNadaeum();
 
   const active = state.routines.filter(r=>r.status==='active');
   document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
@@ -1173,6 +1191,7 @@ function submitCommentFromBar() {
   if(!c.comments) c.comments=[];
   c.comments.push({id:Date.now(), author:state.youth.name, text, ts:Date.now()});
   state.youth.commCount++;
+  earnNadaeum('comment');
   save();
   input.value='';
   // 댓글 목록 업데이트
@@ -1214,6 +1233,7 @@ function submitComment(certId) {
     ts: Date.now()
   });
   state.youth.commCount++;
+  earnNadaeum('comment');
   save();
   renderCertDetail(certId);
   // 피드 카운트 업데이트
@@ -1353,10 +1373,57 @@ function updateCertCount() {
   checkCertBtn();
 }
 function checkCertBtn() { document.getElementById('certSubmitBtn').disabled=!(certHasPhoto&&document.getElementById('certMemo').value.length>=15); }
+// ════════════════════════════════════════════════════════
+// 나다움 포인트
+// ════════════════════════════════════════════════════════
+let nadaeumToastTimer=null;
+function showNadaeumToast(msg) {
+  const el=document.getElementById('nadaeumToast');
+  el.textContent=msg;
+  el.classList.add('show');
+  if(nadaeumToastTimer) clearTimeout(nadaeumToastTimer);
+  nadaeumToastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+function todayKey() { return new Date().toDateString(); }
+function resetTodayIfNeeded() {
+  if(!state.youth.nadaeumToday) state.youth.nadaeumToday={date:'',certs:0,comments:0};
+  if(state.youth.nadaeumToday.date !== todayKey()) {
+    state.youth.nadaeumToday={date:todayKey(),certs:0,comments:0};
+  }
+}
+function earnNadaeum(type, routineId) {
+  if(!state.youth.nadaeum) state.youth.nadaeum=0;
+  if(!state.youth.nadaeumReviews) state.youth.nadaeumReviews=[];
+  resetTodayIfNeeded();
+  const t=state.youth.nadaeumToday;
+  let earned=0, msg='';
+  if(type==='cert') {
+    if(t.certs<1) { earned=10; t.certs++; msg='📸 인증 +10 나다움'; }
+  } else if(type==='comment') {
+    if(t.comments<5) { earned=1; t.comments++; msg='💬 댓글 +1 나다움'; }
+  } else if(type==='review') {
+    if(routineId && !state.youth.nadaeumReviews.includes(routineId)) {
+      earned=30; state.youth.nadaeumReviews.push(routineId); msg='✍️ 후기 +30 나다움';
+    }
+  }
+  if(earned>0) {
+    state.youth.nadaeum+=earned;
+    save();
+    showNadaeumToast(msg+` → 총 ${state.youth.nadaeum}N`);
+    renderNadaeum();
+  }
+}
+function renderNadaeum() {
+  const n=state.youth.nadaeum||0;
+  const els=document.querySelectorAll('.nadaeum-val');
+  els.forEach(el=>el.textContent=n+'N');
+}
+
 function submitCert() {
   const r=state.routines.find(x=>x.id===currentCertId);
   if(r){r.todayCert=true;r.progress=Math.min(100,r.progress+5);}
   state.youth.certCount++;
+  earnNadaeum('cert');
   save();
   closeOverlay('certFormOverlay');
   document.getElementById('certSuccess').classList.add('open');
@@ -1399,11 +1466,13 @@ function togglePostLike(id) {
   if(p.liked) state.youth.commCount++;
   save(); renderComm(commFilter);
 }
+let currentReviewRoutineId = null;
 function openCommWriteWithRoutine(routineId, type) {
   // 완료 루틴 목록으로 글쓰기 시트 열기 (특정 루틴 선택된 상태로)
   if(routineId) {
     const r = state.routines.find(x=>x.id===routineId);
     if(type==='review') {
+      currentReviewRoutineId = routineId;
       document.getElementById('reviewWriteRoutineName').textContent = r.emoji+' '+r.title;
       document.getElementById('postTitle').value='';
       document.getElementById('postContent').value='';
@@ -1436,6 +1505,8 @@ function submitPost() {
   const c=document.getElementById('postContent').value.trim();
   if(!t||!c){alert('제목과 내용을 입력해주세요.');return;}
   state.posts.unshift({id:Date.now(),type:'review',title:t,content:c,author:state.youth.name,date:'방금',likes:0,liked:false});
+  earnNadaeum('review', currentReviewRoutineId);
+  currentReviewRoutineId=null;
   save();
   closeSheet('writeSheetBg');
   closeSheet('reviewWriteSheetBg');
