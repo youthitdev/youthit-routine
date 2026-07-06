@@ -512,11 +512,6 @@ input:focus { outline: none; border-color: #2E33BC; }
       <div><div style="font-size:11px;opacity:0.75;" id="feedOverlaySub"></div><div style="font-size:16px;font-weight:600;" id="feedOverlayTitle"></div></div>
     </div>
     <div style="overflow-y:auto;padding-bottom:100px;" id="feedOverlayBody"></div>
-    <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
-      <button onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
-        <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
-      </button>
-    </div>
   </div>
 
   <!-- 루틴/인증 상세 -->
@@ -766,6 +761,11 @@ input:focus { outline: none; border-color: #2E33BC; }
     <button class="primary-btn" style="width:auto;padding:12px 32px;" onclick="closeCreateSuccess()">루틴관리로 이동</button>
   </div>
 
+  <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
+    <button onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
+      <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
+    </button>
+  </div>
 </div>
 <script>
 // ════════════════════════════════════════════════════════
