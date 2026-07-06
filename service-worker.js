@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hankkut-routine-v2';
+const CACHE_NAME = 'hankkut-routine-v3';
 const ASSETS = [
   '/youthit-routine/',
   '/youthit-routine/index.html',
