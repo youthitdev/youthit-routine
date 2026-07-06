@@ -762,9 +762,12 @@ input:focus { outline: none; border-color: #2E33BC; }
   </div>
 
   <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
-    <button onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
+    <button id="certFloatingAction" onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
       <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
     </button>
+    <div id="certFloatingDone" style="display:none;width:100%;padding:14px;background:#fff;border:2px solid #83CA00;border-radius:14px;font-size:15px;font-weight:600;color:#27500A;text-align:center;box-shadow:0 4px 12px rgba(131,202,0,0.2);">
+      ✅ 오늘 인증 완료!
+    </div>
   </div>
 </div>
 <script>
@@ -1109,7 +1112,9 @@ function openRoutineFeed(routineId) {
       </div>`;
   document.getElementById('feedOverlayBody').innerHTML=html;
   const myR=state.routines.find(x=>x.id===routineId);
-  document.getElementById('certFloatingBtn').style.display=(!myR.todayCert)?'':'none';
+  document.getElementById('certFloatingBtn').style.display='block';
+  document.getElementById('certFloatingAction').style.display=myR.todayCert?'none':'flex';
+  document.getElementById('certFloatingDone').style.display=myR.todayCert?'block':'none';
   openOverlay('routineFeedOverlay');
 }
 function openCertFromFeed() {
@@ -2028,6 +2033,9 @@ function openOverlay(id) {
 }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
+  if(id==='routineFeedOverlay') {
+    document.getElementById('certFloatingBtn').style.display='none';
+  }
   if(id==='routineDetailOverlay') {
     const bar=document.getElementById('rdCommentBar');
     if(bar) bar.style.display='none';
