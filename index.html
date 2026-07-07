@@ -414,6 +414,8 @@ input:focus { outline: none; border-color: #2E33BC; }
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openSheet('editProfileBg')"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#888;cursor:pointer;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px;"></i> 로그아웃</button>
           </div>
+          <div id="verifyCard"></div>
+          <input type="file" id="verifyDocInput" accept="image/*,.pdf" style="display:none;" onchange="handleVerifyDoc(event)">
           <div style="background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
             <div>
               <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px;">내 나다움 포인트</div>
@@ -570,6 +572,8 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div id="kMyLevelBar" style="height:100%;background:#83CA00;border-radius:2px;width:0%;transition:width 0.4s;"></div>
             </div>
           </div>
+
+          <div id="adminVerifySection"></div>
 
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">💌 받은 편지</div><span style="font-size:12px;color:#888;" id="kLetterCount"></span></div>
@@ -962,6 +966,8 @@ async function loadProfileAndEnter() {
   state.youth.commCount = profile.comm_count || 0;
   state.youth.nadaeum = profile.nadaeum || 0;
   state.youth.certDates = profile.cert_dates || [];
+  state.youth.verifyStatus = profile.verify_status || 'none';
+  state.youth.verifyDocUrl = profile.verify_doc_url || null;
   state.kkutjjang.name = profile.name;
   const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
   const isAdmin = ADMINS.includes(currentUser.email);
@@ -1734,6 +1740,10 @@ function openRoutineDetail(id) {
 }
 async function joinRoutine(id) {
   if(!currentUser){alert('로그인이 필요해요.');return;}
+  if(state.youth.verifyStatus !== 'approved'){
+    alert('학교밖청소년 확인서 승인 후 루틴에 참여할 수 있어요.\nMY 탭에서 서류를 제출해주세요.');
+    return;
+  }
   if((state.youth.pendingRoutines||[]).includes(id)) return;
   const { error } = await sb.from('routine_participants').insert({
     routine_id:id, user_id:currentUser.id, status:'pending',
@@ -2066,7 +2076,61 @@ function renderMy() {
   }
   renderCal();
   renderSwitchBtn();
+  renderVerifyCard();
 }
+
+// ════════════════════════════════════════════════════════
+// 학교밖 청소년 인증 서류
+// ════════════════════════════════════════════════════════
+function renderVerifyCard() {
+  const el = document.getElementById('verifyCard');
+  if(!el) return;
+  const status = state.youth.verifyStatus || 'none';
+  if(status === 'approved') {
+    el.innerHTML = `<div style="background:#EAF3DE;border:0.5px solid #83CA00;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:20px;">✅</div>
+      <div><div style="font-size:13px;font-weight:600;color:#3B6D11;">학교밖청소년 인증 완료</div><div style="font-size:11px;color:#5c8a2e;margin-top:1px;">모든 루틴에 자유롭게 참여할 수 있어요</div></div>
+    </div>`;
+    return;
+  }
+  if(status === 'pending') {
+    el.innerHTML = `<div style="background:#FFF8E1;border:0.5px solid #FFD600;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:20px;">⏳</div>
+      <div><div style="font-size:13px;font-weight:600;color:#856404;">서류 검토 중이에요</div><div style="font-size:11px;color:#a68a3a;margin-top:1px;">확인 후 승인되면 알려드려요</div></div>
+    </div>`;
+    return;
+  }
+  const isRejected = status === 'rejected';
+  el.innerHTML = `<div style="background:${isRejected?'#FBEAF0':'#f5f5f7'};border:0.5px solid ${isRejected?'#f4a8c0':'#e8e8e8'};border-radius:16px;padding:14px 16px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isRejected?'8px':'10px'};">
+      <div style="font-size:20px;">${isRejected?'⚠️':'📄'}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${isRejected?'서류 반려됨 — 다시 제출해주세요':'학교밖청소년 확인서를 제출해주세요'}</div>
+        <div style="font-size:11px;color:#888;margin-top:1px;">${isRejected?'다른 서류로 다시 시도해주세요':'제출 전에도 루틴 둘러보기는 가능해요'}</div>
+      </div>
+    </div>
+    <button onclick="document.getElementById('verifyDocInput').click()" style="width:100%;padding:10px;background:#2E33BC;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">서류 업로드하기</button>
+  </div>`;
+}
+async function handleVerifyDoc(e) {
+  const f = e.target.files[0]; if(!f) return;
+  if(!currentUser){ alert('로그인이 필요해요.'); return; }
+  const el = document.getElementById('verifyCard');
+  el.innerHTML = `<div style="background:#f5f5f7;border-radius:16px;padding:16px;text-align:center;font-size:13px;color:#888;">업로드 중이에요...</div>`;
+  const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${currentUser.id}/${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('verify-docs').upload(path, f, { upsert: true });
+  if(upErr) { alert('업로드 실패: ' + upErr.message); renderVerifyCard(); return; }
+  const { error: updErr } = await sb.from('profiles').update({
+    verify_doc_url: path, verify_status: 'pending',
+  }).eq('id', currentUser.id);
+  if(updErr) { alert('상태 저장 실패: ' + updErr.message); renderVerifyCard(); return; }
+  state.youth.verifyStatus = 'pending';
+  state.youth.verifyDocUrl = path;
+  save();
+  renderVerifyCard();
+}
+
 function handleAvatar(e) {
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
@@ -2448,6 +2512,55 @@ async function kSubmitPost() {
 }
 
 // ════════════════════════════════════════════════════════
+// 관리자: 학교밖 인증 서류 승인
+// ════════════════════════════════════════════════════════
+async function renderAdminVerifySection() {
+  const el = document.getElementById('adminVerifySection');
+  if(!el) return;
+  if(state.loginType !== 'both') { el.innerHTML=''; return; }
+  el.innerHTML = `<div class="section-card"><div class="section-hd"><div class="section-hd-title">🗂 학교밖 인증 서류 승인</div></div><div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">불러오는 중...</div></div>`;
+  const { data: pending, error } = await sb.from('profiles').select('*').eq('verify_status','pending').eq('role','youth');
+  if(error) { el.innerHTML = `<div class="section-card"><div style="padding:16px;color:#c00;font-size:12px;">불러오기 실패: ${error.message}</div></div>`; return; }
+  if(!pending || pending.length===0) {
+    el.innerHTML = `<div class="section-card"><div class="section-hd"><div class="section-hd-title">🗂 학교밖 인증 서류 승인</div></div><div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">승인 대기 중인 서류가 없어요</div></div>`;
+    return;
+  }
+  const rows = await Promise.all(pending.map(async p => {
+    let url = null;
+    if(p.verify_doc_url) {
+      const { data } = await sb.storage.from('verify-docs').createSignedUrl(p.verify_doc_url, 600);
+      url = data?.signedUrl || null;
+    }
+    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:0.5px solid #f0f0f0;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${(p.name||'?')[0]}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${p.name}</div>
+        ${url?`<a href="${url}" target="_blank" style="font-size:11px;color:#2E33BC;">서류 보기 ↗</a>`:`<span style="font-size:11px;color:#aaa;">서류 없음</span>`}
+      </div>
+      <button onclick="adminApproveVerify('${p.id}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">승인</button>
+      <button onclick="adminRejectVerify('${p.id}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;flex-shrink:0;">반려</button>
+    </div>`;
+  }));
+  el.innerHTML = `<div class="section-card">
+    <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="section-hd-title">🗂 학교밖 인증 서류 승인</div>
+      <span style="font-size:11px;color:#FF006C;font-weight:600;">${pending.length}건 대기</span>
+    </div>
+    ${rows.join('')}
+  </div>`;
+}
+async function adminApproveVerify(userId) {
+  const { error } = await sb.from('profiles').update({ verify_status:'approved' }).eq('id', userId);
+  if(error){ alert('승인 실패: '+error.message); return; }
+  renderAdminVerifySection();
+}
+async function adminRejectVerify(userId) {
+  const { error } = await sb.from('profiles').update({ verify_status:'rejected' }).eq('id', userId);
+  if(error){ alert('반려 실패: '+error.message); return; }
+  renderAdminVerifySection();
+}
+
+// ════════════════════════════════════════════════════════
 // 끗짱 MY
 // ════════════════════════════════════════════════════════
 function kRenderMy() {
@@ -2462,6 +2575,8 @@ function kRenderMy() {
   document.getElementById('kMyLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('kMyLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
   setTimeout(()=>{ const b=document.getElementById('kMyLevelBar'); if(b) b.style.width=lv.pct+'%'; },100);
+
+  renderAdminVerifySection();
 
   // 받은 편지
   const letters=state.letters||[];
