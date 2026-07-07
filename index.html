@@ -875,9 +875,12 @@ async function initAuth() {
     await loadProfileAndEnter();
   }
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session && !document.getElementById('mainHeader').style.display) {
+    if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
-      await loadProfileAndEnter();
+      const splash = document.getElementById('splashScreen');
+      if (splash && !splash.classList.contains('hide')) {
+        await loadProfileAndEnter();
+      }
     }
     if (event === 'SIGNED_OUT') {
       currentUser = null;
