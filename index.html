@@ -284,8 +284,8 @@ input:focus { outline: none; border-color: #2E33BC; }
     </div>
     <!-- 로그인 폼 -->
     <div class="auth-form" id="authFormLogin">
-      <input type="email" id="loginEmail" class="auth-input" placeholder="이메일">
-      <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호">
+      <input type="email" id="loginEmail" class="auth-input" placeholder="이메일" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
     </div>
     <!-- 회원가입 폼 -->
