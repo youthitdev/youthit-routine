@@ -915,6 +915,7 @@ async function loadProfileAndEnter() {
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  try { await loadRoutines(); await loadPosts(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
 }
 
@@ -1014,6 +1015,94 @@ function save() {
 let state = loadState();
 
 // ════════════════════════════════════════════════════════
+// 데이터 레이어 (Supabase → 뷰모델)
+// ════════════════════════════════════════════════════════
+function _fmtPeriod(s, e) {
+  const f = x => x ? x.slice(2).replace(/-/g, '.') : '';
+  return (s && e) ? `${f(s)}–${f(e)}` : '';
+}
+function _dayLabel(startDate) {
+  if (!startDate) return '1일째';
+  const start = new Date(startDate + 'T00:00:00');
+  const diff = Math.floor((Date.now() - start.getTime()) / 86400000) + 1;
+  return (diff < 1 ? 1 : diff) + '일째';
+}
+function _relDate(ts) {
+  if (!ts) return '';
+  const d = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
+  if (d <= 0) return '오늘';
+  if (d === 1) return '어제';
+  return d + '일 전';
+}
+function _computeProgress(r) {
+  if (r.status === 'done') return 100;
+  if (r.status !== 'active' || !r.start_date || !r.end_date) return 0;
+  const s = new Date(r.start_date + 'T00:00:00').getTime();
+  const e = new Date(r.end_date + 'T00:00:00').getTime();
+  if (e <= s) return 0;
+  return Math.max(0, Math.min(100, Math.round((Date.now() - s) / (e - s) * 100)));
+}
+
+async function loadRoutines() {
+  const [rRes, pRes, cRes, profRes] = await Promise.all([
+    sb.from('routines').select('*').order('created_at', { ascending: false }),
+    sb.from('routine_participants').select('*'),
+    sb.from('certifications').select('id,routine_id,user_id,created_at'),
+    sb.from('profiles').select('id,name'),
+  ]);
+  const routines = rRes.data || [], parts = pRes.data || [], certs = cRes.data || [];
+  const nameById = {};
+  (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  const today = new Date().toISOString().slice(0, 10);
+  state.routines = routines.map(r => {
+    const rParts = parts.filter(p => p.routine_id === r.id);
+    const rCerts = certs.filter(c => c.routine_id === r.id);
+    const approved = rParts.filter(p => p.status === 'approved');
+    const certOf = uid => rCerts.filter(c => c.user_id === uid).length;
+    const doneToday = uid => rCerts.some(c => c.user_id === uid && (c.created_at || '').slice(0, 10) === today);
+    return {
+      id: r.id, status: r.status, title: r.title, emoji: r.emoji || '🌱',
+      period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
+      people: approved.length, maxPeople: r.max_people || 10,
+      desc: r.description || '', tag: r.tag || '생활',
+      certCount: rCerts.length, avgRate: 0, createdBy: r.created_by,
+      progress: _computeProgress(r),
+      todayCert: currentUser ? doneToday(currentUser.id) : false,
+      participants: approved.map(p => ({
+        userId: p.user_id, name: nameById[p.user_id] || '익명',
+        cert: certOf(p.user_id), todayDone: doneToday(p.user_id), day: _dayLabel(r.start_date),
+      })),
+      applicants: rParts.map(p => ({
+        userId: p.user_id, name: nameById[p.user_id] || '익명',
+        date: _relDate(p.joined_at), status: p.status,
+      })),
+    };
+  });
+  if (currentUser) {
+    state.youth.pendingRoutines = parts
+      .filter(p => p.user_id === currentUser.id && p.status === 'pending')
+      .map(p => p.routine_id);
+  }
+}
+
+async function loadPosts() {
+  const [postRes, likeRes, profRes] = await Promise.all([
+    sb.from('posts').select('*').order('created_at', { ascending: false }),
+    sb.from('post_likes').select('post_id,user_id'),
+    sb.from('profiles').select('id,name'),
+  ]);
+  const posts = postRes.data || [], likes = likeRes.data || [];
+  const nameById = {};
+  (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  state.posts = posts.map(p => ({
+    id: p.id, type: p.type || 'review', title: p.title, content: p.content,
+    author: nameById[p.author_id] || '익명', date: _relDate(p.created_at),
+    likes: likes.filter(l => l.post_id === p.id).length,
+    liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
+  }));
+}
+
+// ════════════════════════════════════════════════════════
 // 유틸
 // ════════════════════════════════════════════════════════
 function timeAgo(ts) {
@@ -1083,12 +1172,12 @@ function applyRole(role) {
   else { kRenderHome(); kRenderSwitchBtn(); }
 }
 function renderSwitchBtn() {
-  document.getElementById('switchRoleArea').innerHTML =
-    `<button class="switch-role-btn" onclick="switchRole()"><i class="ti ti-repeat" style="font-size:16px;"></i> 끗짱으로 전환하기</button>`;
+  document.getElementById('switchRoleArea').innerHTML = state.loginType==='both'
+    ? `<button class="switch-role-btn" onclick="switchRole()"><i class="ti ti-repeat" style="font-size:16px;"></i> 끗짱으로 전환하기</button>` : '';
 }
 function kRenderSwitchBtn() {
-  document.getElementById('kSwitchRoleArea').innerHTML =
-    `<button class="switch-role-btn" onclick="switchRole()"><i class="ti ti-repeat" style="font-size:16px;"></i> 청소년으로 전환하기</button>`;
+  document.getElementById('kSwitchRoleArea').innerHTML = state.loginType==='both'
+    ? `<button class="switch-role-btn" onclick="switchRole()"><i class="ti ti-repeat" style="font-size:16px;"></i> 청소년으로 전환하기</button>` : '';
 }
 function switchRole() {
   applyRole(state.currentRole === 'youth' ? 'kkutjjang' : 'youth');
@@ -1465,21 +1554,17 @@ function openRoutineDetail(id) {
   document.getElementById('rdBody').innerHTML=body;
   openOverlay('routineDetailOverlay');
 }
-function joinRoutine(id) {
-  const r = state.routines.find(x=>x.id===id);
-  if(!state.youth.pendingRoutines) state.youth.pendingRoutines=[];
-  if(!r.applicants) r.applicants=[];
-  // 이미 신청했는지 확인
-  if(state.youth.pendingRoutines.includes(id)) return;
-  // 신청 처리
-  state.youth.pendingRoutines.push(id);
-  r.applicants.push({name:state.youth.name, date:'방금', status:'pending'});
-  save();
+async function joinRoutine(id) {
+  if(!currentUser){alert('로그인이 필요해요.');return;}
+  if((state.youth.pendingRoutines||[]).includes(id)) return;
+  const { error } = await sb.from('routine_participants').insert({
+    routine_id:id, user_id:currentUser.id, status:'pending',
+  });
+  if(error){ alert('신청 실패: '+error.message); return; }
+  await loadRoutines();
   closeOverlay('routineDetailOverlay');
-  // 승인 대기 안내
   document.getElementById('rdBody').innerHTML='';
   renderRoutine();
-  // 안내 팝업
   setTimeout(()=>{
     alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.');
   }, 300);
@@ -1612,24 +1697,24 @@ function renderNadaeum() {
   els.forEach(el=>el.textContent=n+'N');
 }
 
-function submitCert() {
-  const r=state.routines.find(x=>x.id===currentCertId);
-  if(r){r.todayCert=true;r.progress=Math.min(100,r.progress+5);}
+async function submitCert() {
+  // Supabase에 인증 기록 저장
+  if (currentUser && currentCertId) {
+    const certText = document.getElementById('certText')?.value || '';
+    const { error } = await sb.from('certifications').insert({
+      routine_id: currentCertId,
+      user_id: currentUser.id,
+      content: certText,
+    });
+    if(error){ alert('인증 저장 실패: '+error.message); return; }
+  }
   state.youth.certCount++;
   const todayStr=new Date().toISOString().slice(0,10);
   if(!state.youth.certDates) state.youth.certDates=[];
   if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
   earnNadaeum('cert');
   save();
-  // Supabase에 인증 기록 저장
-  if (currentUser && currentCertId) {
-    const certText = document.getElementById('certText')?.value || '';
-    sb.from('certifications').insert({
-      routine_id: currentCertId,
-      user_id: currentUser.id,
-      content: certText,
-    }).then(() => {});
-  }
+  await loadRoutines();
   closeOverlay('certFormOverlay');
   document.getElementById('certSuccess').classList.add('open');
 }
@@ -1665,10 +1750,17 @@ function filterComm(t,el) {
   document.querySelectorAll('#commFilter .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active'); renderComm(t);
 }
-function togglePostLike(id) {
+async function togglePostLike(id) {
+  if(!currentUser) return;
   const p=state.posts.find(x=>x.id===id);
-  p.liked=!p.liked; p.likes+=p.liked?1:-1;
-  if(p.liked) state.youth.commCount++;
+  if(!p) return;
+  if(p.liked){
+    await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id);
+  } else {
+    await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
+    state.youth.commCount++;
+  }
+  await loadPosts();
   save(); renderComm(commFilter);
 }
 let currentReviewRoutineId = null;
@@ -1705,14 +1797,20 @@ function openCommWriteWithRoutine(routineId, type) {
   openSheet('writeSheetBg');
 }
 
-function submitPost() {
+async function submitPost() {
   const t=document.getElementById('postTitle').value.trim();
   const c=document.getElementById('postContent').value.trim();
   if(!t||!c){alert('제목과 내용을 입력해주세요.');return;}
-  state.posts.unshift({id:Date.now(),type:'review',title:t,content:c,author:state.youth.name,date:'방금',likes:0,liked:false});
+  if(!currentUser){alert('로그인이 필요해요.');return;}
+  const { error } = await sb.from('posts').insert({
+    type:'review', title:t, content:c, author_id:currentUser.id,
+    routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
+  });
+  if(error){ alert('게시 실패: '+error.message); return; }
   earnNadaeum('review', currentReviewRoutineId);
   currentReviewRoutineId=null;
   save();
+  await loadPosts();
   closeSheet('writeSheetBg');
   closeSheet('reviewWriteSheetBg');
   document.getElementById('postTitle').value='';
@@ -1931,8 +2029,8 @@ function openKRoutineDetail(routineId) {
                 <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
               </div>
               ${a.status==='pending'?`
-                <button onclick="approveApplicant(${routineId},'${a.name}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
-                <button onclick="rejectApplicant(${routineId},'${a.name}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
+                <button onclick="approveApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
+                <button onclick="rejectApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
               :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>`
               :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
             </div>`).join('')}
@@ -1940,36 +2038,25 @@ function openKRoutineDetail(routineId) {
   openOverlay('routineDetailOverlay');
 }
 
-function approveApplicant(routineId, name) {
+async function approveApplicant(routineId, userId) {
   const r = state.routines.find(x=>x.id===routineId);
-  const a = r.applicants.find(x=>x.name===name);
-  if(!a) return;
-  a.status = 'approved';
-  r.people = (r.applicants.filter(x=>x.status==='approved')).length;
-  // 청소년 pendingRoutines에서 제거하고 active로 전환 (같은 기기 테스트용)
-  if(state.youth.name===name) {
-    state.youth.pendingRoutines = (state.youth.pendingRoutines||[]).filter(id=>id!==routineId);
-    r.status = 'active';
-    r.progress = 0;
-    r.todayCert = false;
-    if(!r.participants) r.participants=[];
-    r.participants.push({name, day:'1일째', cert:0, todayDone:false});
+  const { error } = await sb.from('routine_participants')
+    .update({status:'approved'}).eq('routine_id',routineId).eq('user_id',userId);
+  if(error){ alert('승인 실패: '+error.message); return; }
+  // 모집 중이던 루틴은 첫 승인 시 진행 중으로 전환
+  if(r && r.status==='recruit') {
+    await sb.from('routines').update({status:'active'}).eq('id',routineId);
   }
-  save();
+  await loadRoutines();
   openKRoutineDetail(routineId);
   kRenderRoutineTab();
 }
 
-function rejectApplicant(routineId, name) {
-  const r = state.routines.find(x=>x.id===routineId);
-  const a = r.applicants.find(x=>x.name===name);
-  if(!a) return;
-  a.status = 'rejected';
-  // 청소년 pendingRoutines에서도 제거
-  if(state.youth.name===name) {
-    state.youth.pendingRoutines = (state.youth.pendingRoutines||[]).filter(id=>id!==routineId);
-  }
-  save();
+async function rejectApplicant(routineId, userId) {
+  const { error } = await sb.from('routine_participants')
+    .update({status:'rejected'}).eq('routine_id',routineId).eq('user_id',userId);
+  if(error){ alert('거절 실패: '+error.message); return; }
+  await loadRoutines();
   openKRoutineDetail(routineId);
 }
 function openKCertDetail(rid,name) {
@@ -2024,7 +2111,7 @@ function handleCreatePhoto(e){
   };
   r.readAsDataURL(f);
 }
-function submitCreateRoutine(){
+async function submitCreateRoutine(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
   if(!n){alert('루틴 이름을 입력해주세요.');return;}
@@ -2032,9 +2119,14 @@ function submitCreateRoutine(){
   if(!p||p<1){alert('참여 인원을 입력해주세요.');return;}
   if(!d){alert('루틴 소개를 입력해주세요.');return;}
   if(!createHasPhoto){alert('인증 예시 사진을 추가해주세요.');return;}
-  const fmt=x=>x.replace(/-/g,'.').slice(2);
-  state.routines.unshift({id:Date.now(),status:'recruit',title:n,emoji:selectedEmoji,period:`${fmt(s)}–${fmt(e)}`,people:0,maxPeople:parseInt(p),progress:0,desc:d,certCount:0,avgRate:0,participants:[],todayCert:false,tag:'생활'});
-  save();
+  if(!currentUser){alert('로그인이 필요해요.');return;}
+  const { error } = await sb.from('routines').insert({
+    title:n, emoji:selectedEmoji, description:d, tag:'생활',
+    start_date:s, end_date:e, max_people:parseInt(p),
+    status:'recruit', created_by:currentUser.id,
+  });
+  if(error){ alert('루틴 등록 실패: '+error.message); return; }
+  await loadRoutines();
   document.getElementById('createSuccessTitle').textContent=`${selectedEmoji} ${n}`;
   document.getElementById('createSuccess').classList.add('open');
 }
@@ -2097,12 +2189,16 @@ function toggleKPostLike(id) {
 // ════════════════════════════════════════════════════════
 // 끗짱 커뮤니티 글쓰기
 // ════════════════════════════════════════════════════════
-function kSubmitPost() {
+async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
-  state.posts.unshift({id:Date.now(),type:'review',title:t,content:c,author:state.kkutjjang.name,date:'방금',likes:0,liked:false});
-  save();
+  if(!currentUser){alert('로그인이 필요해요.');return;}
+  const { error } = await sb.from('posts').insert({
+    type:'notice', title:t, content:c, author_id:currentUser.id,
+  });
+  if(error){ alert('게시 실패: '+error.message); return; }
+  await loadPosts();
   closeSheet('kWriteSheetBg');
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
