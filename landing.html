@@ -345,6 +345,40 @@
       .cta-bg { padding: 64px 20px; }
     }
 
+    /* ── MOTION ── */
+    /* 히어로 등장 (backwards fill: reduced-motion에서도 안전) */
+    @keyframes heroUp { from { opacity: 0; transform: translateY(28px); } }
+    .hero-eyebrow { animation: heroUp .7s cubic-bezier(.22,1,.36,1) .05s backwards; }
+    .hero h1      { animation: heroUp .7s cubic-bezier(.22,1,.36,1) .16s backwards; }
+    .hero-body    { animation: heroUp .7s cubic-bezier(.22,1,.36,1) .27s backwards; }
+    .hero-btns    { animation: heroUp .7s cubic-bezier(.22,1,.36,1) .38s backwards; }
+
+    /* 폰 목업: 등장 후 은은한 플로팅 */
+    @keyframes phoneFloat     { 0%,100% { transform: translateY(0); }    50% { transform: translateY(-9px); } }
+    @keyframes phoneFloatBack { 0%,100% { transform: translateY(24px); } 50% { transform: translateY(17px); } }
+    .hero-phones .phone {
+      animation: heroUp .9s cubic-bezier(.22,1,.36,1) .45s backwards,
+                 phoneFloat 5.5s ease-in-out 1.6s infinite;
+    }
+    .hero-phones .phone-back {
+      animation: heroUp .9s cubic-bezier(.22,1,.36,1) .62s backwards,
+                 phoneFloatBack 5.5s ease-in-out 2s infinite;
+    }
+
+    /* 스크롤 리빌 (JS가 .in 부여) */
+    .js .reveal { opacity: 0; transform: translateY(26px);
+      transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+    .js .reveal.in { opacity: 1; transform: none; }
+
+    /* 카드 호버 리프트 */
+    .p-card, .n-card, .voice-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease; }
+    .p-card:hover, .n-card:hover, .voice-card:hover {
+      transform: translateY(-5px) !important;
+      box-shadow: 0 16px 36px rgba(17,17,24,.09);
+    }
+    .results-big-item { transition: transform .35s cubic-bezier(.22,1,.36,1); }
+    .results-big-item:hover { transform: translateY(-4px) !important; }
+
     @media (prefers-reduced-motion: reduce) {
       * { transition: none !important; animation: none !important; }
     }
@@ -788,6 +822,65 @@
     </div>
   </div>
 </footer>
+
+<script>
+document.documentElement.classList.add('js');
+(function(){
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── 스크롤 리빌 대상 태깅 ──
+  // 그리드 자식들: 순서대로 시차(stagger)
+  ['.problem-grid','.nadam-grid','.results-voices','.results-big','.stats-inner','.ai-list'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(g){
+      Array.prototype.forEach.call(g.children, function(el, i){
+        el.classList.add('reveal');
+        el.style.transitionDelay = (i * 90) + 'ms';
+      });
+    });
+  });
+  // 단일 요소들
+  ['.section .eyebrow','.section h2','.section-body','.feat-row',
+   '.ai-eye','.ai-h2','.ai-body','.ai-phone-wrap',
+   '.results-period','.results-voices-title',
+   '.cta-h2','.cta-body','.cta-btns','.cta-note'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(el){ el.classList.add('reveal'); });
+  });
+
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' });
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  // ── 숫자 카운트업 ──
+  function countUp(el){
+    var raw = el.textContent.trim();
+    var m = raw.match(/^([\d,]+(?:\.\d+)?)(.*)$/);
+    if(!m) return;
+    var num = parseFloat(m[1].replace(/,/g,''));
+    var suffix = m[2];
+    var dec = (m[1].split('.')[1] || '').length;
+    var dur = 1500, t0 = null;
+    function tick(t){
+      if(!t0) t0 = t;
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      el.textContent = (num * e).toLocaleString('ko-KR', {minimumFractionDigits: dec, maximumFractionDigits: dec}) + suffix;
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  if(!reduce){
+    var cio = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ countUp(e.target); cio.unobserve(e.target); }
+      });
+    }, { threshold: 0.6 });
+    document.querySelectorAll('.stat-n, .results-big-n').forEach(function(el){ cio.observe(el); });
+  }
+})();
+</script>
 
 </body>
 </html>
