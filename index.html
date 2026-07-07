@@ -322,18 +322,36 @@ input:focus { outline: none; border-color: #2E33BC; }
       <!-- 홈 -->
       <div class="tab-page active" id="page-home">
         <div class="scroll-body">
-          <div style="background:#2E33BC;border-radius:16px;padding:16px;color:white;">
-            <div style="font-size:11px;opacity:0.75;margin-bottom:2px;">오늘 하루도 한끗씩 ✦</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-              <span style="font-size:17px;font-weight:600;" id="homeUsername"></span>
-              <span style="background:rgba(255,255,255,0.2);border-radius:12px;padding:3px 10px;font-size:11px;" id="homeLevelBadge"></span>
-            </div>
-            <div style="display:flex;gap:16px;">
-              <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">📸 <span id="homeCertCount">0</span>회</div>
-              <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">💬 <span id="homeCommCount">0</span>회</div>
-              <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:rgba(255,255,255,0.85);">✨ <span class="nadaeum-val">0N</span></div>
+          <!-- 히어로 카드 -->
+          <div style="background:linear-gradient(135deg,#2E33BC 0%,#4B50D4 100%);border-radius:20px;padding:18px 16px 16px;color:white;position:relative;overflow:hidden;">
+            <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+            <div style="position:absolute;right:36px;bottom:-36px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+            <div style="position:relative;">
+              <div style="font-size:12px;opacity:0.8;margin-bottom:3px;" id="homeGreeting">오늘 하루도 한끗씩 ✦</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <span style="font-size:19px;font-weight:700;" id="homeUsername"></span>
+                <span style="background:rgba(255,255,255,0.2);border-radius:12px;padding:3px 10px;font-size:11px;" id="homeLevelBadge"></span>
+              </div>
+              <div id="homeStreakArea"></div>
+              <div id="homeLevelProgress" style="margin-top:12px;"></div>
+              <div style="display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.18);">
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">📸 <span id="homeCertCount">0</span>회</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">💬 <span id="homeCommCount">0</span>회</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">✨ <span class="nadaeum-val">0N</span></div>
+              </div>
             </div>
           </div>
+          <!-- 오늘의 미션 -->
+          <div id="todayMissionArea"></div>
+          <!-- 이번 주 한끗 -->
+          <div class="section-card">
+            <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+              <div class="section-hd-title">이번 주 한끗</div>
+              <span id="weekGrassCount" style="font-size:11px;color:#888;"></span>
+            </div>
+            <div id="weekGrass" style="display:flex;justify-content:space-between;padding:10px 16px 14px;"></div>
+          </div>
+          <!-- 참여 중인 루틴 -->
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">참여 중인 루틴</div></div>
             <div id="activeRoutinesList"></div>
@@ -453,15 +471,45 @@ input:focus { outline: none; border-color: #2E33BC; }
       <!-- 끗짱 홈 -->
       <div class="tab-page active" id="kpage-home">
         <div class="scroll-body">
-          <div class="section-card">
-            <div class="section-hd">
-              <div class="section-hd-title">진행 중인 루틴</div>
-              <span style="font-size:11px;background:#f5f5f5;padding:3px 9px;border-radius:10px;color:#666;" id="kTodayDate"></span>
+          <!-- 끗짱 히어로 -->
+          <div style="background:linear-gradient(135deg,#FF006C 0%,#FF4D94 100%);border-radius:20px;padding:18px 16px;color:white;position:relative;overflow:hidden;">
+            <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
+            <div style="position:absolute;right:40px;bottom:-36px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+            <div style="position:relative;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+                <div style="font-size:12px;opacity:0.85;">오늘도 청소년들과 함께 💪</div>
+                <span style="font-size:11px;background:rgba(255,255,255,0.2);padding:3px 10px;border-radius:12px;" id="kTodayDate"></span>
+              </div>
+              <div style="font-size:19px;font-weight:700;margin-bottom:14px;" id="kHomeName"></div>
+              <div style="display:flex;gap:8px;">
+                <div onclick="kSwitchTab('home')" style="flex:1;background:rgba(255,255,255,0.14);border-radius:14px;padding:10px 6px;text-align:center;">
+                  <div style="font-size:20px;font-weight:700;" id="kStatCert">0/0</div>
+                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">오늘 인증</div>
+                </div>
+                <div onclick="kSwitchTab('routine')" style="flex:1;background:rgba(255,255,255,0.14);border-radius:14px;padding:10px 6px;text-align:center;cursor:pointer;">
+                  <div style="font-size:20px;font-weight:700;" id="kStatPending">0</div>
+                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">승인 대기</div>
+                </div>
+                <div onclick="kSwitchTab('routine')" style="flex:1;background:rgba(255,255,255,0.14);border-radius:14px;padding:10px 6px;text-align:center;cursor:pointer;">
+                  <div style="font-size:20px;font-weight:700;" id="kStatActive">0</div>
+                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">진행 중 루틴</div>
+                </div>
+              </div>
             </div>
+          </div>
+          <!-- 승인 대기 알림 -->
+          <div id="kPendingAlert"></div>
+          <!-- 진행 중인 루틴 -->
+          <div class="section-card">
+            <div class="section-hd"><div class="section-hd-title">진행 중인 루틴</div></div>
             <div id="kActiveRoutineList"></div>
           </div>
+          <!-- 오늘 인증 현황 -->
           <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">오늘 인증 현황</div></div>
+            <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+              <div class="section-hd-title">오늘 인증 현황</div>
+              <span id="kCertSummary" style="font-size:11px;color:#888;"></span>
+            </div>
             <div id="kTodayCertList"></div>
           </div>
         </div>
@@ -1201,15 +1249,112 @@ function switchTab(tab) {
 // ════════════════════════════════════════════════════════
 // 청소년 홈
 // ════════════════════════════════════════════════════════
+function _streak(dates) {
+  if(!dates || !dates.length) return 0;
+  const set = new Set(dates);
+  const key = d => d.toISOString().slice(0,10);
+  let d = new Date(), n = 0;
+  if(!set.has(key(d))) d.setDate(d.getDate()-1); // 오늘 아직이면 어제부터 카운트
+  while(set.has(key(d))) { n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function _greeting() {
+  const h = new Date().getHours();
+  if(h < 6)  return '고요한 새벽이에요 🌙';
+  if(h < 12) return '좋은 아침이에요 ☀️';
+  if(h < 18) return '오늘 하루도 한끗씩 ✦';
+  return '하루 마무리 잘 하고 있나요 🌙';
+}
 function renderHome() {
   const lv = getYLevel(state.youth.certCount);
+  document.getElementById('homeGreeting').textContent = _greeting();
   document.getElementById('homeUsername').textContent = state.youth.name+'님';
   document.getElementById('homeLevelBadge').textContent = `${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('homeCertCount').textContent = state.youth.certCount;
   document.getElementById('homeCommCount').textContent = state.youth.commCount;
   renderNadaeum();
 
+  // 스트릭 배지
+  const sk = _streak(state.youth.certDates);
+  document.getElementById('homeStreakArea').innerHTML = sk > 0
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,214,0,0.22);border:0.5px solid rgba(255,214,0,0.5);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:#FFD600;">🔥 ${sk}일 연속 인증 중</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px;font-size:12px;color:rgba(255,255,255,0.85);">🌱 오늘 첫 한끗을 쌓아볼까요?</span>`;
+
+  // 레벨 진행바
+  const NEXT = {1:{at:20,name:'새싹',emoji:'🌿'},2:{at:50,name:'나무',emoji:'🌳'},3:{at:100,name:'숲',emoji:'🌲'}};
+  const nx = NEXT[lv.level];
+  const base = lv.level===1?0:lv.level===2?20:lv.level===3?50:100;
+  document.getElementById('homeLevelProgress').innerHTML = nx
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.75);margin-bottom:5px;">
+         <span>${nx.emoji} ${nx.name}까지 인증 ${nx.at - state.youth.certCount}회</span>
+         <span>${state.youth.certCount}/${nx.at}</span>
+       </div>
+       <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.18);overflow:hidden;">
+         <div style="height:100%;width:${Math.min(100,Math.round((state.youth.certCount-base)/(nx.at-base)*100))}%;border-radius:3px;background:linear-gradient(90deg,#83CA00,#FFD600);transition:width 0.4s;"></div>
+       </div>`
+    : `<div style="font-size:11px;color:rgba(255,255,255,0.8);">🌲 최고 레벨이에요! 숲이 되어주셔서 고마워요</div>`;
+
   const active = state.routines.filter(r=>r.status==='active');
+
+  // 오늘의 미션 카드
+  const notDone = active.filter(r=>!r.todayCert);
+  const missionEl = document.getElementById('todayMissionArea');
+  if(active.length === 0) {
+    missionEl.innerHTML = `<div class="section-card" style="padding:22px 16px;text-align:center;">
+      <div style="font-size:30px;margin-bottom:8px;">🧭</div>
+      <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:4px;">아직 참여 중인 루틴이 없어요</div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px;">나에게 맞는 루틴을 찾아 첫 한끗을 시작해봐요</div>
+      <button onclick="switchTab('routine')" style="padding:10px 22px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">루틴 둘러보기</button>
+    </div>`;
+  } else if(notDone.length === 0) {
+    missionEl.innerHTML = `<div style="background:linear-gradient(135deg,#83CA00,#9FE01F);border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">🎉</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:white;">오늘 한끗 완료!</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">참여 중인 루틴 ${active.length}개 모두 인증했어요</div>
+      </div>
+    </div>`;
+  } else {
+    missionEl.innerHTML = `<div class="section-card">
+      <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="section-hd-title">오늘의 한끗</div>
+        <span style="font-size:11px;color:#FF006C;font-weight:600;">${notDone.length}개 남음</span>
+      </div>
+      ${notDone.map(r=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:0.5px solid #f0f0f0;">
+          <div style="width:38px;height:38px;border-radius:12px;background:#f0f1fb;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${r.emoji}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+            <div style="font-size:11px;color:#aaa;margin-top:1px;">아직 오늘 인증 전이에요</div>
+          </div>
+          <button onclick="selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="flex-shrink:0;padding:8px 14px;background:#2E33BC;color:white;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">인증하기</button>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // 이번 주 잔디
+  const now = new Date();
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const dayNames = ['월','화','수','목','금','토','일'];
+  const certSet = new Set(state.youth.certDates||[]);
+  const todayKey2 = now.toISOString().slice(0,10);
+  let weekDone = 0;
+  document.getElementById('weekGrass').innerHTML = dayNames.map((dn,i)=>{
+    const d = new Date(mon); d.setDate(mon.getDate()+i);
+    const k = d.toISOString().slice(0,10);
+    const done = certSet.has(k); if(done) weekDone++;
+    const isToday = k === todayKey2;
+    const isFuture = k > todayKey2;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+      <div style="width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;
+        background:${done?'#83CA00':isFuture?'#fafafa':'#f0f0f0'};
+        ${isToday?'box-shadow:0 0 0 2px #2E33BC;':''}">
+        ${done?'✓':''}
+      </div>
+      <span style="font-size:10px;color:${isToday?'#2E33BC':'#aaa'};font-weight:${isToday?'700':'400'};">${dn}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('weekGrassCount').textContent = weekDone>0 ? `이번 주 ${weekDone}일 인증 🌱` : '';
   document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
     const todayCerts = CERT_FEED.filter(c=>c.routineId===r.id && isWithin24h(c.ts));
     const previewHtml = todayCerts.length > 0
@@ -1237,7 +1382,7 @@ function renderHome() {
       <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
       ${previewHtml}
     </div>`;
-  }).join('');
+  }).join('') || `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 루틴이 아직 없어요</div>`;
 }
 function toggleLike(id) {
   const p = state.posts.find(x=>x.id===id);
@@ -1923,22 +2068,71 @@ function kSwitchTab(tab) {
 function kRenderHome() {
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
+  document.getElementById('kHomeName').textContent=(state.kkutjjang.name||'끗짱')+'님';
   const active=state.routines.filter(r=>r.status==='active');
-  const first=active.length>0?active[0]:null;
-  document.getElementById('kActiveRoutineList').innerHTML=first
-    ?`<div class="rmr" onclick="kSwitchTab('routine')">
-        <div class="rmr-top"><span class="rmr-name">${first.emoji} ${first.title}</span><span class="s-active">진행 중</span></div>
-        <div class="rmr-meta">${first.people}명 참여 · ${first.period}</div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${first.progress}%"></div></div>
-        ${active.length>1?`<div style="font-size:11px;color:#888;margin-top:6px;text-align:right;">외 ${active.length-1}개 루틴 진행 중</div>`:''}
+
+  // 오늘 요약 3칸
+  const allParts = active.flatMap(r=>r.participants||[]);
+  const doneToday = allParts.filter(p=>p.todayDone).length;
+  const pendingApps = state.routines.flatMap(r=>(r.applicants||[]).filter(a=>a.status==='pending').map(a=>({...a, routineId:r.id, routineTitle:r.title})));
+  document.getElementById('kStatCert').textContent = `${doneToday}/${allParts.length}`;
+  document.getElementById('kStatPending').textContent = pendingApps.length;
+  document.getElementById('kStatActive').textContent = active.length;
+
+  // 승인 대기 알림 카드
+  document.getElementById('kPendingAlert').innerHTML = pendingApps.length>0
+    ? `<div onclick="openKRoutineDetail(${pendingApps[0].routineId})" style="background:#FFF8E1;border:0.5px solid #FFD600;border-radius:16px;padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="font-size:20px;">⏳</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:#111;">${pendingApps[0].name}님${pendingApps.length>1?` 외 ${pendingApps.length-1}명`:''}이 승인을 기다려요</div>
+          <div style="font-size:11px;color:#888;margin-top:1px;">${pendingApps[0].routineTitle}</div>
+        </div>
+        <i class="ti ti-chevron-right" style="font-size:16px;color:#bba000;"></i>
       </div>`
-    :`<div style="padding:20px 16px;text-align:center;font-size:13px;color:#aaa;">진행 중인 루틴이 없어요</div>`;
-  document.getElementById('kTodayCertList').innerHTML=active.flatMap(r=>r.participants.map(p=>`
-    <div class="youth-row" onclick="openKCertDetail(${r.id},'${p.name}')">
-      <div class="youth-avatar">${p.name[0]}</div>
-      <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.title} · ${p.day}</div></div>
-      <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
-    </div>`)).join('');
+    : '';
+
+  // 진행 중 루틴 — 참여자 아바타 + 오늘 인증률 미니바
+  document.getElementById('kActiveRoutineList').innerHTML = active.length>0
+    ? active.map(r=>{
+        const parts=r.participants||[];
+        const done=parts.filter(p=>p.todayDone).length;
+        const rate=parts.length>0?Math.round(done/parts.length*100):0;
+        return `<div style="padding:13px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;" onclick="openKRoutineFeed(${r.id})">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:14px;font-weight:600;color:#111;">${r.emoji} ${r.title}</span>
+            <span class="s-active">진행 중</span>
+          </div>
+          <div style="font-size:11px;color:#aaa;margin-bottom:8px;">${r.period} · ${r.people}명 참여</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;">
+              ${parts.slice(0,4).map((p,i)=>`<div style="width:24px;height:24px;border-radius:50%;background:${p.todayDone?'#EAF3DE':'#f0f0f0'};border:1.5px solid white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:${p.todayDone?'#3B6D11':'#aaa'};${i>0?'margin-left:-7px;':''}">${p.name[0]}</div>`).join('')}
+              ${parts.length>4?`<div style="width:24px;height:24px;border-radius:50%;background:#f5f5f5;border:1.5px solid white;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888;margin-left:-7px;">+${parts.length-4}</div>`:''}
+            </div>
+            <div style="flex:1;height:5px;border-radius:3px;background:#f0f0f0;overflow:hidden;">
+              <div style="height:100%;width:${rate}%;border-radius:3px;background:#FF006C;"></div>
+            </div>
+            <span style="font-size:11px;font-weight:600;color:${rate>=50?'#FF006C':'#aaa'};flex-shrink:0;">오늘 ${rate}%</span>
+          </div>
+        </div>`;
+      }).join('')
+    : `<div style="padding:26px 16px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">🌱</div>
+        <div style="font-size:13px;color:#888;margin-bottom:12px;">진행 중인 루틴이 없어요</div>
+        <button onclick="openCreateRoutine()" style="padding:9px 20px;background:#FF006C;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">새 루틴 만들기</button>
+      </div>`;
+
+  // 오늘 인증 현황 — 미인증 우선 정렬
+  const rows = active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
+  rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
+  document.getElementById('kCertSummary').textContent = rows.length>0?`${doneToday}/${rows.length}명 완료`:'';
+  document.getElementById('kTodayCertList').innerHTML = rows.length>0
+    ? rows.map(({r,p})=>`
+      <div class="youth-row" onclick="openKCertDetail(${r.id},'${(p.name||'').replace(/'/g,"\\'")}')">
+        <div class="youth-avatar" style="${p.todayDone?'':'background:#FBEAF0;color:#FF006C;'}">${p.name[0]}</div>
+        <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.title} · ${p.day}</div></div>
+        <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
+      </div>`).join('')
+    : `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 청소년이 아직 없어요</div>`;
 }
 
 // ════════════════════════════════════════════════════════
