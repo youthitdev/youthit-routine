@@ -546,7 +546,7 @@ input:focus { outline: none; border-color: #2E33BC; }
         </div>
       </div>
 
-      <!-- 끗짱 루틴관리 -->
+      <!-- 끗짱 루틴 -->
       <div class="tab-page" id="kpage-routine">
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="kRoutineFilterBar" style="padding-top:0;flex:1;">
@@ -560,6 +560,17 @@ input:focus { outline: none; border-color: #2E33BC; }
           </button>
         </div>
         <div class="routine-grid" id="kRoutineGrid"></div>
+      </div>
+
+      <!-- 끗짱 인증 -->
+      <div class="tab-page" id="kpage-cert">
+        <div class="scroll-body" style="gap:0;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-size:17px;font-weight:700;color:#111;">오늘 인증 현황</div>
+            <span id="kCertTabSummary" style="font-size:12px;color:#888;"></span>
+          </div>
+          <div id="kCertTabList" style="margin:0 -16px;"></div>
+        </div>
       </div>
 
       <!-- 끗짱 후기 -->
@@ -644,7 +655,8 @@ input:focus { outline: none; border-color: #2E33BC; }
     </div>
     <div id="kkutjjangNav" style="display:none;contents;">
       <div class="nav-item active" id="knav-home" onclick="kSwitchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
-      <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴관리</span></div>
+      <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
+      <div class="nav-item-cert" id="knav-cert" onclick="kSwitchTab('cert')"><div class="nav-cert-circle"><i class="ti ti-camera"></i></div><span>인증</span></div>
       <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="knav-my" onclick="kSwitchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
@@ -713,7 +725,7 @@ input:focus { outline: none; border-color: #2E33BC; }
   <div class="overlay" id="createRoutineOverlay">
     <div class="overlay-hd">
       <button class="back-btn" onclick="closeOverlay('createRoutineOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
-      <div><div style="font-size:11px;opacity:0.75;">루틴관리</div><div style="font-size:16px;font-weight:600;">새 루틴 만들기</div></div>
+      <div><div style="font-size:11px;opacity:0.75;">루틴</div><div style="font-size:16px;font-weight:600;">새 루틴 만들기</div></div>
     </div>
     <div class="overlay-body">
       <div><div class="field-label">루틴 이모지 <span class="required">* 필수</span></div><div class="emoji-grid" id="emojiGrid"></div></div>
@@ -906,7 +918,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div class="success-icon"><i class="ti ti-check" style="font-size:32px;color:white;"></i></div>
     <div style="font-size:18px;font-weight:600;color:#111;" id="createSuccessTitle"></div>
     <div style="font-size:14px;color:#888;text-align:center;line-height:1.6;">루틴이 등록됐어요!<br>청소년들의 참여를 기다려요.</div>
-    <button class="primary-btn" style="width:auto;padding:12px 32px;" onclick="closeCreateSuccess()">루틴관리로 이동</button>
+    <button class="primary-btn" style="width:auto;padding:12px 32px;" onclick="closeCreateSuccess()">루틴으로 이동</button>
   </div>
 
   <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
@@ -2228,11 +2240,12 @@ async function openReport() {
 // ════════════════════════════════════════════════════════
 function kSwitchTab(tab) {
   document.querySelectorAll('#kkutjjangTabs .tab-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('#kkutjjangNav .nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('#kkutjjangNav .nav-item, #kkutjjangNav .nav-item-cert').forEach(n=>n.classList.remove('active'));
   document.getElementById('kpage-'+tab).classList.add('active');
   document.getElementById('knav-'+tab).classList.add('active');
   if(tab==='home') kRenderHome();
   else if(tab==='routine') kRenderRoutineTab();
+  else if(tab==='cert') kRenderCertTab();
   else if(tab==='review') { kResetReviewFilter(); kRenderReviewTab('all'); }
   else if(tab==='my') kRenderMy();
 }
@@ -2311,7 +2324,30 @@ function kRenderHome() {
 }
 
 // ════════════════════════════════════════════════════════
-// 끗짱 루틴관리
+// 끗짱 인증 (오늘 인증 현황)
+// ════════════════════════════════════════════════════════
+function kRenderCertTab() {
+  const active=state.routines.filter(r=>r.status==='active');
+  const rows=active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
+  rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
+  const doneToday=rows.filter(x=>x.p.todayDone).length;
+  document.getElementById('kCertTabSummary').textContent = rows.length>0?`${doneToday}/${rows.length}명 완료`:'';
+  document.getElementById('kCertTabList').innerHTML = rows.length>0
+    ? rows.map(({r,p})=>`
+      <div class="youth-row" onclick="openKCertDetail(${r.id},'${(p.name||'').replace(/'/g,"\\'")}')">
+        <div class="youth-avatar" style="${p.todayDone?'':'background:#FBEAF0;color:#FF006C;'}">${p.name[0]}</div>
+        <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.title} · ${p.day}</div></div>
+        <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
+      </div>`).join('')
+    : `<div style="padding:48px 16px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:10px;">📸</div>
+        <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 인증 현황이 없어요</div>
+        <div style="font-size:12px;color:#aaa;">진행 중인 루틴이 열리면 여기에 표시돼요</div>
+      </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// 끗짱 루틴
 // ════════════════════════════════════════════════════════
 function kRenderRoutineTab() {
   document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));
