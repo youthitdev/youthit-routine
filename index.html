@@ -911,7 +911,9 @@ async function loadProfileAndEnter() {
   state.youth.nadaeum = profile.nadaeum || 0;
   state.youth.certDates = profile.cert_dates || [];
   state.kkutjjang.name = profile.name;
-  state.loginType = 'both';
+  const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
+  const isAdmin = ADMINS.includes(currentUser.email);
+  state.loginType = isAdmin ? 'both' : profile.role;
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
   enterAs(profile.role);
 }
