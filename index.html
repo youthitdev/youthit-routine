@@ -323,10 +323,12 @@ input:focus { outline: none; border-color: #2E33BC; }
         <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
       </div>
       <div id="signupYouthExtra">
-        <div class="role-row">
-          <button type="button" class="role-btn active" id="oosBtnYes" onclick="selectOutOfSchool(true)">학교 밖 청소년</button>
-          <button type="button" class="role-btn" id="oosBtnNo" onclick="selectOutOfSchool(false)">재학 중</button>
-        </div>
+        <select id="signupSchoolStatus" class="auth-input">
+          <option value="">재학 상태 선택</option>
+          <option value="out_of_school">학교 밖 청소년이에요</option>
+          <option value="enrolled">학교를 다녀요</option>
+          <option value="alternative">대안학교를 다녀요</option>
+        </select>
         <textarea id="signupReason" class="auth-input" rows="3" placeholder="한끗루틴에 참여하고 싶은 계기를 짧게 적어주세요." style="resize:none;"></textarea>
       </div>
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
@@ -1064,7 +1066,7 @@ async function loadProfileAndEnter() {
       phone: meta.phone || null,
       region_sido: meta.region_sido || null,
       region_sigugun: meta.region_sigugun || null,
-      is_out_of_school: meta.is_out_of_school ?? null,
+      school_status: meta.school_status || null,
       signup_reason: meta.signup_reason || null,
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
@@ -1084,7 +1086,7 @@ async function loadProfileAndEnter() {
   state.youth.phone = profile.phone || '';
   state.youth.regionSido = profile.region_sido || '';
   state.youth.regionSigugun = profile.region_sigugun || '';
-  state.youth.isOutOfSchool = profile.is_out_of_school ?? null;
+  state.youth.schoolStatus = profile.school_status || null;
   state.kkutjjang.name = profile.name;
   const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
   const isAdmin = ADMINS.includes(currentUser.email);
@@ -1106,7 +1108,6 @@ async function doLogin() {
   }
 }
 
-let signupIsOutOfSchool = true;
 async function doSignup() {
   const name = document.getElementById('signupName').value.trim();
   const realName = document.getElementById('signupRealName').value.trim();
@@ -1116,9 +1117,11 @@ async function doSignup() {
   const phone = document.getElementById('signupPhone').value.trim();
   const sido = document.getElementById('signupSido').value;
   const sigugun = document.getElementById('signupSigugun').value;
+  const schoolStatus = document.getElementById('signupSchoolStatus').value;
   const reason = document.getElementById('signupReason').value.trim();
   if (!name || !realName || !birthDate || !email || !pw || !phone || !sido || !sigugun) return showAuthMsg('모든 항목을 입력해주세요');
   if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
+  if (signupRole === 'youth' && !schoolStatus) return showAuthMsg('재학 상태를 선택해주세요');
   if (signupRole === 'youth' && !reason) return showAuthMsg('참여 계기를 입력해주세요');
   showAuthMsg('가입 중...');
   const { error } = await sb.auth.signUp({
@@ -1126,7 +1129,7 @@ async function doSignup() {
     options: { data: {
       name, role: signupRole, real_name: realName, birth_date: birthDate, phone,
       region_sido: sido, region_sigugun: sigugun,
-      is_out_of_school: signupRole === 'youth' ? signupIsOutOfSchool : null,
+      school_status: signupRole === 'youth' ? schoolStatus : null,
       signup_reason: signupRole === 'youth' ? reason : null,
     } }
   });
@@ -1147,11 +1150,6 @@ function selectSignupRole(role) {
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
   document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
-}
-function selectOutOfSchool(isOos) {
-  signupIsOutOfSchool = isOos;
-  document.getElementById('oosBtnYes').classList.toggle('active', isOos);
-  document.getElementById('oosBtnNo').classList.toggle('active', !isOos);
 }
 
 function showAuthMsg(msg) {

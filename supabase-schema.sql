@@ -19,7 +19,7 @@ CREATE TABLE profiles (
   phone         text,
   region_sido   text,
   region_sigugun text,
-  is_out_of_school boolean,
+  school_status text CHECK (school_status IN ('out_of_school','enrolled','alternative')),
   signup_reason text,
   created_at    timestamptz DEFAULT now()
 );
@@ -197,7 +197,7 @@ CREATE POLICY "nadaeum_insert" ON nadaeum_log FOR INSERT WITH CHECK (auth.uid() 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, is_out_of_school, signup_reason)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -207,7 +207,7 @@ BEGIN
     NEW.raw_user_meta_data->>'phone',
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
-    (NEW.raw_user_meta_data->>'is_out_of_school')::boolean,
+    NEW.raw_user_meta_data->>'school_status',
     NEW.raw_user_meta_data->>'signup_reason'
   );
   RETURN NEW;
@@ -312,7 +312,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birth_date date;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS region_sido text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS region_sigugun text;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_out_of_school boolean;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school_status text CHECK (school_status IN ('out_of_school','enrolled','alternative'));
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS signup_reason text;
 
 -- 2) routines: 참여 자격 (전체 / 학교밖청소년 전용)
@@ -325,7 +325,7 @@ ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS application_note text;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, is_out_of_school, signup_reason)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -335,9 +335,16 @@ BEGIN
     NEW.raw_user_meta_data->>'phone',
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
-    (NEW.raw_user_meta_data->>'is_out_of_school')::boolean,
+    NEW.raw_user_meta_data->>'school_status',
     NEW.raw_user_meta_data->>'signup_reason'
   );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-07d] 학교 밖 여부 → 재학 상태 셀렉트로 변경
+-- 위 2026-07-07c를 이미 실행한 프로젝트라면 아래만 실행하세요.
+-- =====================================================
+ALTER TABLE profiles DROP COLUMN IF EXISTS is_out_of_school;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school_status text CHECK (school_status IN ('out_of_school','enrolled','alternative'));
