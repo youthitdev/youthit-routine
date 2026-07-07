@@ -307,13 +307,27 @@ input:focus { outline: none; border-color: #2E33BC; }
       <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
     </div>
     <!-- 회원가입 폼 -->
-    <div class="auth-form" id="authFormSignup" style="display:none;">
-      <input type="text" id="signupName" class="auth-input" placeholder="이름 (앱에서 사용할 이름)">
+    <div class="auth-form" id="authFormSignup" style="display:none;max-height:60vh;overflow-y:auto;">
+      <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
+      <input type="text" id="signupRealName" class="auth-input" placeholder="이름 (실명)">
+      <input type="date" id="signupBirth" class="auth-input">
       <input type="email" id="signupEmail" class="auth-input" placeholder="이메일">
       <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)">
+      <input type="tel" id="signupPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
+      <div style="display:flex;gap:6px;">
+        <select id="signupSido" class="auth-input" style="flex:1;" onfocus="populateSidoSelect()" onchange="populateSigugunSelect()"><option value="">시/도 선택</option></select>
+        <select id="signupSigugun" class="auth-input" style="flex:1;"><option value="">시/군/구 선택</option></select>
+      </div>
       <div class="role-row">
         <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
+      </div>
+      <div id="signupYouthExtra">
+        <div class="role-row">
+          <button type="button" class="role-btn active" id="oosBtnYes" onclick="selectOutOfSchool(true)">학교 밖 청소년</button>
+          <button type="button" class="role-btn" id="oosBtnNo" onclick="selectOutOfSchool(false)">재학 중</button>
+        </div>
+        <textarea id="signupReason" class="auth-input" rows="3" placeholder="한끗루틴에 참여하고 싶은 계기를 짧게 적어주세요." style="resize:none;"></textarea>
       </div>
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
     </div>
@@ -434,7 +448,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div style="flex:1;min-width:0;">
               <div style="font-size:16px;font-weight:600;color:#111;" id="myName"></div>
               <div><span style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span></div>
-              <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입</div>
+              <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openSheet('editProfileBg')"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#888;cursor:pointer;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px;"></i> 로그아웃</button>
@@ -696,6 +710,21 @@ input:focus { outline: none; border-color: #2E33BC; }
     </div>
   </div>
 
+  <!-- 루틴 참여 신청 -->
+  <div class="overlay" id="applyRoutineOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('applyRoutineOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">참여 신청</div><div style="font-size:16px;font-weight:600;">이 루틴에 임하는 각오</div></div>
+    </div>
+    <div class="overlay-body">
+      <div>
+        <div class="field-label">참여 각오 / 소감 <span class="required">* 필수</span></div>
+        <textarea id="applyNote" rows="5" placeholder="이 루틴을 신청하는 이유나 각오를 10자 이상 적어주세요." maxlength="300"></textarea>
+      </div>
+      <button class="primary-btn" onclick="submitApplyRoutine()">신청하기</button>
+    </div>
+  </div>
+
   <!-- 인증 작성 -->
   <div class="overlay" id="certFormOverlay">
     <div class="overlay-hd">
@@ -731,6 +760,7 @@ input:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">루틴 이모지 <span class="required">* 필수</span></div><div class="emoji-grid" id="emojiGrid"></div></div>
       <div><div class="field-label">루틴 이름 <span class="required">* 필수</span></div><input type="text" id="rName" placeholder="예) 아침 루틴 21일" maxlength="20" oninput="updateCreatePreview();document.getElementById('nameCount').textContent=this.value.length"><div class="char-end"><span id="nameCount">0</span>/20</div></div>
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
+      <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">🌱 누구나 참여</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">🎓 학교밖청소년 전용</button></div></div>
       <div><div class="field-label">기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
@@ -963,6 +993,41 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 let currentUser = null;
 let signupRole = 'youth';
 
+const REGION_DATA = {
+  '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
+  '부산광역시': ['중구','서구','동구','영도구','부산진구','동래구','남구','북구','해운대구','사하구','금정구','강서구','연제구','수영구','사상구','기장군'],
+  '대구광역시': ['중구','동구','서구','남구','북구','수성구','달서구','달성군','군위군'],
+  '인천광역시': ['중구','동구','미추홀구','연수구','남동구','부평구','계양구','서구','강화군','옹진군'],
+  '광주광역시': ['동구','서구','남구','북구','광산구'],
+  '대전광역시': ['동구','중구','서구','유성구','대덕구'],
+  '울산광역시': ['중구','남구','동구','북구','울주군'],
+  '세종특별자치시': ['세종특별자치시'],
+  '경기도': ['수원시','성남시','의정부시','안양시','부천시','광명시','평택시','동두천시','안산시','고양시','과천시','구리시','남양주시','오산시','시흥시','군포시','의왕시','하남시','용인시','파주시','이천시','안성시','김포시','화성시','광주시','양주시','포천시','여주시','연천군','가평군','양평군'],
+  '강원특별자치도': ['춘천시','원주시','강릉시','동해시','태백시','속초시','삼척시','홍천군','횡성군','영월군','평창군','정선군','철원군','화천군','양구군','인제군','고성군','양양군'],
+  '충청북도': ['청주시','충주시','제천시','보은군','옥천군','영동군','증평군','진천군','괴산군','음성군','단양군'],
+  '충청남도': ['천안시','공주시','보령시','아산시','서산시','논산시','계룡시','당진시','금산군','부여군','서천군','청양군','홍성군','예산군','태안군'],
+  '전북특별자치도': ['전주시','군산시','익산시','정읍시','남원시','김제시','완주군','진안군','무주군','장수군','임실군','순창군','고창군','부안군'],
+  '전라남도': ['목포시','여수시','순천시','나주시','광양시','담양군','곡성군','구례군','고흥군','보성군','화순군','장흥군','강진군','해남군','영암군','무안군','함평군','영광군','장성군','완도군','진도군','신안군'],
+  '경상북도': ['포항시','경주시','김천시','안동시','구미시','영주시','영천시','상주시','문경시','경산시','의성군','청송군','영양군','영덕군','청도군','고령군','성주군','칠곡군','예천군','봉화군','울진군','울릉군'],
+  '경상남도': ['창원시','진주시','통영시','사천시','김해시','밀양시','거제시','양산시','의령군','함안군','창녕군','고성군','남해군','하동군','산청군','함양군','거창군','합천군'],
+  '제주특별자치도': ['제주시','서귀포시'],
+};
+function populateSidoSelect(){
+  const sel=document.getElementById('signupSido');
+  if(!sel||sel.options.length>1) return;
+  Object.keys(REGION_DATA).forEach(sido=>{
+    const o=document.createElement('option'); o.value=sido; o.textContent=sido; sel.appendChild(o);
+  });
+}
+function populateSigugunSelect(){
+  const sido=document.getElementById('signupSido').value;
+  const sel=document.getElementById('signupSigugun');
+  sel.innerHTML='<option value="">시/군/구 선택</option>';
+  (REGION_DATA[sido]||[]).forEach(g=>{
+    const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o);
+  });
+}
+
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
@@ -994,6 +1059,13 @@ async function loadProfileAndEnter() {
       id: currentUser.id,
       name: meta.name || '익명',
       role: meta.role || 'youth',
+      real_name: meta.real_name || null,
+      birth_date: meta.birth_date || null,
+      phone: meta.phone || null,
+      region_sido: meta.region_sido || null,
+      region_sigugun: meta.region_sigugun || null,
+      is_out_of_school: meta.is_out_of_school ?? null,
+      signup_reason: meta.signup_reason || null,
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
     profile = created;
@@ -1007,6 +1079,12 @@ async function loadProfileAndEnter() {
   state.youth.certDates = profile.cert_dates || [];
   state.youth.verifyStatus = profile.verify_status || 'none';
   state.youth.verifyDocUrl = profile.verify_doc_url || null;
+  state.youth.realName = profile.real_name || '';
+  state.youth.birthDate = profile.birth_date || null;
+  state.youth.phone = profile.phone || '';
+  state.youth.regionSido = profile.region_sido || '';
+  state.youth.regionSigugun = profile.region_sigugun || '';
+  state.youth.isOutOfSchool = profile.is_out_of_school ?? null;
   state.kkutjjang.name = profile.name;
   const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
   const isAdmin = ADMINS.includes(currentUser.email);
@@ -1028,16 +1106,29 @@ async function doLogin() {
   }
 }
 
+let signupIsOutOfSchool = true;
 async function doSignup() {
   const name = document.getElementById('signupName').value.trim();
+  const realName = document.getElementById('signupRealName').value.trim();
+  const birthDate = document.getElementById('signupBirth').value;
   const email = document.getElementById('signupEmail').value.trim();
   const pw = document.getElementById('signupPw').value;
-  if (!name || !email || !pw) return showAuthMsg('모든 항목을 입력해주세요');
+  const phone = document.getElementById('signupPhone').value.trim();
+  const sido = document.getElementById('signupSido').value;
+  const sigugun = document.getElementById('signupSigugun').value;
+  const reason = document.getElementById('signupReason').value.trim();
+  if (!name || !realName || !birthDate || !email || !pw || !phone || !sido || !sigugun) return showAuthMsg('모든 항목을 입력해주세요');
   if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
+  if (signupRole === 'youth' && !reason) return showAuthMsg('참여 계기를 입력해주세요');
   showAuthMsg('가입 중...');
   const { error } = await sb.auth.signUp({
     email, password: pw,
-    options: { data: { name, role: signupRole } }
+    options: { data: {
+      name, role: signupRole, real_name: realName, birth_date: birthDate, phone,
+      region_sido: sido, region_sigugun: sigugun,
+      is_out_of_school: signupRole === 'youth' ? signupIsOutOfSchool : null,
+      signup_reason: signupRole === 'youth' ? reason : null,
+    } }
   });
   if (error) showAuthMsg('⚠️ ' + error.message);
   else showAuthMsg('✅ 가입 완료! 자동 로그인 중...');
@@ -1055,6 +1146,12 @@ function selectSignupRole(role) {
   signupRole = role;
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
+  document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
+}
+function selectOutOfSchool(isOos) {
+  signupIsOutOfSchool = isOos;
+  document.getElementById('oosBtnYes').classList.toggle('active', isOos);
+  document.getElementById('oosBtnNo').classList.toggle('active', !isOos);
 }
 
 function showAuthMsg(msg) {
@@ -1163,6 +1260,7 @@ async function loadRoutines() {
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       people: approved.length, maxPeople: r.max_people || 10,
       desc: r.description || '', tag: r.tag || '생활', partnerOrg: r.partner_org || null,
+      eligibility: r.eligibility || 'all',
       certCount: rCerts.length, avgRate: 0, createdBy: r.created_by,
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
@@ -1172,7 +1270,7 @@ async function loadRoutines() {
       })),
       applicants: rParts.map(p => ({
         userId: p.user_id, name: nameById[p.user_id] || '익명',
-        date: _relDate(p.joined_at), status: p.status,
+        date: _relDate(p.joined_at), status: p.status, note: p.application_note || '',
       })),
     };
   });
@@ -1532,6 +1630,7 @@ function renderRoutineGrid(type, q) {
         ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
         <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
         <span class="rc-people">👤 ${peopleTxt}</span>
+        ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">
         <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:${r.partnerOrg?'3px':'5px'};min-height:17px;">${isDone?'✓ ':''}${hl(r.title)}</div>
@@ -1548,6 +1647,12 @@ function renderRoutineGrid(type, q) {
       <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 등록된 루틴이 없어요</div>
       <div style="font-size:12px;color:#aaa;">곧 새로운 루틴이 열릴 거예요!</div>
     </div>`;
+}
+function _birthdayInfo(dateStr) {
+  if(!dateStr) return null;
+  const b=new Date(dateStr+'T00:00:00');
+  const age=new Date().getFullYear()-b.getFullYear()+1; // 한국식 나이
+  return { label:`${b.getMonth()+1}월 ${b.getDate()}일`, age };
 }
 function _dday(dateStr) {
   if(!dateStr) return null;
@@ -1764,6 +1869,7 @@ function openRoutineDetail(id) {
   document.getElementById('rdSub').textContent=r.tag;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.people}명 참여</div>
@@ -1772,15 +1878,18 @@ function openRoutineDetail(id) {
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
+  const needsDoc = r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved';
   if(r.status==='recruit') body+=`
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
       <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
     </div>
-    ${isPending
+    ${needsDoc
+      ? `<div style="width:100%;padding:14px;background:#FFF8E1;border-radius:12px;font-size:13px;color:#856404;text-align:center;line-height:1.5;">🎓 학교밖청소년 전용 루틴이에요<br>MY 탭에서 확인 서류를 제출하고 승인받으면 신청할 수 있어요</div>`
+      : isPending
       ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:14px;color:#888;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
           <i class="ti ti-clock" style="font-size:16px;color:#aaa;"></i> 승인 대기 중이에요
         </div>`
-      : `<button class="primary-btn" onclick="joinRoutine(${r.id})">참여 신청하기</button>`
+      : `<button class="primary-btn" onclick="openApplyOverlay(${r.id})">참여 신청하기</button>`
     }`;
   else if(r.status==='done') body+=`
     <div style="text-align:center;padding:16px 0 8px;">
@@ -1792,18 +1901,32 @@ function openRoutineDetail(id) {
   document.getElementById('rdBody').innerHTML=body;
   openOverlay('routineDetailOverlay');
 }
-async function joinRoutine(id) {
+let applyRoutineId=null;
+function openApplyOverlay(id){
   if(!currentUser){alert('로그인이 필요해요.');return;}
-  if(state.youth.verifyStatus !== 'approved'){
+  applyRoutineId=id;
+  document.getElementById('applyNote').value='';
+  openOverlay('applyRoutineOverlay');
+}
+async function submitApplyRoutine(){
+  const id=applyRoutineId;
+  const note=document.getElementById('applyNote').value.trim();
+  if(!note||note.length<10){alert('참여 각오를 10자 이상 적어주세요.');return;}
+  const r=state.routines.find(x=>x.id===id);
+  if(r && r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved'){
     alert('학교밖청소년 확인서 승인 후 루틴에 참여할 수 있어요.\nMY 탭에서 서류를 제출해주세요.');
     return;
   }
   if((state.youth.pendingRoutines||[]).includes(id)) return;
+  const btn=document.querySelector('#applyRoutineOverlay .primary-btn');
+  if(btn){btn.disabled=true;btn.textContent='신청 중...';}
   const { error } = await sb.from('routine_participants').insert({
-    routine_id:id, user_id:currentUser.id, status:'pending',
+    routine_id:id, user_id:currentUser.id, status:'pending', application_note:note,
   });
+  if(btn){btn.disabled=false;btn.textContent='신청하기';}
   if(error){ alert('신청 실패: '+error.message); return; }
   await loadRoutines();
+  closeOverlay('applyRoutineOverlay');
   closeOverlay('routineDetailOverlay');
   document.getElementById('rdBody').innerHTML='';
   renderRoutine();
@@ -2137,6 +2260,8 @@ function renderMy() {
   document.getElementById('myName').textContent=state.youth.name;
   document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('myJoinDate').textContent=state.youth.joinDate;
+  const bday=_birthdayInfo(state.youth.birthDate);
+  document.getElementById('myBirthday').textContent=bday?` · 🎂 ${bday.label} (${bday.age}세)`:'';
   document.getElementById('myCertCount').textContent=state.youth.certCount;
   document.getElementById('myStreak').textContent=_streak(state.youth.certDates)+'일';
   document.getElementById('myCommCount').textContent=state.youth.commCount;
@@ -2386,6 +2511,7 @@ function kFilterRoutine(type,el) {
         ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
         <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
         <span class="rc-people">👤 ${r.people}명</span>
+        ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">
         <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;margin-bottom:${r.partnerOrg?'3px':'5px'};">${isDone?'✓ ':''}${r.title}</div>
@@ -2439,17 +2565,20 @@ function openKRoutineDetail(routineId) {
         <div style="font-size:11px;font-weight:500;color:#856404;background:#FFF3CD;padding:4px 10px;border-radius:8px;margin-bottom:8px;display:inline-block;">⏳ 승인 대기 ${pending.length}명</div>`:''}
         <div style="display:flex;flex-direction:column;gap:8px;">
           ${applicants.map(a=>`
-            <div style="display:flex;align-items:center;gap:10px;padding:12px;background:${a.status==='approved'?'#EAF3DE':a.status==='rejected'?'#f5f5f5':'#fff'};border:0.5px solid ${a.status==='approved'?'#83CA00':a.status==='rejected'?'#e0e0e0':'#e8e8e8'};border-radius:12px;">
-              <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
-              <div style="flex:1;">
-                <div style="font-size:13px;font-weight:500;color:${a.status==='rejected'?'#aaa':'#111'};">${a.name}</div>
-                <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
+            <div style="padding:12px;background:${a.status==='approved'?'#EAF3DE':a.status==='rejected'?'#f5f5f5':'#fff'};border:0.5px solid ${a.status==='approved'?'#83CA00':a.status==='rejected'?'#e0e0e0':'#e8e8e8'};border-radius:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:500;color:${a.status==='rejected'?'#aaa':'#111'};">${a.name}</div>
+                  <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
+                </div>
+                ${a.status==='pending'?`
+                  <button onclick="approveApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
+                  <button onclick="rejectApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
+                :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>`
+                :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
               </div>
-              ${a.status==='pending'?`
-                <button onclick="approveApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
-                <button onclick="rejectApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
-              :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>`
-              :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
+              ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;">💬 ${a.note}</div>`:''}
             </div>`).join('')}
         </div>`}`;
   openOverlay('routineDetailOverlay');
@@ -2493,7 +2622,12 @@ function openKCertDetail(rid,name) {
 
 // 루틴 만들기
 const EMOJIS=['🌱','🌿','🌳','🌞','🏃','📚','💧','🍳','🎵','✍️','🧘','🚶'];
-let selectedEmoji='🌱', createHasPhoto=false;
+let selectedEmoji='🌱', createHasPhoto=false, createEligibility='all';
+function selectEligibility(v){
+  createEligibility=v;
+  document.getElementById('rEligAll').classList.toggle('active', v==='all');
+  document.getElementById('rEligOos').classList.toggle('active', v==='out_of_school');
+}
 function openCreateRoutine() {
   selectedEmoji='🌱'; createHasPhoto=false;
   renderEmojiGrid(); updateCreatePreview();
@@ -2552,6 +2686,7 @@ async function submitCreateRoutine(){
   coverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
   const { error } = await sb.from('routines').insert({
     title:n, emoji:selectedEmoji, description:d, tag:'생활', partner_org:partner||null,
+    eligibility:createEligibility,
     start_date:s, end_date:e, max_people:parseInt(p),
     status:'recruit', created_by:currentUser.id, cover_image_url:coverUrl,
   });
@@ -2568,7 +2703,7 @@ function closeCreateSuccess(){
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
-  createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱';
+  createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱'; selectEligibility('all');
   const pu=document.getElementById('createPhotoUpload');
   if(pu){ pu.className='photo-upload'; pu.innerHTML=`<i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div>`; pu.onclick=()=>document.getElementById('createPhotoInput').click(); }
   renderEmojiGrid(); updateCreatePreview(); kRenderRoutineTab();
@@ -2929,6 +3064,7 @@ if(localStorage.getItem('hankkut_onboarding_done')) {
 // ════════════════════════════════════════════════════════
 // 초기화
 // ════════════════════════════════════════════════════════
+populateSidoSelect();
 initAuth();
 </script>
 <script>

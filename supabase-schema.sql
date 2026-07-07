@@ -14,6 +14,13 @@ CREATE TABLE profiles (
   cert_dates    text[] DEFAULT '{}',
   verify_status text DEFAULT 'none' CHECK (verify_status IN ('none','pending','approved','rejected')),
   verify_doc_url text,
+  real_name     text,
+  birth_date    date,
+  phone         text,
+  region_sido   text,
+  region_sigugun text,
+  is_out_of_school boolean,
+  signup_reason text,
   created_at    timestamptz DEFAULT now()
 );
 
@@ -28,6 +35,7 @@ CREATE TABLE routines (
   start_date  date,
   end_date    date,
   max_people  int  DEFAULT 10,
+  eligibility text DEFAULT 'all' CHECK (eligibility IN ('all', 'out_of_school')),
   status      text DEFAULT 'recruit' CHECK (status IN ('recruit', 'active', 'done')),
   created_by  uuid REFERENCES auth.users ON DELETE SET NULL,
   created_at  timestamptz DEFAULT now()
@@ -40,6 +48,7 @@ CREATE TABLE routine_participants (
   routine_id  bigint REFERENCES routines(id) ON DELETE CASCADE,
   user_id     uuid   REFERENCES auth.users   ON DELETE CASCADE,
   status      text   DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  application_note text,
   joined_at   timestamptz DEFAULT now(),
   PRIMARY KEY (routine_id, user_id)
 );
@@ -188,11 +197,18 @@ CREATE POLICY "nadaeum_insert" ON nadaeum_log FOR INSERT WITH CHECK (auth.uid() 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, is_out_of_school, signup_reason)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'youth')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    (NEW.raw_user_meta_data->>'is_out_of_school')::boolean,
+    NEW.raw_user_meta_data->>'signup_reason'
   );
   RETURN NEW;
 END;
@@ -284,3 +300,44 @@ DROP POLICY IF EXISTS "routine_covers_select_all" ON storage.objects;
 CREATE POLICY "routine_covers_select_all" ON storage.objects FOR SELECT USING (
   bucket_id = 'routine-covers'
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-07c] 가입 시 기본정보 + 루틴 참여자격 + 신청 각오
+-- 기존 프로젝트에 이미 profiles/routines/routine_participants가 있다면 아래만 실행하세요.
+-- =====================================================
+
+-- 1) profiles: 가입 시 받는 기본정보
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS real_name text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birth_date date;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS region_sido text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS region_sigugun text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_out_of_school boolean;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS signup_reason text;
+
+-- 2) routines: 참여 자격 (전체 / 학교밖청소년 전용)
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS eligibility text DEFAULT 'all' CHECK (eligibility IN ('all', 'out_of_school'));
+
+-- 3) routine_participants: 신청 시 각오/소감
+ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS application_note text;
+
+-- 4) 신규 가입 트리거 갱신 (기본정보까지 함께 저장)
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, is_out_of_school, signup_reason)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    (NEW.raw_user_meta_data->>'is_out_of_school')::boolean,
+    NEW.raw_user_meta_data->>'signup_reason'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
