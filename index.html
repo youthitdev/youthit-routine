@@ -423,8 +423,9 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">인증 +10N · 댓글 +1N<br>후기 +30N</div>
             </div>
           </div>
-          <div class="stats-grid-3">
+          <div class="stats-grid-3" style="grid-template-columns:repeat(2,minmax(0,1fr));">
             <div class="stat-card"><span style="font-size:18px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label">총 인증 수</span></div>
+            <div class="stat-card"><span style="font-size:18px;">🔥</span><span class="stat-val" id="myStreak">0</span><span class="stat-label">연속 인증</span></div>
             <div class="stat-card"><span style="font-size:18px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label">소통 수</span></div>
             <div class="stat-card"><span style="font-size:18px;">🏅</span><span class="stat-val" id="myCompleteCount">0</span><span class="stat-label">완주한 루틴</span></div>
           </div>
@@ -438,9 +439,12 @@ input:focus { outline: none; border-color: #2E33BC; }
               </div>
             </div>
             <div id="calGrid" style="margin-top:8px;"></div>
-            <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px;padding-top:8px;padding-right:16px;border-top:0.5px solid #f0f0f0;">
-              <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#83CA00;flex-shrink:0;"></div>인증 완료</div>
-              <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#f0f0f0;flex-shrink:0;"></div>미인증</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:8px 16px 0;border-top:0.5px solid #f0f0f0;">
+              <span id="calMonthSummary" style="font-size:11px;font-weight:600;color:#3B6D11;"></span>
+              <div style="display:flex;gap:12px;">
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#83CA00;flex-shrink:0;"></div>인증 완료</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#f0f0f0;flex-shrink:0;"></div>미인증</div>
+              </div>
             </div>
           </div>
           <div class="ai-card">
@@ -1440,27 +1444,56 @@ function renderRoutineGrid(type, q) {
   });
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
-    const cardBg=isDone?'#f0f0f0':'#fff';
-    const cardBorder=isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
-    const bw=isActive?'1.5px':'0.5px';
+    const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
+    const cardBg=isDone?'#fafafa':'#fff';
+    const cardBorder=isDone?'#e8e8e8':isActive?'#2E33BC':isPending?'#FFD600':'#e8e8e8';
+    const bw=isActive||isPending?'1.5px':'0.5px';
     const tc=isDone?'#aaa':'#111';
-    const sl=isActive?'참여 중':isRecruit?'모집 중':'완료';
-    const bb=isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
-    const bc=isActive?'#fff':isRecruit?'#185FA5':'#aaa';
+    const sl=isActive?'참여 중':isRecruit?(isPending?'⏳ 승인 대기':'모집 중'):'완주';
+    const bb=isActive?'#2E33BC':isRecruit?(isPending?'#FFF3CD':'#E6F1FB'):'#f0f0f0';
+    const bc=isActive?'#fff':isRecruit?(isPending?'#856404':'#185FA5'):'#aaa';
+    // D-day
+    const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
+    const ddHtml = dd===null ? '' : isRecruit
+      ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">오늘 시작!</span>`:'')
+      : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">마지막 날</span>`:'');
+    // 하단 정보줄
+    const capPct = Math.min(100, Math.round((r.people||0)/(r.maxPeople||1)*100));
+    const bottom = isActive
+      ? `<div style="display:flex;align-items:center;gap:6px;margin-top:9px;">
+           <div style="flex:1;height:4px;border-radius:2px;background:#f0f0f0;overflow:hidden;"><div style="height:100%;width:${r.progress||0}%;background:#2E33BC;border-radius:2px;"></div></div>
+           <span style="font-size:10px;flex-shrink:0;${r.todayCert?'color:#3B6D11;font-weight:700;':'color:#bbb;'}">${r.todayCert?'오늘 ✓':'오늘 전'}</span>
+         </div>`
+      : isRecruit
+      ? `<div style="display:flex;align-items:center;gap:6px;margin-top:9px;">
+           <div style="flex:1;height:4px;border-radius:2px;background:#f0f0f0;overflow:hidden;"><div style="height:100%;width:${capPct}%;background:#83CA00;border-radius:2px;"></div></div>
+           <span style="font-size:10px;color:#888;flex-shrink:0;">${r.people}/${r.maxPeople}명</span>
+         </div>`
+      : `<div style="margin-top:9px;font-size:10px;color:#aaa;">🏅 완주 · ${r.people}명 함께함</div>`;
     const matchedNicks=q?CERT_FEED.filter(c=>c.routineId===r.id&&c.name.toLowerCase().includes(q.toLowerCase())).map(c=>c.name):[];
     const nickHtml=matchedNicks.length>0?`<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${matchedNicks.map(n=>`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:10px;">${hl(n)}</span>`).join('')}</div>`:'';
-    return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:4px;">
-        <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.3;">${isDone?'✓ ':''}${r.emoji} ${hl(r.title)}</div>
-        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:500;">${sl}</span>
+    return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:4px;">
+        <div style="width:38px;height:38px;border-radius:12px;background:${isDone?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;${isDone?'filter:grayscale(0.6);':''}">${r.emoji}</div>
+        <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:600;">${sl}</span>
       </div>
-      <div style="font-size:11px;color:${isDone?'#bbb':'#888'};margin-bottom:5px;">${r.period}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
-        <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
-      </div>${nickHtml}
+      <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:4px;min-height:17px;">${isDone?'✓ ':''}${hl(r.title)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+        <span style="font-size:11px;color:${isDone?'#ccc':'#999'};">${r.period}</span>
+        ${ddHtml}
+      </div>
+      ${bottom}${nickHtml}
     </div>`;
-  }).join('');
+  }).join('') || `<div style="grid-column:1/-1;padding:44px 16px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:10px;">🌱</div>
+      <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 등록된 루틴이 없어요</div>
+      <div style="font-size:12px;color:#aaa;">곧 새로운 루틴이 열릴 거예요!</div>
+    </div>`;
+}
+function _dday(dateStr) {
+  if(!dateStr) return null;
+  const t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((new Date(dateStr+'T00:00:00') - t) / 86400000);
 }
 
 function toggleSearch() {
@@ -1872,24 +1905,37 @@ function closeCertSuccess() {
 // 커뮤니티
 // ════════════════════════════════════════════════════════
 let commFilter='all';
+const AVATAR_COLORS=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1','#D4C5F9','#A8E0D4'];
+function _avColor(name){let h=0;for(const ch of (name||'?'))h=(h*31+ch.charCodeAt(0))>>>0;return AVATAR_COLORS[h%AVATAR_COLORS.length];}
+function _postCard(p, likeFn) {
+  const isNotice=p.type==='notice';
+  return `<div style="background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+      ${isNotice
+        ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
+        :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
+      <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
+      <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
+    </div>
+    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
+    <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
+    <div style="margin-top:12px;">
+      <span onclick="${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
+        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
+      </span>
+    </div>
+  </div>`;
+}
 function renderComm(f) {
   commFilter=f;
   const list=f==='all'?state.posts:state.posts.filter(p=>p.type===f);
-  document.getElementById('postList').innerHTML=list.map(p=>`
-    <div style="background:${p.type==='notice'?'#f0f1fb':'#fff'};border:0.5px solid ${p.type==='notice'?'#2E33BC':'#e8e8e8'};border-radius:16px;padding:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        ${p.type==='notice'?'<span style="background:#2E33BC;color:white;font-size:10px;padding:2px 8px;border-radius:10px;">공지</span>':''}
-        <span style="font-size:12px;color:#888;">${p.author}</span>
-        <span style="font-size:12px;color:#aaa;margin-left:auto;">${p.date}</span>
-      </div>
-      <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:4px;">${p.title}</div>
-      <div style="font-size:13px;color:#666;line-height:1.5;">${p.content}</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
-        <div onclick="togglePostLike(${p.id})" style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px;color:#aaa;">
-          <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#ccc'};"></i>${p.likes}
-        </div>
-      </div>
-    </div>`).join('');
+  document.getElementById('postList').innerHTML = list.length>0
+    ? list.map(p=>_postCard(p,'togglePostLike')).join('')
+    : `<div style="padding:52px 16px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:10px;">💬</div>
+        <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 이야기가 없어요</div>
+        <div style="font-size:12px;color:#aaa;">첫 번째 이야기를 남겨볼까요?</div>
+      </div>`;
 }
 function filterComm(t,el) {
   document.querySelectorAll('#commFilter .chip').forEach(c=>c.classList.remove('active'));
@@ -1994,6 +2040,10 @@ function renderCal() {
   }
   html+=`</div>`;
   document.getElementById('calGrid').innerHTML=html;
+  const mPrefix=`${calYear}-${String(calMonth+1).padStart(2,'0')}-`;
+  const mCount=(state.youth.certDates||[]).filter(d=>d.startsWith(mPrefix)).length;
+  const sumEl=document.getElementById('calMonthSummary');
+  if(sumEl) sumEl.textContent = mCount>0 ? `🌱 이번 달 ${mCount}일 인증` : '';
 }
 function calPrevMonth(){if(calMonth===0){calMonth=11;calYear--;}else calMonth--;renderCal();}
 function calNextMonth(){const n=new Date();if(calYear>n.getFullYear()||(calYear===n.getFullYear()&&calMonth>=n.getMonth()))return;if(calMonth===11){calMonth=0;calYear++;}else calMonth++;renderCal();}
@@ -2006,6 +2056,7 @@ function renderMy() {
   document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('myJoinDate').textContent=state.youth.joinDate;
   document.getElementById('myCertCount').textContent=state.youth.certCount;
+  document.getElementById('myStreak').textContent=_streak(state.youth.certDates)+'일';
   document.getElementById('myCommCount').textContent=state.youth.commCount;
   document.getElementById('myCompleteCount').textContent=state.youth.completeCount;
   const done=state.routines.filter(r=>r.status==='done');
@@ -2342,42 +2393,38 @@ function kResetReviewFilter() {
   document.querySelectorAll('#kReviewFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#kReviewFilterBar .chip').classList.add('active');
 }
+let kReviewFilter='all';
 function kRenderReviewTab(filter) {
+  kReviewFilter=filter||'all';
   const list = filter==='notice' ? state.posts.filter(p=>p.type==='notice')
     : filter==='review' ? state.posts.filter(p=>p.type==='review')
     : state.posts;
   const el=document.getElementById('kReviewFeed');
   if(!el) return;
   el.innerHTML = list.length > 0
-    ? list.map(p=>`
-      <div style="background:${p.type==='notice'?'#f0f1fb':'#fff'};border:0.5px solid ${p.type==='notice'?'#2E33BC':'#e8e8e8'};border-radius:16px;padding:14px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          ${p.type==='notice'?`<span style="background:#2E33BC;color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;">📢 공지</span>`:`<div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${p.author[0]}</div>`}
-          <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${p.author}</div></div>
-          <div style="font-size:11px;color:#aaa;">${p.date}</div>
-        </div>
-        <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:6px;">${p.title}</div>
-        <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
-        <div style="display:flex;align-items:center;gap:5px;margin-top:10px;cursor:pointer;" onclick="toggleKPostLike(${p.id})">
-          <i class="ti ti-heart${p.liked?'-filled':''}" id="kPHeart_${p.id}" style="font-size:16px;color:${p.liked?'#FF006C':'#ccc'};"></i>
-          <span id="kPLike_${p.id}" style="font-size:12px;color:#aaa;">${p.likes}</span>
-        </div>
-      </div>`).join('')
-    : `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;">아직 글이 없어요</div>`;
+    ? list.map(p=>_postCard(p,'toggleKPostLike')).join('')
+    : `<div style="padding:52px 16px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:10px;">💬</div>
+        <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 글이 없어요</div>
+        <div style="font-size:12px;color:#aaa;">청소년들에게 첫 소식을 전해보세요</div>
+      </div>`;
 }
 function kFilterReview(type,el) {
   document.querySelectorAll('#kReviewFilterBar .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   kRenderReviewTab(type);
 }
-function toggleKPostLike(id) {
+async function toggleKPostLike(id) {
+  if(!currentUser) return;
   const p=state.posts.find(x=>x.id===id);
   if(!p) return;
-  p.liked=!p.liked; p.likes+=p.liked?1:-1; save();
-  const hi=document.getElementById('kPHeart_'+id);
-  const li=document.getElementById('kPLike_'+id);
-  if(hi){hi.className='ti ti-heart'+(p.liked?'-filled':'');hi.style.color=p.liked?'#FF006C':'#ccc';}
-  if(li) li.textContent=p.likes;
+  if(p.liked){
+    await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id);
+  } else {
+    await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
+  }
+  await loadPosts();
+  kRenderReviewTab(kReviewFilter);
 }
 
 // ════════════════════════════════════════════════════════
