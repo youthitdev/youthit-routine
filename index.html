@@ -496,6 +496,16 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
           </div>
 
+          <div class="section-card">
+            <div class="section-hd"><div class="section-hd-title">📸 오늘 인증 현황</div></div>
+            <div id="kTodayCertStatus"></div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-hd"><div class="section-hd-title">✍️ 내가 올린 글</div><span style="font-size:12px;color:#888;" id="kMyPostCount"></span></div>
+            <div id="kMyPostList"></div>
+          </div>
+
           <div class="menu-card">
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
@@ -1972,6 +1982,42 @@ function kRenderMy() {
       </div>`).join('')
       +(letters.length>2?`<div class="more-btn" onclick="openAllLetters()">편지 더보기 (${letters.length}통) <i class="ti ti-chevron-right" style="font-size:13px;"></i></div>`:'')
     :`<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 받은 편지가 없어요</div>`;
+
+  // 오늘 인증 현황
+  const activeRoutines = state.routines.filter(r=>r.status==='active');
+  document.getElementById('kTodayCertStatus').innerHTML = activeRoutines.length > 0
+    ? activeRoutines.map(r => {
+        const total = r.participants.length;
+        const done = r.participants.filter(p=>p.todayDone).length;
+        const pct = total > 0 ? Math.round(done/total*100) : 0;
+        return `<div style="padding:12px 16px;border-top:0.5px solid #f0f0f0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:13px;font-weight:500;color:#111;">${r.emoji} ${r.title}</div>
+            <div style="font-size:12px;color:#888;">${done}/${total}명</div>
+          </div>
+          <div style="height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${pct>=80?'#83CA00':pct>=50?'#FFD600':'#FF006C'};border-radius:3px;transition:width 0.4s;"></div>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">${pct}% 인증 완료</div>
+        </div>`;
+      }).join('')
+    : `<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">진행 중인 루틴이 없어요</div>`;
+
+  // 내가 올린 글
+  const myPosts = state.posts.filter(p=>p.author===state.kkutjjang.name);
+  document.getElementById('kMyPostCount').textContent = `${myPosts.length}개`;
+  document.getElementById('kMyPostList').innerHTML = myPosts.length > 0
+    ? myPosts.map(p=>`
+        <div onclick="openPost(${p.id})" style="padding:12px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${p.type==='notice'?'#FFF0D4':'#EAF3DE'};color:${p.type==='notice'?'#B8600B':'#3B6D11'};">${p.type==='notice'?'공지':'후기'}</span>
+            <span style="font-size:11px;color:#aaa;">${p.date}</span>
+          </div>
+          <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:2px;">${p.title}</div>
+          <div style="font-size:12px;color:#888;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">${p.content}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:4px;">❤️ ${p.likes}</div>
+        </div>`).join('')
+    : `<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 올린 글이 없어요</div>`;
 
   kRenderSwitchBtn();
 }
