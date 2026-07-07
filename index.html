@@ -370,6 +370,21 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="stat-card"><span style="font-size:18px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label">소통 수</span></div>
             <div class="stat-card"><span style="font-size:18px;">🏅</span><span class="stat-val" id="myCompleteCount">0</span><span class="stat-label">완주한 루틴</span></div>
           </div>
+          <div class="section-card">
+            <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+              <div class="section-hd-title">인증 달력</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button onclick="calPrevMonth()" style="background:none;border:none;cursor:pointer;font-size:16px;color:#888;padding:2px 6px;">‹</button>
+                <span id="calMonthLabel" style="font-size:13px;font-weight:600;color:#111;"></span>
+                <button onclick="calNextMonth()" style="background:none;border:none;cursor:pointer;font-size:16px;color:#888;padding:2px 6px;">›</button>
+              </div>
+            </div>
+            <div id="calGrid" style="margin-top:8px;"></div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding-top:8px;border-top:0.5px solid #f0f0f0;">
+              <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#83CA00;"></div>인증 완료</div>
+              <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;"><div style="width:10px;height:10px;border-radius:50%;background:#f0f0f0;"></div>미인증</div>
+            </div>
+          </div>
           <div class="ai-card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
               <div style="font-size:15px;font-weight:600;color:white;">AI 루틴 리포트</div>
@@ -797,7 +812,7 @@ const CERT_FEED = [
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,nadaeumToday:{date:'',certs:0,comments:0},nadaeumReviews:[]},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,nadaeumToday:{date:'',certs:0,comments:0},nadaeumReviews:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
     {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
@@ -1433,6 +1448,9 @@ function submitCert() {
   const r=state.routines.find(x=>x.id===currentCertId);
   if(r){r.todayCert=true;r.progress=Math.min(100,r.progress+5);}
   state.youth.certCount++;
+  const todayStr=new Date().toISOString().slice(0,10);
+  if(!state.youth.certDates) state.youth.certDates=[];
+  if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
   earnNadaeum('cert');
   save();
   closeOverlay('certFormOverlay');
@@ -1528,6 +1546,38 @@ function submitPost() {
 // ════════════════════════════════════════════════════════
 // 청소년 MY
 // ════════════════════════════════════════════════════════
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+function renderCal() {
+  const dates=new Set(state.youth.certDates||[]);
+  const today=new Date().toISOString().slice(0,10);
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const monthNames=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('calMonthLabel').textContent=`${calYear}년 ${monthNames[calMonth]}`;
+  const dayLabels=['일','월','화','수','목','금','토'];
+  let html=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;">`;
+  html+=dayLabels.map((d,i)=>`<div style="font-size:10px;color:${i===0?'#FF4444':i===6?'#4488FF':'#aaa'};padding:4px 0;font-weight:500;">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++) html+=`<div></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const key=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const certified=dates.has(key);
+    const isToday=key===today;
+    const dow=(firstDay+d-1)%7;
+    const color=dow===0?'#FF4444':dow===6?'#4488FF':'#111';
+    const future=key>today;
+    html+=`<div style="padding:3px 0;display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:${isToday?700:400};
+        background:${certified?'#83CA00':isToday?'#f0f0f0':'transparent'};
+        color:${certified?'#27500A':future?'#ccc':color};
+        border:${isToday&&!certified?'1.5px solid #ccc':'none'};">${d}</div>
+    </div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('calGrid').innerHTML=html;
+}
+function calPrevMonth(){if(calMonth===0){calMonth=11;calYear--;}else calMonth--;renderCal();}
+function calNextMonth(){const n=new Date();if(calYear>n.getFullYear()||(calYear===n.getFullYear()&&calMonth>=n.getMonth()))return;if(calMonth===11){calMonth=0;calYear++;}else calMonth++;renderCal();}
+
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
@@ -1543,6 +1593,7 @@ function renderMy() {
     document.getElementById('completedSection').style.display='';
     document.getElementById('completedList').innerHTML=done.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div>`).join('');
   }
+  renderCal();
   renderSwitchBtn();
 }
 function handleAvatar(e) {
