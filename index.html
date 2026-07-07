@@ -890,8 +890,21 @@ async function initAuth() {
 }
 
 async function loadProfileAndEnter() {
-  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  if (error || !profile) { showAuthMsg('프로필 로드 실패. 잠시 후 다시 시도해주세요.'); return; }
+  let { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+
+  // 트리거가 안 돌았으면 직접 생성
+  if (!profile) {
+    const meta = currentUser.user_metadata || {};
+    const { data: created, error: insertErr } = await sb.from('profiles').insert({
+      id: currentUser.id,
+      name: meta.name || '익명',
+      role: meta.role || 'youth',
+    }).select().single();
+    if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
+    profile = created;
+  }
+
+  if (!profile) { showAuthMsg('⚠️ 프로필 로드 실패. 잠시 후 다시 시도해주세요.'); return; }
   state.youth.name = profile.name;
   state.youth.certCount = profile.cert_count || 0;
   state.youth.commCount = profile.comm_count || 0;
