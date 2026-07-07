@@ -249,6 +249,62 @@
     .n-action-title { font-size: 14px; font-weight: 700; margin-top: 10px; margin-bottom: 4px; }
     .n-action-desc { font-size: 12px; color: var(--ink-60); line-height: 1.5; }
 
+    /* ── RESULTS ── */
+    .results-bg { background: var(--ink); }
+    .results-inner { max-width: 1100px; margin: 0 auto; }
+    .results-period {
+      display: inline-block;
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,.5);
+      background: rgba(255,255,255,.07);
+      padding: 6px 16px; border-radius: 100px;
+      margin-bottom: 40px;
+    }
+    .results-big {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+      background: rgba(255,255,255,.08);
+      border-radius: 16px; overflow: hidden;
+      margin-bottom: 56px;
+    }
+    .results-big-item {
+      background: #1a1a24;
+      padding: 28px 20px; text-align: center;
+    }
+    .results-big-n {
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 800; color: var(--green);
+      display: block; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .results-big-l { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 8px; display: block; line-height: 1.4; }
+    .results-voices-title {
+      font-size: 18px; font-weight: 700; color: rgba(255,255,255,.9);
+      margin-bottom: 20px;
+    }
+    .results-voices {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    }
+    .voice-card {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px; padding: 22px;
+    }
+    .voice-icon { font-size: 22px; margin-bottom: 12px; display: block; }
+    .voice-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .voice-body { font-size: 13px; line-height: 1.65; color: rgba(255,255,255,.55); }
+    .results-rescore {
+      margin-top: 32px; text-align: center;
+      font-size: 16px; font-weight: 700; color: rgba(255,255,255,.85);
+    }
+    .results-rescore strong { color: var(--green); font-size: 22px; }
+    @media (max-width: 900px) {
+      .results-big { grid-template-columns: repeat(3, 1fr); }
+      .results-voices { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .results-big { grid-template-columns: repeat(2, 1fr); }
+      .results-voices { grid-template-columns: 1fr; }
+    }
+
     /* ── CTA ── */
     .cta-bg { background: var(--green); padding: 96px 32px; text-align: center; }
     .cta-h2 {
@@ -399,10 +455,10 @@
 <!-- STATS -->
 <div class="stats-bar">
   <div class="stats-inner">
-    <div class="stat"><span class="stat-n">500+</span><span class="stat-l">누적 인증 수</span></div>
-    <div class="stat"><span class="stat-n">83%</span><span class="stat-l">평균 완주율</span></div>
-    <div class="stat"><span class="stat-n">21일</span><span class="stat-l">최장 루틴 기간</span></div>
-    <div class="stat"><span class="stat-n">2역할</span><span class="stat-l">청소년 · 끗짱</span></div>
+    <div class="stat"><span class="stat-n">319명</span><span class="stat-l">누적 참여 청소년</span></div>
+    <div class="stat"><span class="stat-n">3,350개</span><span class="stat-l">누적 인증 루틴</span></div>
+    <div class="stat"><span class="stat-n">74%</span><span class="stat-l">완주율 <small style="font-size:10px;opacity:.6;">*10일 이상 기준</small></span></div>
+    <div class="stat"><span class="stat-n">95.6%</span><span class="stat-l">재참여 의향</span></div>
   </div>
 </div>
 
@@ -645,6 +701,64 @@
         <div class="n-action-desc">루틴 완주 후 1회 · 진심 어린 기록<br>가장 높은 가치의 나다움 활동</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section class="section results-bg">
+  <div class="results-inner">
+    <div class="eyebrow" style="color:rgba(131,202,0,.8);">실제 성과</div>
+    <h2 style="color:#fff;margin-bottom:12px;">2025년 4월부터<br>함께 쌓아온 기록</h2>
+    <div class="results-period">2025년 4월 ~ 2026년 6월</div>
+
+    <div class="results-big">
+      <div class="results-big-item">
+        <span class="results-big-n">46개</span>
+        <span class="results-big-l">운영된 루틴</span>
+      </div>
+      <div class="results-big-item">
+        <span class="results-big-n">319명</span>
+        <span class="results-big-l">참여 청소년</span>
+      </div>
+      <div class="results-big-item">
+        <span class="results-big-n">46명</span>
+        <span class="results-big-l">끗짱(어른)</span>
+      </div>
+      <div class="results-big-item">
+        <span class="results-big-n">3,350개</span>
+        <span class="results-big-l">누적 인증 루틴</span>
+      </div>
+      <div class="results-big-item">
+        <span class="results-big-n">74%</span>
+        <span class="results-big-l">완주율<br><span style="font-size:10px;opacity:.6;">*10일 이상 참여 기준</span></span>
+      </div>
+    </div>
+
+    <div class="results-voices-title">참여 청소년들이 이렇게 말했어요</div>
+    <div class="results-voices">
+      <div class="voice-card">
+        <span class="voice-icon">🧭</span>
+        <div class="voice-title">방향이 생겨요.</div>
+        <div class="voice-body">"오늘은 하늘 사진 한 장 찍기!" 작고 단순하지만, 오늘을 살아가는 이유가 하나 생겨요.</div>
+      </div>
+      <div class="voice-card">
+        <span class="voice-icon">🏅</span>
+        <div class="voice-title">성취감이 쌓여요.</div>
+        <div class="voice-body">내가 뭔가를 했다는 감각은 무기력함을 밀어내는 강한 힘이 돼요.</div>
+      </div>
+      <div class="voice-card">
+        <span class="voice-icon">🤝</span>
+        <div class="voice-title">누군가와 연결된 느낌을 줘요.</div>
+        <div class="voice-body">혼자 하는 것 같지만 함께 루틴을 인증하고 응원받는 경험은 "나 혼자 아니구나" 하는 소속감을 줘요.</div>
+      </div>
+      <div class="voice-card">
+        <span class="voice-icon">🎵</span>
+        <div class="voice-title">일상에 리듬이 생겨요.</div>
+        <div class="voice-body">불규칙한 생활 속에서 하루 한 가지 약속을 지켜가는 것만으로도 삶에 작은 리듬과 안정감이 생겨요.</div>
+      </div>
+    </div>
+
+    <div class="results-rescore">참여자 <strong>95.6%</strong>가 한끗루틴에 다시 참여하고 싶다고 응답했어요</div>
   </div>
 </section>
 
