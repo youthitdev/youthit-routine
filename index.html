@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="한끗루틴">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root { --role-color: #2E33BC; }
@@ -26,13 +27,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 
 /* 로그인 */
-.splash { position: absolute; inset: 0; background: #2E33BC; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; transition: opacity 0.3s; }
+.splash { position: absolute; inset: 0; background: #2E33BC; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; transition: opacity 0.3s; padding: 32px 28px; }
 .splash.hide { opacity: 0; pointer-events: none; }
 .splash-logo { font-size: 32px; font-weight: 700; color: white; letter-spacing: -1px; }
-.splash-sub { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 6px; margin-bottom: 48px; }
-.splash-btn { width: 280px; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; margin-bottom: 12px; }
+.splash-sub { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 6px; margin-bottom: 32px; }
+.splash-btn { width: 100%; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; margin-bottom: 10px; }
 .splash-btn-primary { background: white; color: #2E33BC; }
 .splash-btn-secondary { background: rgba(255,255,255,0.15); color: white; }
+/* Auth form */
+.auth-tabs { display: flex; width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.12); }
+.auth-tab { flex: 1; padding: 10px; border: none; background: transparent; color: rgba(255,255,255,0.55); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.auth-tab.active { background: rgba(255,255,255,0.22); color: white; }
+.auth-form { display: flex; flex-direction: column; width: 100%; }
+.auth-input { width: 100%; padding: 13px 16px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.1); color: white; font-size: 15px; margin-bottom: 10px; outline: none; font-family: inherit; }
+.auth-input::placeholder { color: rgba(255,255,255,0.4); }
+.auth-input:focus { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.15); }
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px rgba(46,51,188,0.8) inset !important; -webkit-text-fill-color: white !important; }
+.role-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.role-btn { flex: 1; padding: 11px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: transparent; color: rgba(255,255,255,0.55); font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.role-btn.active { background: rgba(255,255,255,0.22); color: white; border-color: rgba(255,255,255,0.55); }
+.auth-msg { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; text-align: center; min-height: 18px; }
 
 /* 앱 구조 */
 .header { background: #2E33BC; padding: 16px 16px 12px; color: white; flex-shrink: 0; }
@@ -263,9 +278,28 @@ input:focus { outline: none; border-color: #2E33BC; }
   <div class="splash" id="splashScreen">
     <div class="splash-logo">한끗루틴</div>
     <div class="splash-sub">오늘 하루도 한끗씩 ✦</div>
-    <button class="splash-btn splash-btn-primary" onclick="loginAs('youth')">청소년으로 로그인</button>
-    <button class="splash-btn splash-btn-secondary" onclick="loginAs('kkutjjang')">끗짱으로 로그인</button>
-    <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:24px;">※ 프로토타입 테스트용 화면입니다</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="showAuthTab('login')">로그인</button>
+      <button class="auth-tab" id="tabSignup" onclick="showAuthTab('signup')">회원가입</button>
+    </div>
+    <!-- 로그인 폼 -->
+    <div class="auth-form" id="authFormLogin">
+      <input type="email" id="loginEmail" class="auth-input" placeholder="이메일">
+      <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호">
+      <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
+    </div>
+    <!-- 회원가입 폼 -->
+    <div class="auth-form" id="authFormSignup" style="display:none;">
+      <input type="text" id="signupName" class="auth-input" placeholder="이름 (앱에서 사용할 이름)">
+      <input type="email" id="signupEmail" class="auth-input" placeholder="이메일">
+      <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)">
+      <div class="role-row">
+        <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
+        <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
+      </div>
+      <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
+    </div>
+    <div class="auth-msg" id="authMsg"></div>
   </div>
 
   <!-- 헤더 -->
@@ -360,6 +394,7 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입</div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openSheet('editProfileBg')"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
+            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#888;cursor:pointer;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px;"></i> 로그아웃</button>
           </div>
           <div style="background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
             <div>
@@ -824,6 +859,96 @@ const CERT_FEED = [
   {id:6,routineId:1,name:'민지',day:'10일째',text:'스트레칭 5분이 이제 습관이 됐어요.',ts:now-20*H,likes:7,liked:false,color:'#C0DD97',comments:[]},
 ];
 
+// ════════════════════════════════════════════════════════
+// Supabase
+// ════════════════════════════════════════════════════════
+const SB_URL = 'https://gosunknickkewreylstj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdvc3Vua25pY2trZXdyZXlsc3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDYxNzMsImV4cCI6MjA5NzgyMjE3M30.93wePt6jaw1VNq6NQODeSof7xl8evyCxDWzk_8ORoSM';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+let currentUser = null;
+let signupRole = 'youth';
+
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadProfileAndEnter();
+  }
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session && !document.getElementById('mainHeader').style.display) {
+      currentUser = session.user;
+      await loadProfileAndEnter();
+    }
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      location.reload();
+    }
+  });
+}
+
+async function loadProfileAndEnter() {
+  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (error || !profile) { showAuthMsg('프로필 로드 실패. 잠시 후 다시 시도해주세요.'); return; }
+  state.youth.name = profile.name;
+  state.youth.certCount = profile.cert_count || 0;
+  state.youth.commCount = profile.comm_count || 0;
+  state.youth.nadaeum = profile.nadaeum || 0;
+  state.youth.certDates = profile.cert_dates || [];
+  state.kkutjjang.name = profile.name;
+  state.loginType = 'both';
+  localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  enterAs(profile.role);
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPw').value;
+  if (!email || !pw) return showAuthMsg('이메일과 비밀번호를 입력해주세요');
+  showAuthMsg('로그인 중...');
+  const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (error) {
+    const msg = error.message.includes('Invalid') ? '이메일 또는 비밀번호가 틀려요' : error.message;
+    showAuthMsg('⚠️ ' + msg);
+  }
+}
+
+async function doSignup() {
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const pw = document.getElementById('signupPw').value;
+  if (!name || !email || !pw) return showAuthMsg('모든 항목을 입력해주세요');
+  if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
+  showAuthMsg('가입 중...');
+  const { error } = await sb.auth.signUp({
+    email, password: pw,
+    options: { data: { name, role: signupRole } }
+  });
+  if (error) showAuthMsg('⚠️ ' + error.message);
+  else showAuthMsg('✅ 가입 완료! 자동 로그인 중...');
+}
+
+function showAuthTab(tab) {
+  document.getElementById('authFormLogin').style.display = tab === 'login' ? 'flex' : 'none';
+  document.getElementById('authFormSignup').style.display = tab === 'signup' ? 'flex' : 'none';
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+  document.getElementById('authMsg').textContent = '';
+}
+
+function selectSignupRole(role) {
+  signupRole = role;
+  document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
+  document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
+}
+
+function showAuthMsg(msg) {
+  document.getElementById('authMsg').textContent = msg;
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+}
+
 const DEFAULT = {
   loginType: null,
   currentRole: null,
@@ -857,7 +982,17 @@ function loadState() {
   try { const s = localStorage.getItem('hankkut_v4'); return s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT)); }
   catch { return JSON.parse(JSON.stringify(DEFAULT)); }
 }
-function save() { localStorage.setItem('hankkut_v4', JSON.stringify(state)); }
+function save() {
+  localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  if (currentUser) {
+    sb.from('profiles').update({
+      cert_count: state.youth.certCount,
+      comm_count: state.youth.commCount,
+      nadaeum: state.youth.nadaeum,
+      cert_dates: state.youth.certDates,
+    }).eq('id', currentUser.id).then(() => {});
+  }
+}
 let state = loadState();
 
 // ════════════════════════════════════════════════════════
@@ -1468,6 +1603,15 @@ function submitCert() {
   if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
   earnNadaeum('cert');
   save();
+  // Supabase에 인증 기록 저장
+  if (currentUser && currentCertId) {
+    const certText = document.getElementById('certText')?.value || '';
+    sb.from('certifications').insert({
+      routine_id: currentCertId,
+      user_id: currentUser.id,
+      content: certText,
+    }).then(() => {});
+  }
   closeOverlay('certFormOverlay');
   document.getElementById('certSuccess').classList.add('open');
 }
@@ -2191,13 +2335,7 @@ if(localStorage.getItem('hankkut_onboarding_done')) {
 // ════════════════════════════════════════════════════════
 // 초기화
 // ════════════════════════════════════════════════════════
-if(state.currentRole) {
-  document.getElementById('splashScreen').classList.add('hide');
-  document.getElementById('mainHeader').style.display='';
-  document.getElementById('mainContent').style.display='';
-  document.getElementById('mainNav').style.display='';
-  applyRole(state.currentRole);
-}
+initAuth();
 </script>
 <script>
 if('serviceWorker' in navigator) {
