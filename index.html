@@ -1875,7 +1875,7 @@ function kFilterRoutine(type,el) {
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
         <div style="display:flex;align-items:center;gap:5px;">
-          ${pendingCount>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;">신청 ${pendingCount}</span>`:''}
+          ${(r.applicants||[]).filter(a=>a.status==='pending').length>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;">신청 ${(r.applicants||[]).filter(a=>a.status==='pending').length}</span>`:''}
           <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
         </div>
       </div>
