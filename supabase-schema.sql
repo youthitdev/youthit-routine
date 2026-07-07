@@ -259,3 +259,25 @@ DROP POLICY IF EXISTS "verify_docs_delete_own" ON storage.objects;
 CREATE POLICY "verify_docs_delete_own" ON storage.objects FOR DELETE USING (
   bucket_id = 'verify-docs' AND (storage.foldername(name))[1] = auth.uid()::text
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-08b] 루틴 대표 이미지
+-- =====================================================
+
+-- 1) routines 컬럼 추가
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS cover_image_url text;
+
+-- 2) Storage 버킷 생성 (루틴 대표 이미지, 공개 — 누구나 볼 수 있어야 함)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('routine-covers', 'routine-covers', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 3) Storage 정책: 로그인 사용자만 업로드, 누구나 조회(공개 버킷)
+DROP POLICY IF EXISTS "routine_covers_insert_auth" ON storage.objects;
+CREATE POLICY "routine_covers_insert_auth" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'routine-covers' AND auth.uid() IS NOT NULL
+);
+DROP POLICY IF EXISTS "routine_covers_select_all" ON storage.objects;
+CREATE POLICY "routine_covers_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'routine-covers'
+);

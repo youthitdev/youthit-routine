@@ -61,6 +61,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .nav-item span { font-size: 10px; color: #888; }
 .nav-item i { font-size: 22px; color: #888; }
 .nav-item.active i, .nav-item.active span { color: #2E33BC; }
+.nav-item-cert { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; cursor: pointer; padding-top: 0; position: relative; }
+.nav-cert-circle {
+  width: 46px; height: 46px; border-radius: 50%; background: var(--role-color, #83CA00);
+  display: flex; align-items: center; justify-content: center;
+  transform: translateY(-14px); box-shadow: 0 6px 14px rgba(0,0,0,0.22), 0 0 0 4px #fff;
+  transition: transform 0.2s;
+}
+.nav-item-cert:active .nav-cert-circle { transform: translateY(-14px) scale(0.94); }
+.nav-cert-circle i { font-size: 22px; color: #fff; }
+.nav-item-cert span { font-size: 10px; color: #888; margin-top: -8px; }
+.nav-item-cert.active span { color: var(--role-color, #83CA00); font-weight: 600; }
 .tab-page { display: none; }
 .tab-page.active { display: block; }
 .scroll-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
@@ -387,6 +398,13 @@ input:focus { outline: none; border-color: #2E33BC; }
         </div>
       </div>
 
+      <!-- 인증 -->
+      <div class="tab-page" id="page-cert">
+        <div class="scroll-body">
+          <div id="certRoutineList"></div>
+        </div>
+      </div>
+
       <!-- 커뮤니티 -->
       <div class="tab-page" id="page-comm">
         <div style="display:flex;gap:8px;padding:12px 16px 8px;" id="commFilter">
@@ -613,6 +631,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div id="youthNav" style="display:contents;">
       <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="nav-routine" onclick="switchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
+      <div class="nav-item-cert" id="nav-cert" onclick="switchTab('cert')"><div class="nav-cert-circle"><i class="ti ti-camera"></i></div><span>인증</span></div>
       <div class="nav-item" id="nav-comm" onclick="switchTab('comm')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="nav-my" onclick="switchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
@@ -1120,6 +1139,7 @@ async function loadRoutines() {
     const doneToday = uid => rCerts.some(c => c.user_id === uid && (c.created_at || '').slice(0, 10) === today);
     return {
       id: r.id, status: r.status, title: r.title, emoji: r.emoji || '🌱',
+      coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       people: approved.length, maxPeople: r.max_people || 10,
       desc: r.description || '', tag: r.tag || '생활',
@@ -1247,11 +1267,12 @@ function switchRole() {
 // ════════════════════════════════════════════════════════
 function switchTab(tab) {
   document.querySelectorAll('#youthTabs .tab-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('#youthNav .nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('#youthNav .nav-item, #youthNav .nav-item-cert').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+tab).classList.add('active');
   document.getElementById('nav-'+tab).classList.add('active');
   if(tab==='home') renderHome();
   else if(tab==='routine') renderRoutine();
+  else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
   else if(tab==='my') renderMy();
 }
@@ -1461,8 +1482,8 @@ function renderRoutineGrid(type, q) {
     // D-day
     const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
-      ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">오늘 시작!</span>`:'')
-      : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">마지막 날</span>`:'');
+      ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 오늘</span>`:'')
+      : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">마지막 날</span>`:'');
     // 하단 정보줄
     const capPct = Math.min(100, Math.round((r.people||0)/(r.maxPeople||1)*100));
     const bottom = isActive
@@ -1478,10 +1499,17 @@ function renderRoutineGrid(type, q) {
       : `<div style="margin-top:9px;font-size:10px;color:#aaa;">🏅 완주 · ${r.people}명 함께함</div>`;
     const matchedNicks=q?CERT_FEED.filter(c=>c.routineId===r.id&&c.name.toLowerCase().includes(q.toLowerCase())).map(c=>c.name):[];
     const nickHtml=matchedNicks.length>0?`<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${matchedNicks.map(n=>`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:10px;">${hl(n)}</span>`).join('')}</div>`:'';
+    const coverHtml = r.coverImageUrl
+      ? `<div style="margin:-12px -12px 8px;height:76px;border-radius:16px 16px 0 0;overflow:hidden;position:relative;">
+           <img src="${r.coverImageUrl}" style="width:100%;height:100%;object-fit:cover;display:block;${isDone?'filter:grayscale(0.5);opacity:0.85;':''}">
+           <div style="position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:14px;">${r.emoji}</div>
+         </div>`
+      : '';
     return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
+      ${coverHtml}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:4px;">
-        <div style="width:38px;height:38px;border-radius:12px;background:${isDone?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;${isDone?'filter:grayscale(0.6);':''}">${r.emoji}</div>
-        <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:600;">${sl}</span>
+        ${r.coverImageUrl?'':`<div style="width:38px;height:38px;border-radius:12px;background:${isDone?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;${isDone?'filter:grayscale(0.6);':''}">${r.emoji}</div>`}
+        <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:600;margin-left:auto;">${sl}</span>
       </div>
       <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:4px;min-height:17px;">${isDone?'✓ ':''}${hl(r.title)}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
@@ -1710,7 +1738,7 @@ function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
   document.getElementById('rdSub').textContent=r.tag;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
-  let body=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+  let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.people}명 참여</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.tag}</div>
@@ -1762,15 +1790,33 @@ async function joinRoutine(id) {
 // 인증
 // ════════════════════════════════════════════════════════
 let currentCertId=null, certHasPhoto=false;
-function renderCert() {
+function renderCert() { renderCertTab(); }
+function renderCertTab() {
   const active=state.routines.filter(r=>r.status==='active');
-  document.getElementById('certList').innerHTML=`<div style="font-size:13px;font-weight:500;color:#888;margin-bottom:4px;">어떤 루틴을 인증할까요?</div>`+
-    active.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px;border:0.5px solid ${currentCertId===r.id?'#2E33BC':'#e8e8e8'};border-radius:16px;cursor:pointer;background:${currentCertId===r.id?'#f0f1fb':'#fff'};" onclick="selectCertRoutine(${r.id},'${r.title}')">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:10px;height:10px;border-radius:50%;background:${currentCertId===r.id?'#2E33BC':'#ddd'};flex-shrink:0;"></div>
-        <div><div style="font-size:14px;font-weight:500;color:#111;">${r.title}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.period}</div></div>
+  const el=document.getElementById('certRoutineList');
+  if(!el) return;
+  if(active.length===0){
+    el.innerHTML=`<div style="padding:52px 16px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:10px;">📸</div>
+      <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">참여 중인 루틴이 없어요</div>
+      <div style="font-size:12px;color:#aaa;">루틴에 참여하면 여기서 인증할 수 있어요</div>
+    </div>`;
+    return;
+  }
+  const doneCount = active.filter(r=>r.todayCert).length;
+  el.innerHTML = `<div style="padding:14px 16px 6px;">
+      <div style="font-size:15px;font-weight:700;color:#111;">오늘의 인증</div>
+      <div style="font-size:12px;color:#888;margin-top:2px;">${doneCount}/${active.length}개 완료</div>
+    </div>` +
+    active.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid ${r.todayCert?'#e8e8e8':'#2E33BC'};border-radius:16px;cursor:pointer;background:${r.todayCert?'#fafafa':'#fff'};" onclick="${r.todayCert?'':`selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')`}">
+      <div style="width:42px;height:42px;border-radius:12px;background:${r.todayCert?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;color:${r.todayCert?'#aaa':'#111'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:1px;">${r.period}</div>
       </div>
-      <i class="ti ti-chevron-right" style="font-size:16px;color:#aaa;"></i>
+      ${r.todayCert
+        ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
+        :`<span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#2E33BC;color:#fff;flex-shrink:0;">인증하기</span>`}
     </div>`).join('');
 }
 function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title); }
@@ -2268,19 +2314,32 @@ function kFilterRoutine(type,el) {
     return 0;
   });
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
-    const isDone=r.status==='done', isActive=r.status==='active';
+    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
     const cardBg=isDone?'#f0f0f0':'#fff';
     const cardBorder=isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
     const bw=isActive?'1.5px':'0.5px';
-    const sl=isActive?'진행 중':r.status==='recruit'?'모집 중':'완료';
-    const bb=isActive?'#2E33BC':r.status==='recruit'?'#E6F1FB':'#e0e0e0';
-    const bc=isActive?'#fff':r.status==='recruit'?'#185FA5':'#aaa';
+    const sl=isActive?'진행 중':isRecruit?'모집 중':'완료';
+    const bb=isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
+    const bc=isActive?'#fff':isRecruit?'#185FA5':'#aaa';
+    const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
+    const ddHtml = dd===null ? '' : isRecruit
+      ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 오늘</span>`:'')
+      : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">마지막 날</span>`:'');
+    const coverHtml = r.coverImageUrl
+      ? `<div style="margin:-12px -12px 8px;height:64px;border-radius:16px 16px 0 0;overflow:hidden;">
+           <img src="${r.coverImageUrl}" style="width:100%;height:100%;object-fit:cover;display:block;${isDone?'filter:grayscale(0.5);opacity:0.85;':''}">
+         </div>`
+      : '';
     return `<div class="routine-card" onclick="${isActive?`openKRoutineFeed(${r.id})`:`openKRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
+      ${coverHtml}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:4px;">
         <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;">${isDone?'✓ ':''}${r.emoji} ${r.title}</div>
         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:500;">${sl}</span>
       </div>
-      <div style="font-size:11px;color:${isDone?'#bbb':'#888'};margin-bottom:5px;">${r.period}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:5px;">
+        <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.period}</span>
+        ${ddHtml}
+      </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
         <div style="display:flex;align-items:center;gap:5px;">
@@ -2408,11 +2467,13 @@ function updateCreatePreview(){
   document.getElementById('pvPeople').textContent=p||10;
   document.getElementById('pvPeriod').textContent=(s&&e&&e>=s)?`${s.replace(/-/g,'.').slice(2)} – ${e.replace(/-/g,'.').slice(2)}`:'기간 미설정';
 }
+let createPhotoFile=null;
 function handleCreatePhoto(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=ev=>{
     createHasPhoto=true;
+    createPhotoFile=f;
     const el=document.getElementById('createPhotoUpload');
     el.className='photo-upload has-photo';
     el.innerHTML=`<img class="photo-prev-img" src="${ev.target.result}"><div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);border-radius:20px;padding:4px 10px;font-size:11px;color:white;">변경</div>`;
@@ -2427,13 +2488,22 @@ async function submitCreateRoutine(){
   if(!s||!e||e<s){alert('기간을 올바르게 설정해주세요.');return;}
   if(!p||p<1){alert('참여 인원을 입력해주세요.');return;}
   if(!d){alert('루틴 소개를 입력해주세요.');return;}
-  if(!createHasPhoto){alert('인증 예시 사진을 추가해주세요.');return;}
+  if(!createHasPhoto||!createPhotoFile){alert('인증 예시 사진을 추가해주세요.');return;}
   if(!currentUser){alert('로그인이 필요해요.');return;}
+  const btn=document.querySelector('#createRoutineOverlay .primary-btn');
+  if(btn){btn.disabled=true;btn.textContent='등록 중...';}
+  let coverUrl=null;
+  const ext=(createPhotoFile.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`${currentUser.id}/${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('routine-covers').upload(path, createPhotoFile);
+  if(upErr){ alert('이미지 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';} return; }
+  coverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
   const { error } = await sb.from('routines').insert({
     title:n, emoji:selectedEmoji, description:d, tag:'생활',
     start_date:s, end_date:e, max_people:parseInt(p),
-    status:'recruit', created_by:currentUser.id,
+    status:'recruit', created_by:currentUser.id, cover_image_url:coverUrl,
   });
+  if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
   if(error){ alert('루틴 등록 실패: '+error.message); return; }
   await loadRoutines();
   document.getElementById('createSuccessTitle').textContent=`${selectedEmoji} ${n}`;
@@ -2446,7 +2516,9 @@ function closeCreateSuccess(){
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
-  createHasPhoto=false; selectedEmoji='🌱';
+  createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱';
+  const pu=document.getElementById('createPhotoUpload');
+  if(pu){ pu.className='photo-upload'; pu.innerHTML=`<i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div>`; pu.onclick=()=>document.getElementById('createPhotoInput').click(); }
   renderEmojiGrid(); updateCreatePreview(); kRenderRoutineTab();
 }
 
