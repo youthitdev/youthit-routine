@@ -23,6 +23,7 @@ CREATE TABLE routines (
   title       text NOT NULL,
   emoji       text DEFAULT '🌱',
   description text,
+  partner_org text,
   tag         text,
   start_date  date,
   end_date    date,
@@ -31,6 +32,8 @@ CREATE TABLE routines (
   created_by  uuid REFERENCES auth.users ON DELETE SET NULL,
   created_at  timestamptz DEFAULT now()
 );
+-- 기존 DB 마이그레이션: 이미 routines 테이블이 있는 경우 아래 한 줄만 실행하세요.
+-- ALTER TABLE routines ADD COLUMN IF NOT EXISTS partner_org text;
 
 -- 3. 루틴 참여자
 CREATE TABLE routine_participants (

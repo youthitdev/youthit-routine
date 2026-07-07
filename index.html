@@ -92,7 +92,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .chip { padding: 5px 14px; border-radius: 20px; font-size: 13px; border: 0.5px solid #ddd; background: #fff; color: #666; cursor: pointer; white-space: nowrap; }
 .chip.active { background: #2E33BC; color: white; border-color: #2E33BC; }
 .routine-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; padding: 0 16px 16px; }
-.routine-card { background: #fff; border: 0.5px solid #e8e8e8; border-radius: 16px; padding: 12px; cursor: pointer; }
+.routine-card { background: #fff; border: 0.5px solid #e8e8e8; border-radius: 16px; padding: 0; overflow: hidden; cursor: pointer; }
+.routine-card .rc-cover { position: relative; width: 100%; height: 132px; overflow: hidden; }
+.routine-card .rc-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.routine-card .rc-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%); }
+.routine-card .rc-status { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 3px 9px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+.routine-card .rc-people { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.42); padding: 3px 8px; border-radius: 8px; }
+.routine-card .rc-emoji { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; border-radius: 9px; background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.routine-card .rc-body { padding: 10px 12px 12px; }
 .active-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; padding: 0 16px 8px; }
 .active-card { background: #2E33BC; border-radius: 16px; padding: 12px; cursor: pointer; }
 
@@ -711,11 +718,12 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-body">
       <div><div class="field-label">루틴 이모지 <span class="required">* 필수</span></div><div class="emoji-grid" id="emojiGrid"></div></div>
       <div><div class="field-label">루틴 이름 <span class="required">* 필수</span></div><input type="text" id="rName" placeholder="예) 아침 루틴 21일" maxlength="20" oninput="updateCreatePreview();document.getElementById('nameCount').textContent=this.value.length"><div class="char-end"><span id="nameCount">0</span>/20</div></div>
+      <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
       <div><div class="field-label">기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 예시 사진 <span class="required">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
-      <div><div class="field-label">미리보기</div><div class="preview-rcard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:22px;" id="pvEmoji">🌱</span><span style="font-size:15px;font-weight:600;color:white;" id="pvName">루틴 이름을 입력해주세요</span></div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;" id="pvDesc">루틴 소개를 입력하면 여기에 표시돼요.</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;" id="pvPeriod">기간 미설정</span><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;"><span id="pvPeople">10</span>명 모집</span></div></div></div>
+      <div><div class="field-label">미리보기</div><div class="preview-rcard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:22px;" id="pvEmoji">🌱</span><span style="font-size:15px;font-weight:600;color:white;" id="pvName">루틴 이름을 입력해주세요</span></div><div id="pvPartner" style="display:none;font-size:11px;color:rgba(255,255,255,0.9);margin-bottom:6px;"></div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;" id="pvDesc">루틴 소개를 입력하면 여기에 표시돼요.</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;" id="pvPeriod">기간 미설정</span><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;"><span id="pvPeople">10</span>명 모집</span></div></div></div>
       <button class="primary-btn" onclick="submitCreateRoutine()">루틴 등록하기</button>
     </div>
   </div>
@@ -1142,7 +1150,7 @@ async function loadRoutines() {
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       people: approved.length, maxPeople: r.max_people || 10,
-      desc: r.description || '', tag: r.tag || '생활',
+      desc: r.description || '', tag: r.tag || '생활', partnerOrg: r.partner_org || null,
       certCount: rCerts.length, avgRate: 0, createdBy: r.created_by,
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
@@ -1499,24 +1507,29 @@ function renderRoutineGrid(type, q) {
       : `<div style="margin-top:9px;font-size:10px;color:#aaa;">🏅 완주 · ${r.people}명 함께함</div>`;
     const matchedNicks=q?CERT_FEED.filter(c=>c.routineId===r.id&&c.name.toLowerCase().includes(q.toLowerCase())).map(c=>c.name):[];
     const nickHtml=matchedNicks.length>0?`<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${matchedNicks.map(n=>`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:10px;">${hl(n)}</span>`).join('')}</div>`:'';
-    const coverHtml = r.coverImageUrl
-      ? `<div style="margin:-12px -12px 8px;height:76px;border-radius:16px 16px 0 0;overflow:hidden;position:relative;">
-           <img src="${r.coverImageUrl}" style="width:100%;height:100%;object-fit:cover;display:block;${isDone?'filter:grayscale(0.5);opacity:0.85;':''}">
-           <div style="position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:14px;">${r.emoji}</div>
-         </div>`
-      : '';
-    return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
-      ${coverHtml}
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:4px;">
-        ${r.coverImageUrl?'':`<div style="width:38px;height:38px;border-radius:12px;background:${isDone?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;${isDone?'filter:grayscale(0.6);':''}">${r.emoji}</div>`}
-        <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:600;margin-left:auto;">${sl}</span>
+    // 참여 인원(이미지 위 오버레이)
+    const peopleTxt = `${r.people}명`;
+    // 대표 이미지 or 그라데이션 폴백
+    const coverInner = r.coverImageUrl
+      ? `<img src="${r.coverImageUrl}" style="${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
+      : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
+    return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
+      <div class="rc-cover">
+        ${coverInner}
+        <div class="rc-scrim"></div>
+        ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
+        <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
+        <span class="rc-people">👤 ${peopleTxt}</span>
       </div>
-      <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:4px;min-height:17px;">${isDone?'✓ ':''}${hl(r.title)}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
-        <span style="font-size:11px;color:${isDone?'#ccc':'#999'};">${r.period}</span>
-        ${ddHtml}
+      <div class="rc-body" style="background:${cardBg};">
+        <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:${r.partnerOrg?'3px':'5px'};min-height:17px;">${isDone?'✓ ':''}${hl(r.title)}</div>
+        ${r.partnerOrg?`<div style="font-size:11px;color:${isDone?'#bbb':'#2E33BC'};font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🤝 ${hl(r.partnerOrg)}</div>`:''}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+          <span style="font-size:11px;color:${isDone?'#ccc':'#999'};">${r.period}</span>
+          ${ddHtml}
+        </div>
+        ${bottom}${nickHtml}
       </div>
-      ${bottom}${nickHtml}
     </div>`;
   }).join('') || `<div style="grid-column:1/-1;padding:44px 16px;text-align:center;">
       <div style="font-size:32px;margin-bottom:10px;">🌱</div>
@@ -1739,6 +1752,7 @@ function openRoutineDetail(id) {
   document.getElementById('rdSub').textContent=r.tag;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.people}명 참여</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.tag}</div>
@@ -2325,27 +2339,26 @@ function kFilterRoutine(type,el) {
     const ddHtml = dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 오늘</span>`:'')
       : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">마지막 날</span>`:'');
-    const coverHtml = r.coverImageUrl
-      ? `<div style="margin:-12px -12px 8px;height:64px;border-radius:16px 16px 0 0;overflow:hidden;">
-           <img src="${r.coverImageUrl}" style="width:100%;height:100%;object-fit:cover;display:block;${isDone?'filter:grayscale(0.5);opacity:0.85;':''}">
-         </div>`
-      : '';
-    return `<div class="routine-card" onclick="${isActive?`openKRoutineFeed(${r.id})`:`openKRoutineDetail(${r.id})`}" style="background:${cardBg};border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
-      ${coverHtml}
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:4px;">
-        <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;">${isDone?'✓ ':''}${r.emoji} ${r.title}</div>
-        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bb};color:${bc};white-space:nowrap;font-weight:500;">${sl}</span>
+    const coverInner = r.coverImageUrl
+      ? `<img src="${r.coverImageUrl}" style="${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
+      : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
+    const pending=(r.applicants||[]).filter(a=>a.status==='pending').length;
+    return `<div class="routine-card" onclick="${isActive?`openKRoutineFeed(${r.id})`:`openKRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
+      <div class="rc-cover">
+        ${coverInner}
+        <div class="rc-scrim"></div>
+        ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
+        <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
+        <span class="rc-people">👤 ${r.people}명</span>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:5px;">
-        <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.period}</span>
-        ${ddHtml}
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>
-        <div style="display:flex;align-items:center;gap:5px;">
-          ${(r.applicants||[]).filter(a=>a.status==='pending').length>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;">신청 ${(r.applicants||[]).filter(a=>a.status==='pending').length}</span>`:''}
-          <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.people}명</span>
+      <div class="rc-body" style="background:${cardBg};">
+        <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;margin-bottom:${r.partnerOrg?'3px':'5px'};">${isDone?'✓ ':''}${r.title}</div>
+        ${r.partnerOrg?`<div style="font-size:11px;color:${isDone?'#bbb':'#2E33BC'};font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🤝 ${r.partnerOrg}</div>`:''}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+          <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.period}</span>
+          ${ddHtml}
         </div>
+        <div style="margin-top:7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${isDone?'#e8e8e8':'#f5f5f5'};color:${isDone?'#aaa':'#666'};">${r.tag}</span>${pending>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;font-weight:700;">신청 ${pending}</span>`:''}</div>
       </div>
     </div>`;
   }).join('');
@@ -2463,6 +2476,8 @@ function updateCreatePreview(){
   const n=document.getElementById('rName').value,d=document.getElementById('rDesc').value,p=document.getElementById('rPeople').value,s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value;
   document.getElementById('pvEmoji').textContent=selectedEmoji;
   document.getElementById('pvName').textContent=n||'루틴 이름을 입력해주세요';
+  const pt=document.getElementById('rPartner').value.trim(), pvPt=document.getElementById('pvPartner');
+  if(pt){pvPt.style.display='';pvPt.textContent='🤝 '+pt;}else pvPt.style.display='none';
   document.getElementById('pvDesc').textContent=d||'루틴 소개를 입력하면 여기에 표시돼요.';
   document.getElementById('pvPeople').textContent=p||10;
   document.getElementById('pvPeriod').textContent=(s&&e&&e>=s)?`${s.replace(/-/g,'.').slice(2)} – ${e.replace(/-/g,'.').slice(2)}`:'기간 미설정';
@@ -2483,6 +2498,7 @@ function handleCreatePhoto(e){
 }
 async function submitCreateRoutine(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
+  const partner=document.getElementById('rPartner').value.trim();
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
   if(!n){alert('루틴 이름을 입력해주세요.');return;}
   if(!s||!e||e<s){alert('기간을 올바르게 설정해주세요.');return;}
@@ -2499,7 +2515,7 @@ async function submitCreateRoutine(){
   if(upErr){ alert('이미지 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';} return; }
   coverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
   const { error } = await sb.from('routines').insert({
-    title:n, emoji:selectedEmoji, description:d, tag:'생활',
+    title:n, emoji:selectedEmoji, description:d, tag:'생활', partner_org:partner||null,
     start_date:s, end_date:e, max_people:parseInt(p),
     status:'recruit', created_by:currentUser.id, cover_image_url:coverUrl,
   });
@@ -2512,7 +2528,7 @@ async function submitCreateRoutine(){
 function closeCreateSuccess(){
   document.getElementById('createSuccess').classList.remove('open');
   closeOverlay('createRoutineOverlay');
-  ['rName','rDesc','rStart','rEnd'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rStart','rEnd'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
