@@ -20,7 +20,6 @@ CREATE TABLE profiles (
   region_sido   text,
   region_sigugun text,
   school_status text CHECK (school_status IN ('out_of_school','enrolled','alternative')),
-  signup_reason text,
   created_at    timestamptz DEFAULT now()
 );
 
@@ -200,7 +199,7 @@ CREATE POLICY "nadaeum_insert" ON nadaeum_log FOR INSERT WITH CHECK (auth.uid() 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -211,7 +210,6 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    NEW.raw_user_meta_data->>'signup_reason',
     COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
   );
   RETURN NEW;
@@ -329,7 +327,7 @@ ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS application_note text;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -340,7 +338,6 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    NEW.raw_user_meta_data->>'signup_reason',
     COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
   );
   RETURN NEW;
@@ -374,7 +371,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kkutjjang_status text DEFAULT 'non
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -385,7 +382,6 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    NEW.raw_user_meta_data->>'signup_reason',
     COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
   );
   RETURN NEW;
@@ -443,3 +439,8 @@ CREATE POLICY "letters_update" ON letters FOR UPDATE USING (
   OR auth.uid() IN (SELECT led_by FROM routines WHERE id = routine_id)
   OR is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-11] 참여 계기(signup_reason) 필드 제거
+-- =====================================================
+ALTER TABLE profiles DROP COLUMN IF EXISTS signup_reason;

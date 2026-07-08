@@ -27,7 +27,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 
 /* 로그인 */
-.splash { position: absolute; inset: 0; background: #2E33BC; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; transition: opacity 0.3s; padding: 32px 28px; }
+.splash { position: absolute; inset: 0; background: #2E33BC; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; transition: opacity 0.3s; padding: 32px 28px; overflow-y: auto; }
 .splash.hide { opacity: 0; pointer-events: none; }
 .splash-logo { font-size: 32px; font-weight: 700; color: white; letter-spacing: -1px; }
 .splash-sub { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 6px; margin-bottom: 32px; }
@@ -311,7 +311,12 @@ input:focus { outline: none; border-color: #2E33BC; }
       <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
     </div>
     <!-- 회원가입 폼 -->
-    <div class="auth-form" id="authFormSignup" style="display:none;max-height:60vh;overflow-y:auto;">
+    <div class="auth-form" id="authFormSignup" style="display:none;">
+      <div class="role-row">
+        <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
+        <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
+      </div>
+      <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="signupRealName" class="auth-input" placeholder="이름 (실명)">
       <input type="date" id="signupBirth" class="auth-input">
@@ -322,11 +327,6 @@ input:focus { outline: none; border-color: #2E33BC; }
         <select id="signupSido" class="auth-input" style="flex:1;" onfocus="populateSidoSelect()" onchange="populateSigugunSelect()"><option value="">시/도 선택</option></select>
         <select id="signupSigugun" class="auth-input" style="flex:1;"><option value="">시/군/구 선택</option></select>
       </div>
-      <div class="role-row">
-        <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
-        <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
-      </div>
-      <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <div id="signupYouthExtra">
         <select id="signupSchoolStatus" class="auth-input">
           <option value="">재학 상태 선택</option>
@@ -334,7 +334,6 @@ input:focus { outline: none; border-color: #2E33BC; }
           <option value="enrolled">학교를 다녀요</option>
           <option value="alternative">대안학교를 다녀요</option>
         </select>
-        <textarea id="signupReason" class="auth-input" rows="3" placeholder="한끗루틴에 참여하고 싶은 계기를 짧게 적어주세요." style="resize:none;"></textarea>
       </div>
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
     </div>
@@ -1090,7 +1089,6 @@ async function loadProfileAndEnter() {
       region_sido: meta.region_sido || null,
       region_sigugun: meta.region_sigugun || null,
       school_status: meta.school_status || null,
-      signup_reason: meta.signup_reason || null,
       kkutjjang_status: meta.kkutjjang_status || 'none',
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
@@ -1161,11 +1159,9 @@ async function doSignup() {
   const sido = document.getElementById('signupSido').value;
   const sigugun = document.getElementById('signupSigugun').value;
   const schoolStatus = document.getElementById('signupSchoolStatus').value;
-  const reason = document.getElementById('signupReason').value.trim();
   if (!name || !realName || !birthDate || !email || !pw || !phone || !sido || !sigugun) return showAuthMsg('모든 항목을 입력해주세요');
   if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
   if (signupRole === 'youth' && !schoolStatus) return showAuthMsg('재학 상태를 선택해주세요');
-  if (signupRole === 'youth' && !reason) return showAuthMsg('참여 계기를 입력해주세요');
   showAuthMsg('가입 중...');
   const { error } = await sb.auth.signUp({
     email, password: pw,
@@ -1173,7 +1169,6 @@ async function doSignup() {
       name, role: signupRole, real_name: realName, birth_date: birthDate, phone,
       region_sido: sido, region_sigugun: sigugun,
       school_status: signupRole === 'youth' ? schoolStatus : null,
-      signup_reason: signupRole === 'youth' ? reason : null,
       kkutjjang_status: signupRole === 'kkutjjang' ? 'pending' : 'none',
     } }
   });
