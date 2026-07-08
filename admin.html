@@ -364,18 +364,22 @@ function toggleSelectAll(el, tab) {
 }
 function renderBulkBar() {
   const bar = document.getElementById('bulkBar');
-  if (currentTab === 'kkutjjang' && selectedIds.size > 0) {
+  if (selectedIds.size > 0) {
     bar.style.display = 'flex';
-    document.getElementById('bulkCount').textContent = `${selectedIds.size}명 선택됨 (끗짱 가입 승인/반려)`;
+    document.getElementById('bulkCount').textContent = currentTab === 'youth'
+      ? `${selectedIds.size}명 선택됨 (청소년 서류 승인/반려)`
+      : `${selectedIds.size}명 선택됨 (끗짱 가입 승인/반려)`;
   } else {
     bar.style.display = 'none';
   }
 }
 async function bulkAction(status) {
   if (selectedIds.size === 0) return;
-  if (!confirm(`선택한 ${selectedIds.size}명을 ${status==='approved'?'승인':'반려'}할까요?`)) return;
+  const label = currentTab === 'youth' ? '청소년 서류를' : '끗짱 가입을';
+  if (!confirm(`선택한 ${selectedIds.size}명의 ${label} ${status==='approved'?'승인':'반려'}할까요?`)) return;
   const ids = [...selectedIds];
-  const { error } = await sb.from('profiles').update({ kkutjjang_status: status }).in('id', ids);
+  const payload = currentTab === 'youth' ? { verify_status: status } : { kkutjjang_status: status };
+  const { error } = await sb.from('profiles').update(payload).in('id', ids);
   if (error) { alert('처리 실패: ' + error.message); return; }
   selectedIds.clear();
   await loadData();
