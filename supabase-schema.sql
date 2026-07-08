@@ -210,7 +210,11 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      ELSE 'pending'
+    END
   );
   RETURN NEW;
 END;
@@ -338,7 +342,11 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      ELSE 'pending'
+    END
   );
   RETURN NEW;
 END;
@@ -382,7 +390,11 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      ELSE 'pending'
+    END
   );
   RETURN NEW;
 END;
@@ -466,3 +478,32 @@ DROP POLICY IF EXISTS "cert_photos_select_all" ON storage.objects;
 CREATE POLICY "cert_photos_select_all" ON storage.objects FOR SELECT USING (
   bucket_id = 'cert-photos'
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-11c] 관리자 끗짱 자동승인 + 서버측 검증
+-- 클라이언트가 보낸 kkutjjang_status를 신뢰하지 않고, 이메일을 서버(DB)에서
+-- 직접 확인해 관리자 이메일만 즉시 승인되도록 변경 (임의 승인 요청 악용 방지)
+-- =====================================================
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    NEW.raw_user_meta_data->>'school_status',
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      ELSE 'pending'
+    END
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
