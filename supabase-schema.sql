@@ -36,6 +36,9 @@ CREATE TABLE routines (
   end_date    date,
   max_people  int  DEFAULT 10,
   eligibility text DEFAULT 'all' CHECK (eligibility IN ('all', 'out_of_school')),
+  kickoff_at  timestamptz,
+  closing_at  timestamptz,
+  meeting_link text,
   status      text DEFAULT 'recruit' CHECK (status IN ('recruit', 'active', 'done')),
   created_by  uuid REFERENCES auth.users ON DELETE SET NULL,
   created_at  timestamptz DEFAULT now()
@@ -348,3 +351,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- =====================================================
 ALTER TABLE profiles DROP COLUMN IF EXISTS is_out_of_school;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school_status text CHECK (school_status IN ('out_of_school','enrolled','alternative'));
+
+-- =====================================================
+-- [마이그레이션 2026-07-09] OT/클로징 온라인 모임 (줌 연동)
+-- 기존 프로젝트는 아래만 실행하세요.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS kickoff_at timestamptz;
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS closing_at timestamptz;
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS meeting_link text;

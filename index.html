@@ -376,6 +376,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
           </div>
           <!-- 오늘의 미션 -->
+          <div id="meetBannerArea"></div>
           <div id="todayMissionArea"></div>
           <!-- 이번 주 한끗 -->
           <div class="section-card">
@@ -545,6 +546,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
           </div>
           <!-- 승인 대기 알림 -->
+          <div id="kMeetBanner"></div>
           <div id="kPendingAlert"></div>
           <!-- 진행 중인 루틴 -->
           <div class="section-card">
@@ -764,6 +766,11 @@ input:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">🌱 누구나 참여</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">🎓 학교밖청소년 전용</button></div></div>
       <div><div class="field-label">기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
+      <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
+        <div style="font-size:11px;color:#888;margin-bottom:6px;">첫날 OT와 마지막날 클로징 모임 일시를 정해주세요.</div>
+        <div class="date-row"><div class="date-item"><label>OT (첫날)</label><input type="datetime-local" id="rKickoff"></div><div class="date-item"><label>클로징 (마지막날)</label><input type="datetime-local" id="rClosing"></div></div>
+        <input type="url" id="rMeetingLink" placeholder="줌 링크 (예: https://zoom.us/j/...)" style="margin-top:8px;">
+      </div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 예시 사진 <span class="required">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
@@ -992,7 +999,7 @@ const CERT_FEED = [
 const SB_URL = 'https://ynqvhsffoesjzefitafv.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlucXZoc2Zmb2VzanplZml0YWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjMxNDIsImV4cCI6MjA5ODg5OTE0Mn0.l16KP5amowhtrtoBaKL1M8wtcPMgUxniVcjoLC6YOIQ';
 const sb = supabase.createClient(SB_URL, SB_KEY);
-let currentUser = null;
+var currentUser = null;
 let signupRole = 'youth';
 
 const REGION_DATA = {
@@ -1259,6 +1266,7 @@ async function loadRoutines() {
       people: approved.length, maxPeople: r.max_people || 10,
       desc: r.description || '', tag: r.tag || '생활', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
+      kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
       certCount: rCerts.length, avgRate: 0, createdBy: r.created_by,
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
@@ -1442,6 +1450,43 @@ function renderHome() {
     : `<div style="font-size:11px;color:rgba(255,255,255,0.8);">🌲 최고 레벨이에요! 숲이 되어주셔서 고마워요</div>`;
 
   const active = state.routines.filter(r=>r.status==='active');
+
+  // 온라인 모임(OT/클로징) 배너 — 내가 참여한 루틴 중 모임이 오늘이거나 다가오는 것
+  const myRoutines = state.routines.filter(r =>
+    (r.status==='active'||r.status==='recruit') &&
+    currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)
+  );
+  const nowTs = Date.now();
+  const banners = [];
+  myRoutines.forEach(r=>{
+    [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징 모임']].forEach(([field,icon,label])=>{
+      const iso=r[field]; if(!iso) return;
+      const diff=new Date(iso).getTime()-nowTs;
+      const dd=_dday(iso.slice(0,10));
+      if(_isToday(iso) && diff > -90*60000) { // 오늘, 종료 90분 전까지 노출
+        banners.push(`<div style="background:linear-gradient(135deg,#FF006C,#FF6B00);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+          <div style="font-size:26px;">${icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;color:white;">오늘 ${label}! ${_fmtDT(iso).split(' ')[1]}에 만나요</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title}</div>
+          </div>
+          ${r.meetingLink?`<a href="${r.meetingLink}" target="_blank" style="flex-shrink:0;padding:9px 14px;background:white;color:#FF006C;border-radius:12px;font-size:12px;font-weight:700;text-decoration:none;">줌 참여</a>`:''}
+        </div>`);
+      } else if(dd!==null && dd>0 && dd<=3) {
+        banners.push(`<div style="background:#FFF8E1;border:0.5px solid #FFD600;border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <div style="font-size:20px;">${icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:#111;">${label} D-${dd} · ${_fmtDT(iso)}</div>
+            <div style="font-size:11px;color:#888;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title} — 줌으로 만나요</div>
+          </div>
+          <a href="${_gcalLink(r.title+' '+label,iso,r.meetingLink)}" target="_blank" style="flex-shrink:0;font-size:11px;color:#2E33BC;font-weight:600;text-decoration:none;">📅 저장</a>
+        </div>`);
+      }
+    });
+  });
+  document.getElementById('meetBannerArea').innerHTML = banners.join('');
+  document.getElementById('meetBannerArea').style.display = banners.length?'flex':'none';
+  if(banners.length) { const el=document.getElementById('meetBannerArea'); el.style.flexDirection='column'; el.style.gap='10px'; }
 
   // 오늘의 미션 카드
   const notDone = active.filter(r=>!r.todayCert);
@@ -1637,6 +1682,7 @@ function renderRoutineGrid(type, q) {
           <span style="font-size:11px;color:${isDone?'#ccc':'#999'};">${r.period}</span>
           ${ddHtml}
         </div>
+        ${isRecruit&&r.kickoffAt?`<div style="font-size:10px;color:#FF6B00;font-weight:700;margin-top:4px;">💻 OT ${_fmtDT(r.kickoffAt)}</div>`:''}
         ${bottom}${nickHtml}
       </div>
     </div>`;
@@ -1645,6 +1691,22 @@ function renderRoutineGrid(type, q) {
       <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 등록된 루틴이 없어요</div>
       <div style="font-size:12px;color:#aaa;">곧 새로운 루틴이 열릴 거예요!</div>
     </div>`;
+}
+function _fmtDT(iso) {
+  if(!iso) return '';
+  const d=new Date(iso);
+  const days=['일','월','화','수','목','금','토'];
+  const hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0');
+  return `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]}) ${hh}:${mm}`;
+}
+function _isToday(iso) {
+  if(!iso) return false;
+  return new Date(iso).toDateString() === new Date().toDateString();
+}
+function _gcalLink(title, iso, link) {
+  const s=new Date(iso), e=new Date(s.getTime()+60*60000);
+  const f=d=>d.toISOString().replace(/[-:]|\.\d{3}/g,'');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${f(s)}/${f(e)}&details=${encodeURIComponent('한끗루틴 온라인 모임\n'+(link||''))}`;
 }
 function _birthdayInfo(dateStr) {
   if(!dateStr) return null;
@@ -1877,7 +1939,14 @@ function openRoutineDetail(id) {
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const needsDoc = r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved';
+  const meetHtml = (r.kickoffAt||r.closingAt) ? `
+    <div style="background:#f0f1fb;border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:700;color:#2E33BC;margin-bottom:6px;">💻 온라인 모임 (줌 필수 참여)</div>
+      ${r.kickoffAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🚀 OT ${_fmtDT(r.kickoffAt)}</span><a href="${_gcalLink(r.title+' OT',r.kickoffAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
+      ${r.closingAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🎉 클로징 ${_fmtDT(r.closingAt)}</span><a href="${_gcalLink(r.title+' 클로징',r.closingAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
+    </div>`:'';
   if(r.status==='recruit') body+=`
+    ${meetHtml}
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
       <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
     </div>
@@ -1929,7 +1998,8 @@ async function submitApplyRoutine(){
   document.getElementById('rdBody').innerHTML='';
   renderRoutine();
   setTimeout(()=>{
-    alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.');
+    const otMsg = r&&r.kickoffAt ? `\n\n🚀 첫날 OT: ${_fmtDT(r.kickoffAt)}\n줌으로 함께 만나 첫 인증을 해볼 거예요!` : '';
+    alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.'+otMsg);
   }, 300);
 }
 
@@ -2391,6 +2461,23 @@ function kRenderHome() {
   document.getElementById('kStatActive').textContent = active.length;
 
   // 승인 대기 알림 카드
+  // 오늘 온라인 모임(OT/클로징) 배너
+  const todayMeets=[];
+  state.routines.filter(r=>r.status!=='done').forEach(r=>{
+    [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징']].forEach(([f,icon,label])=>{
+      if(r[f]&&_isToday(r[f])) todayMeets.push({r,iso:r[f],icon,label});
+    });
+  });
+  document.getElementById('kMeetBanner').innerHTML = todayMeets.map(({r,iso,icon,label})=>`
+    <div style="background:linear-gradient(135deg,#FF006C,#FF6B00);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="font-size:26px;">${icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:white;">오늘 ${label} ${_fmtDT(iso).split(' ')[1]}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title} · ${r.people}명 참여</div>
+      </div>
+      ${r.meetingLink?`<a href="${r.meetingLink}" target="_blank" style="flex-shrink:0;padding:9px 14px;background:white;color:#FF006C;border-radius:12px;font-size:12px;font-weight:700;text-decoration:none;">줌 열기</a>`:''}
+    </div>`).join('');
+
   document.getElementById('kPendingAlert').innerHTML = pendingApps.length>0
     ? `<div onclick="openKRoutineDetail(${pendingApps[0].routineId})" style="background:#FFF8E1;border:0.5px solid #FFD600;border-radius:16px;padding:13px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;">
         <div style="font-size:20px;">⏳</div>
@@ -2668,7 +2755,10 @@ async function submitCreateRoutine(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
   const partner=document.getElementById('rPartner').value.trim();
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
+  const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
+  const meetLink=document.getElementById('rMeetingLink').value.trim();
   if(!n){alert('루틴 이름을 입력해주세요.');return;}
+  if((kickoff||closing)&&!meetLink){alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.');return;}
   if(!s||!e||e<s){alert('기간을 올바르게 설정해주세요.');return;}
   if(!p||p<1){alert('참여 인원을 입력해주세요.');return;}
   if(!d){alert('루틴 소개를 입력해주세요.');return;}
@@ -2685,6 +2775,9 @@ async function submitCreateRoutine(){
   const { error } = await sb.from('routines').insert({
     title:n, emoji:selectedEmoji, description:d, tag:'생활', partner_org:partner||null,
     eligibility:createEligibility,
+    kickoff_at:kickoff?new Date(kickoff).toISOString():null,
+    closing_at:closing?new Date(closing).toISOString():null,
+    meeting_link:meetLink||null,
     start_date:s, end_date:e, max_people:parseInt(p),
     status:'recruit', created_by:currentUser.id, cover_image_url:coverUrl,
   });
@@ -2697,7 +2790,7 @@ async function submitCreateRoutine(){
 function closeCreateSuccess(){
   document.getElementById('createSuccess').classList.remove('open');
   closeOverlay('createRoutineOverlay');
-  ['rName','rPartner','rDesc','rStart','rEnd'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
