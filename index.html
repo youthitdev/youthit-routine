@@ -467,7 +467,6 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
-            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#888;cursor:pointer;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px;"></i> 로그아웃</button>
           </div>
           <div id="verifyCard"></div>
           <input type="file" id="verifyDocInput" accept="image/*,.pdf" style="display:none;" onchange="handleVerifyDoc(event)">
@@ -522,6 +521,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
           <div id="switchRoleArea"></div>
+          <button style="width:100%;padding:13px;background:none;border:0.5px solid #eee;border-radius:12px;color:#aaa;font-size:13px;cursor:pointer;margin-top:4px;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:13px;"></i> 로그아웃</button>
         </div>
       </div>
     </div>
@@ -673,6 +673,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="menu-item" onclick="openOverlay('inquiryOverlay')"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
           <div id="kSwitchRoleArea"></div>
+          <button style="width:100%;padding:13px;background:none;border:0.5px solid #eee;border-radius:12px;color:#aaa;font-size:13px;cursor:pointer;margin-top:4px;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:13px;"></i> 로그아웃</button>
         </div>
       </div>
     </div>
@@ -923,7 +924,22 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">프로필 편집</div>
-      <div style="margin-bottom:16px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">닉네임 <span class="required">* 필수</span></div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">이름(실명) <span class="required">* 필수</span></div><input type="text" id="editRealName" placeholder="이름(실명)"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">생년월일</div><input type="date" id="editBirth"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">휴대폰번호</div><input type="tel" id="editPhone" placeholder="휴대폰번호 ('-' 없이 입력)"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">지역</div><div style="display:flex;gap:6px;">
+        <select id="editSido" style="flex:1;" onfocus="populateSidoSelect('editSido')" onchange="populateSigugunSelect('editSido','editSigugun')"><option value="">시/도 선택</option></select>
+        <select id="editSigugun" style="flex:1;"><option value="">시/군/구 선택</option></select>
+      </div></div>
+      <div id="editYouthExtra" style="margin-bottom:14px;"><div class="field-label">재학 상태</div>
+        <select id="editSchoolStatus">
+          <option value="">재학 상태 선택</option>
+          <option value="out_of_school">학교 밖 청소년이에요</option>
+          <option value="enrolled">학교를 다녀요</option>
+          <option value="alternative">대안학교를 다녀요</option>
+        </select>
+      </div>
       <button class="primary-btn" onclick="saveProfile()">저장하기</button>
     </div>
   </div>
@@ -1039,16 +1055,18 @@ const REGION_DATA = {
   '경상남도': ['창원시','진주시','통영시','사천시','김해시','밀양시','거제시','양산시','의령군','함안군','창녕군','고성군','남해군','하동군','산청군','함양군','거창군','합천군'],
   '제주특별자치도': ['제주시','서귀포시'],
 };
-function populateSidoSelect(){
-  const sel=document.getElementById('signupSido');
+function populateSidoSelect(sidoId){
+  sidoId = sidoId || 'signupSido';
+  const sel=document.getElementById(sidoId);
   if(!sel||sel.options.length>1) return;
   Object.keys(REGION_DATA).forEach(sido=>{
     const o=document.createElement('option'); o.value=sido; o.textContent=sido; sel.appendChild(o);
   });
 }
-function populateSigugunSelect(){
-  const sido=document.getElementById('signupSido').value;
-  const sel=document.getElementById('signupSigugun');
+function populateSigugunSelect(sidoId, sigugunId){
+  sidoId = sidoId || 'signupSido'; sigugunId = sigugunId || 'signupSigugun';
+  const sido=document.getElementById(sidoId).value;
+  const sel=document.getElementById(sigugunId);
   sel.innerHTML='<option value="">시/군/구 선택</option>';
   (REGION_DATA[sido]||[]).forEach(g=>{
     const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o);
@@ -1114,6 +1132,11 @@ async function loadProfileAndEnter() {
   state.youth.schoolStatus = profile.school_status || null;
   state.kkutjjang.name = profile.name;
   state.kkutjjang.status = profile.kkutjjang_status || 'none';
+  state.kkutjjang.realName = profile.real_name || '';
+  state.kkutjjang.birthDate = profile.birth_date || null;
+  state.kkutjjang.phone = profile.phone || '';
+  state.kkutjjang.regionSido = profile.region_sido || '';
+  state.kkutjjang.regionSigugun = profile.region_sigugun || '';
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
@@ -2465,24 +2488,50 @@ function handleAvatar(e) {
   r.onload=ev=>{state.youth.avatar=ev.target.result;save();renderMy();};
   r.readAsDataURL(f);
 }
+function _profileState() { return state.currentRole==='youth' ? state.youth : state.kkutjjang; }
 function openEditProfile() {
-  const current = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
-  document.getElementById('editNickname').value = current || '';
+  const p = _profileState();
+  const isYouth = state.currentRole==='youth';
+  document.getElementById('editNickname').value = p.name || '';
+  document.getElementById('editRealName').value = p.realName || '';
+  document.getElementById('editBirth').value = p.birthDate || '';
+  document.getElementById('editPhone').value = p.phone || '';
+  populateSidoSelect('editSido');
+  document.getElementById('editSido').value = p.regionSido || '';
+  populateSigugunSelect('editSido','editSigugun');
+  document.getElementById('editSigugun').value = p.regionSigugun || '';
+  document.getElementById('editYouthExtra').style.display = isYouth ? '' : 'none';
+  document.getElementById('editSchoolStatus').value = isYouth ? (p.schoolStatus || '') : '';
   openSheet('editProfileBg');
 }
 async function saveProfile() {
   const n=document.getElementById('editNickname').value.trim();
+  const realName=document.getElementById('editRealName').value.trim();
+  const birth=document.getElementById('editBirth').value;
+  const phone=document.getElementById('editPhone').value.trim();
+  const sido=document.getElementById('editSido').value;
+  const sigugun=document.getElementById('editSigugun').value;
+  const isYouth = state.currentRole==='youth';
+  const schoolStatus = isYouth ? document.getElementById('editSchoolStatus').value : null;
   if(!n){alert('닉네임을 입력해주세요.');return;}
+  if(!realName){alert('이름(실명)을 입력해주세요.');return;}
   if(!currentUser){alert('로그인이 필요해요.');return;}
   const btn=document.querySelector('#editProfileBg .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
-  const { error } = await sb.from('profiles').update({ name:n }).eq('id', currentUser.id);
+  const payload = {
+    name:n, real_name:realName, birth_date: birth||null, phone: phone||null,
+    region_sido: sido||null, region_sigugun: sigugun||null,
+  };
+  if(isYouth) payload.school_status = schoolStatus||null;
+  const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if(btn){btn.disabled=false;btn.textContent='저장하기';}
   if(error){alert('저장 실패: '+error.message);return;}
-  if(state.currentRole==='youth') state.youth.name=n; else state.kkutjjang.name=n;
+  const p = _profileState();
+  p.name=n; p.realName=realName; p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||'';
+  if(isYouth) p.schoolStatus=schoolStatus||null;
   save();
   closeSheet('editProfileBg');
-  if(state.currentRole==='youth') { renderMy(); renderHome(); }
+  if(isYouth) { renderMy(); renderHome(); }
   else { kRenderMy(); kRenderHome(); }
 }
 
