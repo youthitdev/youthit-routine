@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한끗루틴 · 관리자</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background:#f5f5f7; color:#111; }
+  #loginScreen { max-width:360px; margin:80px auto; background:#fff; border-radius:16px; padding:28px; box-shadow:0 4px 20px rgba(0,0,0,0.06); }
+  #loginScreen h1 { font-size:18px; margin:0 0 18px; }
+  #loginScreen input { width:100%; padding:11px 14px; border:1px solid #ddd; border-radius:10px; font-size:14px; margin-bottom:10px; }
+  #loginScreen button { width:100%; padding:12px; background:#2E33BC; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+  #loginMsg { font-size:12px; color:#c00; margin-top:8px; min-height:16px; }
+  #noAccess { max-width:420px; margin:100px auto; text-align:center; font-size:14px; color:#888; }
+
+  #app { display:none; max-width:1200px; margin:0 auto; padding:24px 20px 60px; }
+  header.top { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  header.top h1 { font-size:20px; margin:0; }
+  header.top .me { font-size:12px; color:#888; }
+  header.top button { background:none; border:1px solid #ddd; border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; color:#666; }
+
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn { padding:9px 18px; border-radius:10px; border:1px solid #ddd; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:#666; }
+  .tab-btn.active { background:#2E33BC; color:#fff; border-color:#2E33BC; }
+
+  .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .filter-bar input[type="text"], .filter-bar select { padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:13px; background:#fff; }
+  .filter-bar input[type="text"] { min-width:200px; }
+  .count-badge { font-size:12px; color:#888; margin-left:auto; }
+  .export-btn { padding:8px 14px; background:#83CA00; color:#27500A; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  thead th { text-align:left; font-size:11px; color:#888; font-weight:600; padding:10px 12px; background:#fafafa; border-bottom:1px solid #eee; white-space:nowrap; cursor:pointer; user-select:none; }
+  thead th:hover { color:#2E33BC; }
+  tbody td { padding:10px 12px; font-size:13px; border-bottom:1px solid #f2f2f2; white-space:nowrap; }
+  tbody tr:hover { background:#fafbff; }
+  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+  .pill-approved { background:#EAF3DE; color:#3B6D11; }
+  .pill-pending { background:#FFF3CD; color:#856404; }
+  .pill-rejected { background:#f5f5f5; color:#aaa; }
+  .pill-none { background:#f5f5f5; color:#aaa; }
+  .routine-tags { display:flex; gap:4px; flex-wrap:wrap; max-width:220px; white-space:normal; }
+  .routine-tag { font-size:10px; background:#f0f1fb; color:#2E33BC; padding:2px 7px; border-radius:8px; }
+  .empty-row td { text-align:center; color:#aaa; padding:40px; }
+  input[type="checkbox"] { cursor:pointer; }
+  .bulk-bar { display:none; align-items:center; gap:10px; background:#111; color:#fff; padding:10px 16px; border-radius:10px; margin-bottom:10px; font-size:13px; }
+  .bulk-bar button { padding:6px 14px; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+  .bulk-approve { background:#2E33BC; color:#fff; }
+  .bulk-reject { background:#fff; color:#333; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1>한끗루틴 관리자</h1>
+  <input type="email" id="loginEmail" placeholder="이메일">
+  <input type="password" id="loginPw" placeholder="비밀번호">
+  <button onclick="doLogin()">로그인</button>
+  <div id="loginMsg"></div>
+</div>
+
+<div id="noAccess" style="display:none;">
+  <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+  <div>관리자 권한이 있는 계정으로만 접근할 수 있어요.</div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <h1>👥 참가자 관리</h1>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="me" id="meLabel"></span>
+      <button onclick="doLogout()">로그아웃</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabYouthBtn" onclick="switchTab('youth')">청소년</button>
+    <button class="tab-btn" id="tabKkBtn" onclick="switchTab('kkutjjang')">끗짱</button>
+  </div>
+
+  <div class="filter-bar" id="youthFilters">
+    <input type="text" id="ySearch" placeholder="닉네임·실명·휴대폰 검색" oninput="renderTable()">
+    <select id="ySido" onchange="onSidoChange()"><option value="">전체 지역(시/도)</option></select>
+    <select id="ySigugun" onchange="renderTable()"><option value="">전체 시/군/구</option></select>
+    <select id="ySchoolStatus" onchange="renderTable()">
+      <option value="">전체 재학상태</option>
+      <option value="out_of_school">학교 밖 청소년</option>
+      <option value="enrolled">재학 중</option>
+      <option value="alternative">대안학교</option>
+    </select>
+    <select id="yVerify" onchange="renderTable()">
+      <option value="">전체 서류상태</option>
+      <option value="approved">승인됨</option>
+      <option value="pending">대기중</option>
+      <option value="rejected">반려됨</option>
+      <option value="none">미제출</option>
+    </select>
+    <select id="yRoutine" onchange="renderTable()"><option value="">전체 참여루틴</option></select>
+    <span class="count-badge" id="yCount"></span>
+    <button class="export-btn" onclick="exportCSV('youth')">📥 CSV 내보내기</button>
+  </div>
+
+  <div class="filter-bar" id="kkFilters" style="display:none;">
+    <input type="text" id="kSearch" placeholder="닉네임·실명·휴대폰 검색" oninput="renderTable()">
+    <select id="kStatus" onchange="renderTable()">
+      <option value="">전체 승인상태</option>
+      <option value="approved">승인됨</option>
+      <option value="pending">대기중</option>
+      <option value="rejected">반려됨</option>
+    </select>
+    <span class="count-badge" id="kCount"></span>
+    <button class="export-btn" onclick="exportCSV('kkutjjang')">📥 CSV 내보내기</button>
+  </div>
+
+  <div class="bulk-bar" id="bulkBar">
+    <span id="bulkCount"></span>
+    <button class="bulk-approve" onclick="bulkAction('approved')">일괄 승인</button>
+    <button class="bulk-reject" onclick="bulkAction('rejected')">일괄 반려</button>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table>
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SB_URL = 'https://ynqvhsffoesjzefitafv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlucXZoc2Zmb2VzanplZml0YWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjMxNDIsImV4cCI6MjA5ODg5OTE0Mn0.l16KP5amowhtrtoBaKL1M8wtcPMgUxniVcjoLC6YOIQ';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
+
+const REGION_DATA = {
+  '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
+  '부산광역시': ['중구','서구','동구','영도구','부산진구','동래구','남구','북구','해운대구','사하구','금정구','강서구','연제구','수영구','사상구','기장군'],
+  '대구광역시': ['중구','동구','서구','남구','북구','수성구','달서구','달성군','군위군'],
+  '인천광역시': ['중구','동구','미추홀구','연수구','남동구','부평구','계양구','서구','강화군','옹진군'],
+  '광주광역시': ['동구','서구','남구','북구','광산구'],
+  '대전광역시': ['동구','중구','서구','유성구','대덕구'],
+  '울산광역시': ['중구','남구','동구','북구','울주군'],
+  '세종특별자치시': ['세종특별자치시'],
+  '경기도': ['수원시','성남시','의정부시','안양시','부천시','광명시','평택시','동두천시','안산시','고양시','과천시','구리시','남양주시','오산시','시흥시','군포시','의왕시','하남시','용인시','파주시','이천시','안성시','김포시','화성시','광주시','양주시','포천시','여주시','연천군','가평군','양평군'],
+  '강원특별자치도': ['춘천시','원주시','강릉시','동해시','태백시','속초시','삼척시','홍천군','횡성군','영월군','평창군','정선군','철원군','화천군','양구군','인제군','고성군','양양군'],
+  '충청북도': ['청주시','충주시','제천시','보은군','옥천군','영동군','증평군','진천군','괴산군','음성군','단양군'],
+  '충청남도': ['천안시','공주시','보령시','아산시','서산시','논산시','계룡시','당진시','금산군','부여군','서천군','청양군','홍성군','예산군','태안군'],
+  '전북특별자치도': ['전주시','군산시','익산시','정읍시','남원시','김제시','완주군','진안군','무주군','장수군','임실군','순창군','고창군','부안군'],
+  '전라남도': ['목포시','여수시','순천시','나주시','광양시','담양군','곡성군','구례군','고흥군','보성군','화순군','장흥군','강진군','해남군','영암군','무안군','함평군','영광군','장성군','완도군','진도군','신안군'],
+  '경상북도': ['포항시','경주시','김천시','안동시','구미시','영주시','영천시','상주시','문경시','경산시','의성군','청송군','영양군','영덕군','청도군','고령군','성주군','칠곡군','예천군','봉화군','울진군','울릉군'],
+  '경상남도': ['창원시','진주시','통영시','사천시','김해시','밀양시','거제시','양산시','의령군','함안군','창녕군','고성군','남해군','하동군','산청군','함양군','거창군','합천군'],
+  '제주특별자치도': ['제주시','서귀포시'],
+};
+
+let currentUser = null;
+let currentTab = 'youth';
+let youthRows = [], kkRows = [];
+let sortKey = null, sortDir = 1;
+let selectedIds = new Set();
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPw').value;
+  const msg = document.getElementById('loginMsg');
+  if (!email || !pw) { msg.textContent = '이메일과 비밀번호를 입력해주세요'; return; }
+  msg.textContent = '로그인 중...';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (error) { msg.textContent = '⚠️ ' + error.message; return; }
+  currentUser = data.user;
+  enter();
+}
+async function doLogout() { await sb.auth.signOut(); location.reload(); }
+
+async function enter() {
+  if (!ADMINS.includes(currentUser.email)) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('noAccess').style.display = 'block';
+    return;
+  }
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('meLabel').textContent = currentUser.email;
+  populateSidoOptions();
+  await loadData();
+}
+
+function populateSidoOptions() {
+  const sel = document.getElementById('ySido');
+  Object.keys(REGION_DATA).forEach(sido => {
+    const o = document.createElement('option'); o.value = sido; o.textContent = sido; sel.appendChild(o);
+  });
+}
+function onSidoChange() {
+  const sido = document.getElementById('ySido').value;
+  const sel = document.getElementById('ySigugun');
+  sel.innerHTML = '<option value="">전체 시/군/구</option>';
+  (REGION_DATA[sido] || []).forEach(g => {
+    const o = document.createElement('option'); o.value = g; o.textContent = g; sel.appendChild(o);
+  });
+  renderTable();
+}
+
+const SCHOOL_LABEL = { out_of_school: '학교 밖 청소년', enrolled: '재학 중', alternative: '대안학교' };
+const STATUS_LABEL = { approved: '승인됨', pending: '대기중', rejected: '반려됨', none: '미제출' };
+const STATUS_CLASS = { approved: 'pill-approved', pending: 'pill-pending', rejected: 'pill-rejected', none: 'pill-none' };
+
+async function loadData() {
+  document.getElementById('tableBody').innerHTML = '<tr class="empty-row"><td colspan="10">불러오는 중...</td></tr>';
+  const [profRes, rpRes, routRes] = await Promise.all([
+    sb.from('profiles').select('*'),
+    sb.from('routine_participants').select('routine_id,user_id,status'),
+    sb.from('routines').select('id,title'),
+  ]);
+  const profiles = profRes.data || [];
+  const rps = rpRes.data || [];
+  const routines = routRes.data || [];
+  const routineTitleById = {};
+  routines.forEach(r => routineTitleById[r.id] = r.title);
+  const routinesByUser = {};
+  rps.filter(p => p.status === 'approved').forEach(p => {
+    (routinesByUser[p.user_id] = routinesByUser[p.user_id] || []).push(routineTitleById[p.routine_id] || '');
+  });
+
+  youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
+    id: p.id, name: p.name, realName: p.real_name || '', birthDate: p.birth_date || '',
+    phone: p.phone || '', sido: p.region_sido || '', sigugun: p.region_sigugun || '',
+    schoolStatus: p.school_status || '', verifyStatus: p.verify_status || 'none',
+    routines: routinesByUser[p.id] || [], createdAt: p.created_at,
+  }));
+  kkRows = profiles.filter(p => p.role === 'kkutjjang').map(p => ({
+    id: p.id, name: p.name, realName: p.real_name || '', phone: p.phone || '',
+    sido: p.region_sido || '', sigugun: p.region_sigugun || '',
+    status: p.kkutjjang_status || 'none', createdAt: p.created_at,
+  }));
+
+  const routineSel = document.getElementById('yRoutine');
+  const uniqueTitles = [...new Set(routines.map(r => r.title))].sort();
+  routineSel.innerHTML = '<option value="">전체 참여루틴</option>' + uniqueTitles.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  renderTable();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  selectedIds.clear();
+  document.getElementById('tabYouthBtn').classList.toggle('active', tab === 'youth');
+  document.getElementById('tabKkBtn').classList.toggle('active', tab === 'kkutjjang');
+  document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
+  document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
+  sortKey = null;
+  renderTable();
+}
+
+function _filteredYouth() {
+  const q = document.getElementById('ySearch').value.trim().toLowerCase();
+  const sido = document.getElementById('ySido').value;
+  const sigugun = document.getElementById('ySigugun').value;
+  const school = document.getElementById('ySchoolStatus').value;
+  const verify = document.getElementById('yVerify').value;
+  const routine = document.getElementById('yRoutine').value;
+  return youthRows.filter(r => {
+    if (q && !(r.name.toLowerCase().includes(q) || r.realName.toLowerCase().includes(q) || r.phone.includes(q))) return false;
+    if (sido && r.sido !== sido) return false;
+    if (sigugun && r.sigugun !== sigugun) return false;
+    if (school && r.schoolStatus !== school) return false;
+    if (verify && r.verifyStatus !== verify) return false;
+    if (routine && !r.routines.includes(routine)) return false;
+    return true;
+  });
+}
+function _filteredKk() {
+  const q = document.getElementById('kSearch').value.trim().toLowerCase();
+  const status = document.getElementById('kStatus').value;
+  return kkRows.filter(r => {
+    if (q && !(r.name.toLowerCase().includes(q) || r.realName.toLowerCase().includes(q) || r.phone.includes(q))) return false;
+    if (status && r.status !== status) return false;
+    return true;
+  });
+}
+
+function sortRows(rows) {
+  if (!sortKey) return rows;
+  return [...rows].sort((a, b) => {
+    const av = (a[sortKey] ?? '').toString(), bv = (b[sortKey] ?? '').toString();
+    return av.localeCompare(bv, 'ko') * sortDir;
+  });
+}
+function toggleSort(key) {
+  if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+  renderTable();
+}
+
+function renderTable() {
+  if (currentTab === 'youth') renderYouthTable(); else renderKkTable();
+}
+
+function renderYouthTable() {
+  let rows = sortRows(_filteredYouth());
+  document.getElementById('yCount').textContent = `${rows.length}명`;
+  document.getElementById('tableHead').innerHTML = `<tr>
+    <th style="width:24px;"><input type="checkbox" onchange="toggleSelectAll(this,'${currentTab}')"></th>
+    <th onclick="toggleSort('name')">닉네임</th>
+    <th onclick="toggleSort('realName')">실명</th>
+    <th onclick="toggleSort('birthDate')">생년월일</th>
+    <th onclick="toggleSort('phone')">휴대폰</th>
+    <th>지역</th>
+    <th onclick="toggleSort('schoolStatus')">재학상태</th>
+    <th onclick="toggleSort('verifyStatus')">서류상태</th>
+    <th>참여 루틴</th>
+    <th onclick="toggleSort('createdAt')">가입일</th>
+  </tr>`;
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><input type="checkbox" data-id="${r.id}" onchange="toggleSelect('${r.id}',this)" ${selectedIds.has(r.id)?'checked':''}></td>
+      <td>${r.name}</td>
+      <td>${r.realName || '-'}</td>
+      <td>${r.birthDate || '-'}</td>
+      <td>${r.phone || '-'}</td>
+      <td>${r.sido ? `${r.sido} ${r.sigugun||''}` : '-'}</td>
+      <td>${SCHOOL_LABEL[r.schoolStatus] || '-'}</td>
+      <td><span class="pill ${STATUS_CLASS[r.verifyStatus]||'pill-none'}">${STATUS_LABEL[r.verifyStatus]||'미제출'}</span></td>
+      <td><div class="routine-tags">${r.routines.length?r.routines.map(t=>`<span class="routine-tag">${t}</span>`).join(''):'-'}</div></td>
+      <td>${(r.createdAt||'').slice(0,10)}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="10">조건에 맞는 청소년이 없어요</td></tr>`;
+  renderBulkBar();
+}
+
+function renderKkTable() {
+  let rows = sortRows(_filteredKk());
+  document.getElementById('kCount').textContent = `${rows.length}명`;
+  document.getElementById('tableHead').innerHTML = `<tr>
+    <th style="width:24px;"><input type="checkbox" onchange="toggleSelectAll(this,'${currentTab}')"></th>
+    <th onclick="toggleSort('name')">닉네임</th>
+    <th onclick="toggleSort('realName')">실명</th>
+    <th onclick="toggleSort('phone')">휴대폰</th>
+    <th>지역</th>
+    <th onclick="toggleSort('status')">승인상태</th>
+    <th onclick="toggleSort('createdAt')">가입일</th>
+  </tr>`;
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><input type="checkbox" data-id="${r.id}" onchange="toggleSelect('${r.id}',this)" ${selectedIds.has(r.id)?'checked':''}></td>
+      <td>${r.name}</td>
+      <td>${r.realName || '-'}</td>
+      <td>${r.phone || '-'}</td>
+      <td>${r.sido ? `${r.sido} ${r.sigugun||''}` : '-'}</td>
+      <td><span class="pill ${STATUS_CLASS[r.status]||'pill-none'}">${STATUS_LABEL[r.status]||'-'}</span></td>
+      <td>${(r.createdAt||'').slice(0,10)}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="7">조건에 맞는 끗짱이 없어요</td></tr>`;
+  renderBulkBar();
+}
+
+function toggleSelect(id, el) {
+  if (el.checked) selectedIds.add(id); else selectedIds.delete(id);
+  renderBulkBar();
+}
+function toggleSelectAll(el, tab) {
+  const rows = tab === 'youth' ? _filteredYouth() : _filteredKk();
+  if (el.checked) rows.forEach(r => selectedIds.add(r.id));
+  else rows.forEach(r => selectedIds.delete(r.id));
+  renderTable();
+}
+function renderBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  if (currentTab === 'kkutjjang' && selectedIds.size > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('bulkCount').textContent = `${selectedIds.size}명 선택됨 (끗짱 가입 승인/반려)`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+async function bulkAction(status) {
+  if (selectedIds.size === 0) return;
+  if (!confirm(`선택한 ${selectedIds.size}명을 ${status==='approved'?'승인':'반려'}할까요?`)) return;
+  const ids = [...selectedIds];
+  const { error } = await sb.from('profiles').update({ kkutjjang_status: status }).in('id', ids);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  selectedIds.clear();
+  await loadData();
+}
+
+function exportCSV(tab) {
+  const rows = tab === 'youth' ? sortRows(_filteredYouth()) : sortRows(_filteredKk());
+  let headers, lines;
+  if (tab === 'youth') {
+    headers = ['닉네임','실명','생년월일','휴대폰','시도','시군구','재학상태','서류상태','참여루틴','가입일'];
+    lines = rows.map(r => [r.name, r.realName, r.birthDate, r.phone, r.sido, r.sigugun, SCHOOL_LABEL[r.schoolStatus]||'', STATUS_LABEL[r.verifyStatus]||'', r.routines.join('|'), (r.createdAt||'').slice(0,10)]);
+  } else {
+    headers = ['닉네임','실명','휴대폰','시도','시군구','승인상태','가입일'];
+    lines = rows.map(r => [r.name, r.realName, r.phone, r.sido, r.sigugun, STATUS_LABEL[r.status]||'', (r.createdAt||'').slice(0,10)]);
+  }
+  const csv = [headers, ...lines].map(row => row.map(v => `"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `한끗루틴_${tab==='youth'?'청소년':'끗짱'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+(async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { currentUser = session.user; await enter(); }
+})();
+</script>
+</body>
+</html>
