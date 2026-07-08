@@ -596,6 +596,8 @@ input:focus { outline: none; border-color: #2E33BC; }
       <!-- 끗짱 인증 -->
       <div class="tab-page" id="kpage-cert">
         <div class="scroll-body" style="gap:0;">
+          <div style="font-size:17px;font-weight:700;color:#111;margin-bottom:8px;">내 루틴 인증하기</div>
+          <div id="kMyCertList" style="margin-bottom:20px;"></div>
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
             <div style="font-size:17px;font-weight:700;color:#111;">오늘 인증 현황</div>
             <span id="kCertTabSummary" style="font-size:12px;color:#888;"></span>
@@ -931,7 +933,7 @@ input:focus { outline: none; border-color: #2E33BC; }
     <div class="success-icon"><i class="ti ti-check" style="font-size:32px;color:white;"></i></div>
     <div style="font-size:18px;font-weight:600;color:#111;">인증 완료!</div>
     <div style="font-size:14px;color:#888;text-align:center;line-height:1.6;">오늘 하루도 한끗씩 해냈어요!</div>
-    <div style="display:flex;align-items:center;gap:8px;background:#FFFBE6;border:1.5px solid #FFD600;border-radius:40px;padding:10px 22px;margin-top:8px;">
+    <div id="certNadaeumBadge" style="display:flex;align-items:center;gap:8px;background:#FFFBE6;border:1.5px solid #FFD600;border-radius:40px;padding:10px 22px;margin-top:8px;">
       <span style="font-size:20px;">✨</span>
       <span style="font-size:15px;font-weight:700;color:#B8860B;">+10 나다움</span>
       <span style="font-size:13px;color:#999;">적립됐어요</span>
@@ -2192,19 +2194,24 @@ async function submitCert() {
     });
     if(error){ alert('인증 저장 실패: '+error.message); return; }
   }
-  state.youth.certCount++;
-  const todayStr=new Date().toISOString().slice(0,10);
-  if(!state.youth.certDates) state.youth.certDates=[];
-  if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
-  earnNadaeum('cert');
+  const isYouth = state.currentRole === 'youth';
+  if(isYouth) {
+    state.youth.certCount++;
+    const todayStr=new Date().toISOString().slice(0,10);
+    if(!state.youth.certDates) state.youth.certDates=[];
+    if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
+    earnNadaeum('cert');
+  }
   save();
   await loadRoutines();
   closeOverlay('certFormOverlay');
+  document.getElementById('certNadaeumBadge').style.display = isYouth ? '' : 'none';
   document.getElementById('certSuccess').classList.add('open');
 }
 function closeCertSuccess() {
   document.getElementById('certSuccess').classList.remove('open');
-  renderCert(); renderHome();
+  if(state.currentRole === 'youth') { renderCert(); renderHome(); }
+  else { kRenderCertTab(); kRenderHome(); }
 }
 
 // ════════════════════════════════════════════════════════
@@ -2572,6 +2579,18 @@ function kRenderHome() {
 // ════════════════════════════════════════════════════════
 function kRenderCertTab() {
   const active=_kMyRoutines().filter(r=>r.status==='active');
+  document.getElementById('kMyCertList').innerHTML = active.length>0
+    ? active.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:14px;border:0.5px solid ${r.todayCert?'#e8e8e8':'#FF006C'};border-radius:16px;cursor:pointer;background:${r.todayCert?'#fafafa':'#fff'};" onclick="${r.todayCert?'':`selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')`}">
+        <div style="width:42px;height:42px;border-radius:12px;background:${r.todayCert?'#eee':'#FBEAF0'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:${r.todayCert?'#aaa':'#111'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:1px;">${r.period}</div>
+        </div>
+        ${r.todayCert
+          ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
+          :`<span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#FF006C;color:#fff;flex-shrink:0;">인증하기</span>`}
+      </div>`).join('')
+    : `<div style="padding:20px 16px;text-align:center;background:#f5f5f7;border-radius:16px;font-size:12px;color:#aaa;">담당 중인 루틴이 없어요</div>`;
   const rows=active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
   rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
   const doneToday=rows.filter(x=>x.p.todayDone).length;
