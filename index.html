@@ -465,7 +465,7 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:16px;font-weight:600;color:#111;" id="myName"></div>
               <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px;">
                 <span style="display:inline-flex;align-items:center;gap:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span>
-                <span id="myVerifiedBadge" style="display:none;align-items:center;gap:3px;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;">✅ 청소년 인증</span>
+                <span id="myVerifiedBadge" style="display:none;align-items:center;gap:3px;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;">✅ 학교밖청소년 인증</span>
               </div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
@@ -2444,7 +2444,7 @@ function renderVerifyCard() {
   if(status === 'approved') {
     el.innerHTML = `<div style="background:#EAF3DE;border:0.5px solid #83CA00;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
       <div style="font-size:20px;">✅</div>
-      <div><div style="font-size:13px;font-weight:600;color:#3B6D11;">청소년 인증 완료</div><div style="font-size:11px;color:#5c8a2e;margin-top:1px;">학교밖청소년 전용 루틴도 참여할 수 있어요</div></div>
+      <div><div style="font-size:13px;font-weight:600;color:#3B6D11;">학교밖청소년 인증 완료</div><div style="font-size:11px;color:#5c8a2e;margin-top:1px;">학교밖청소년 전용 루틴도 참여할 수 있어요</div></div>
     </div>`;
     return;
   }
