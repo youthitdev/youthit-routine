@@ -39,7 +39,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .auth-tab { flex: 1; padding: 10px; border: none; background: transparent; color: rgba(255,255,255,0.55); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .auth-tab.active { background: rgba(255,255,255,0.22); color: white; }
 .auth-form { display: flex; flex-direction: column; width: 100%; }
-.auth-input { width: 100%; padding: 13px 16px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.1); color: white; font-size: 15px; margin-bottom: 10px; outline: none; font-family: inherit; }
+.auth-input { box-sizing: border-box; width: 100%; height: 48px; padding: 0 16px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.1); color: white; font-size: 15px; margin-bottom: 10px; outline: none; font-family: inherit; }
 .auth-input::placeholder { color: rgba(255,255,255,0.4); }
 .auth-input:focus { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.15); }
 .auth-input:-webkit-autofill,
@@ -115,8 +115,8 @@ textarea { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-rad
 textarea:focus { outline: none; border-color: #2E33BC; }
 input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="url"] { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; }
 input:focus { outline: none; border-color: #2E33BC; }
-.auth-input[type="text"], .auth-input[type="date"], .auth-input[type="number"] { background: rgba(255,255,255,0.1); color: white; }
-.auth-input[type="text"]:focus, .auth-input[type="date"]:focus, .auth-input[type="number"]:focus { background: rgba(255,255,255,0.15); }
+.auth-input[type="text"], .auth-input[type="date"], .auth-input[type="number"] { background: rgba(255,255,255,0.1); color: white; height: 48px; padding: 0 16px; border-radius: 12px; font-size: 15px; border: 1.5px solid rgba(255,255,255,0.22); box-sizing: border-box; }
+.auth-input[type="text"]:focus, .auth-input[type="date"]:focus, .auth-input[type="number"]:focus { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); }
 .count-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .count-ok { font-size: 11px; color: #3B6D11; }
 .count-not { font-size: 11px; color: #888; }
