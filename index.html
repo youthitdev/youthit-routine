@@ -2452,12 +2452,22 @@ function renderVerifyCard() {
     return;
   }
   const isRejected = status === 'rejected';
+  const isOutOfSchool = state.youth.schoolStatus === 'out_of_school' || state.youth.schoolStatus === 'alternative';
+  const docListHtml = isOutOfSchool
+    ? `<ul style="margin:8px 0 0;padding-left:18px;font-size:11px;color:#888;line-height:1.7;">
+        <li>정원외관리증명서</li>
+        <li>검정고시 합격증서 사본 또는 합격증명서</li>
+        <li>대안학교 재학증명서</li>
+        <li>제적증명서</li>
+        <li>기타 학교 밖 청소년 증빙 서류</li>
+      </ul>`
+    : `<div style="font-size:11px;color:#888;margin-top:4px;">청소년증 또는 학생증을 제출해주세요</div>`;
   el.innerHTML = `<div style="background:${isRejected?'#FBEAF0':'#f5f5f7'};border:0.5px solid ${isRejected?'#f4a8c0':'#e8e8e8'};border-radius:16px;padding:14px 16px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isRejected?'8px':'10px'};">
       <div style="font-size:20px;">${isRejected?'⚠️':'📄'}</div>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;color:#111;">${isRejected?'서류 반려됨 — 다시 제출해주세요':'학교밖청소년 확인서를 제출해주세요'}</div>
-        <div style="font-size:11px;color:#888;margin-top:1px;">${isRejected?'다른 서류로 다시 시도해주세요':'제출 전에도 루틴 둘러보기는 가능해요'}</div>
+        <div style="font-size:13px;font-weight:600;color:#111;">${isRejected?'서류 반려됨 — 다시 제출해주세요':(isOutOfSchool?'학교 밖 청소년 확인 서류를 제출해주세요':'청소년 확인 서류를 제출해주세요')}</div>
+        ${docListHtml}
       </div>
     </div>
     <button onclick="document.getElementById('verifyDocInput').click()" style="width:100%;padding:10px;background:#2E33BC;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">서류 업로드하기</button>
