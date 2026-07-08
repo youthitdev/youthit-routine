@@ -2799,13 +2799,19 @@ async function openCreateRoutine() {
     leaderField.style.display='';
     const sel=document.getElementById('rLeader');
     sel.innerHTML='<option value="">불러오는 중...</option>';
-    const { data, error } = await sb.from('profiles').select('id,name').eq('role','kkutjjang').eq('kkutjjang_status','approved').order('name');
+    const { data, error } = await sb.from('profiles').select('id,name,real_name,phone').eq('role','kkutjjang').eq('kkutjjang_status','approved').order('name');
     if(error) {
       sel.innerHTML=`<option value="">불러오기 실패 — 새로고침 후 다시 시도해주세요</option>`;
     } else if(!data || data.length===0) {
       sel.innerHTML=`<option value="">승인된 끗짱이 없어요 (MY 탭에서 먼저 승인해주세요)</option>`;
     } else {
-      sel.innerHTML='<option value="">담당 끗짱 선택</option>'+data.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+      const dupNames = new Set(data.map(p=>p.name).filter((n,i,arr)=>arr.indexOf(n)!==i));
+      sel.innerHTML='<option value="">담당 끗짱 선택</option>'+data.map(p=>{
+        const label = dupNames.has(p.name)
+          ? `${p.name} (${p.real_name||'실명 미상'} · ${p.phone||'연락처 없음'})`
+          : p.name;
+        return `<option value="${p.id}">${label}</option>`;
+      }).join('');
     }
   } else {
     leaderField.style.display='none';
