@@ -458,18 +458,18 @@ input:focus { outline: none; border-color: #2E33BC; }
       <!-- MY (청소년) -->
       <div class="tab-page" id="page-my">
         <div class="scroll-body">
-          <div class="profile-card">
+          <div class="profile-card" style="position:relative;">
+            <button onclick="openEditProfile()" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:#f5f5f7;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">✏️</button>
             <div class="avatar-circle" id="myAvatar" onclick="document.getElementById('avatarInput').click()"></div>
             <input type="file" id="avatarInput" accept="image/*" style="display:none;" onchange="handleAvatar(event)">
             <div style="flex:1;min-width:0;">
               <div style="font-size:16px;font-weight:600;color:#111;" id="myName"></div>
-              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px;">
-                <span style="display:inline-flex;align-items:center;gap:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span>
-                <span id="myVerifiedBadge" style="display:none;align-items:center;gap:3px;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;">✅ 학교밖청소년 인증</span>
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:nowrap;margin-top:4px;overflow-x:auto;">
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;flex-shrink:0;" id="myLevelBadge"></span>
+                <span id="myVerifiedBadge" style="display:none;align-items:center;gap:3px;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;flex-shrink:0;white-space:nowrap;">✅ 학교밖청소년 인증</span>
               </div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
-            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
           </div>
           <div id="verifyCard"></div>
           <input type="file" id="verifyDocInput" accept="image/*,.pdf" style="display:none;" onchange="handleVerifyDoc(event)">
@@ -625,14 +625,14 @@ input:focus { outline: none; border-color: #2E33BC; }
       <!-- 끗짱 MY -->
       <div class="tab-page" id="kpage-my">
         <div class="scroll-body">
-          <div class="profile-card">
+          <div class="profile-card" style="position:relative;">
+            <button onclick="openEditProfile()" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:#f5f5f7;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">✏️</button>
             <div class="avatar-circle" id="kAvatar"></div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:16px;font-weight:600;color:#111;" id="kMyName"></div>
               <div><span class="kkutjjang-badge"><i class="ti ti-star" style="font-size:11px;"></i>끗짱</span></div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="kJoinDate"></span> 가입</div>
             </div>
-            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
           </div>
 
           <div style="background:#2E33BC;border-radius:16px;padding:14px;">
