@@ -2415,7 +2415,7 @@ function renderMy() {
   document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('myJoinDate').textContent=state.youth.joinDate;
   const bday=_birthdayInfo(state.youth.birthDate);
-  document.getElementById('myBirthday').textContent=bday?` · 🎂 ${bday.label} (${bday.age}세)`:'';
+  document.getElementById('myBirthday').textContent=bday?` · 🎂 ${bday.label}`:'';
   document.getElementById('myCertCount').textContent=state.youth.certCount;
   document.getElementById('myStreak').textContent=_streak(state.youth.certDates)+'일';
   document.getElementById('myCommCount').textContent=state.youth.commCount;
