@@ -466,7 +466,7 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div><span style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span></div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
-            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openSheet('editProfileBg')"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
+            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#888;cursor:pointer;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px;"></i> 로그아웃</button>
           </div>
           <div id="verifyCard"></div>
@@ -629,7 +629,7 @@ input:focus { outline: none; border-color: #2E33BC; }
               <div><span class="kkutjjang-badge"><i class="ti ti-star" style="font-size:11px;"></i>끗짱</span></div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="kJoinDate"></span> 가입</div>
             </div>
-            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
+            <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
           </div>
 
           <div style="background:#2E33BC;border-radius:16px;padding:14px;">
@@ -1236,7 +1236,7 @@ function loadState() {
 }
 function save() {
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
-  if (currentUser) {
+  if (currentUser && state.currentRole === 'youth') {
     sb.from('profiles').update({
       cert_count: state.youth.certCount,
       comm_count: state.youth.commCount,
@@ -2462,10 +2462,25 @@ function handleAvatar(e) {
   r.onload=ev=>{state.youth.avatar=ev.target.result;save();renderMy();};
   r.readAsDataURL(f);
 }
-function saveProfile() {
+function openEditProfile() {
+  const current = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+  document.getElementById('editNickname').value = current || '';
+  openSheet('editProfileBg');
+}
+async function saveProfile() {
   const n=document.getElementById('editNickname').value.trim();
   if(!n){alert('닉네임을 입력해주세요.');return;}
-  state.youth.name=n; save(); closeSheet('editProfileBg'); renderMy(); renderHome();
+  if(!currentUser){alert('로그인이 필요해요.');return;}
+  const btn=document.querySelector('#editProfileBg .primary-btn');
+  if(btn){btn.disabled=true;btn.textContent='저장 중...';}
+  const { error } = await sb.from('profiles').update({ name:n }).eq('id', currentUser.id);
+  if(btn){btn.disabled=false;btn.textContent='저장하기';}
+  if(error){alert('저장 실패: '+error.message);return;}
+  if(state.currentRole==='youth') state.youth.name=n; else state.kkutjjang.name=n;
+  save();
+  closeSheet('editProfileBg');
+  if(state.currentRole==='youth') { renderMy(); renderHome(); }
+  else { kRenderMy(); kRenderHome(); }
 }
 
 // AI 리포트
