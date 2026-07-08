@@ -463,7 +463,10 @@ input:focus { outline: none; border-color: #2E33BC; }
             <input type="file" id="avatarInput" accept="image/*" style="display:none;" onchange="handleAvatar(event)">
             <div style="flex:1;min-width:0;">
               <div style="font-size:16px;font-weight:600;color:#111;" id="myName"></div>
-              <div><span style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span></div>
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px;">
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#2E33BC;color:white;font-size:11px;padding:3px 9px;border-radius:12px;" id="myLevelBadge"></span>
+                <span id="myVerifiedBadge" style="display:none;align-items:center;gap:3px;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;">✅ 청소년 인증</span>
+              </div>
               <div style="font-size:11px;color:#888;margin-top:5px;">📅 <span id="myJoinDate"></span> 가입<span id="myBirthday"></span></div>
             </div>
             <button style="background:none;border:0.5px solid #ddd;border-radius:10px;padding:6px 10px;font-size:12px;color:#666;cursor:pointer;" onclick="openEditProfile()"><i class="ti ti-pencil" style="font-size:12px;"></i> 편집</button>
@@ -2413,6 +2416,7 @@ function renderMy() {
   av.innerHTML=state.youth.avatar?`<img src="${state.youth.avatar}">`:(state.youth.name[0]);
   document.getElementById('myName').textContent=state.youth.name;
   document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
+  document.getElementById('myVerifiedBadge').style.display = state.youth.verifyStatus==='approved' ? 'inline-flex' : 'none';
   document.getElementById('myJoinDate').textContent=state.youth.joinDate;
   const bday=_birthdayInfo(state.youth.birthDate);
   document.getElementById('myBirthday').textContent=bday?` · 🎂 ${bday.label}`:'';
