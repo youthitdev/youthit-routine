@@ -444,3 +444,25 @@ CREATE POLICY "letters_update" ON letters FOR UPDATE USING (
 -- [마이그레이션 2026-07-11] 참여 계기(signup_reason) 필드 제거
 -- =====================================================
 ALTER TABLE profiles DROP COLUMN IF EXISTS signup_reason;
+
+-- =====================================================
+-- [마이그레이션 2026-07-11b] 인증 사진 저장
+-- =====================================================
+
+-- 1) certifications: 여러 장 지원 (기존 photo_url은 그대로 두고 배열 컬럼 추가)
+ALTER TABLE certifications ADD COLUMN IF NOT EXISTS photo_urls text[] DEFAULT '{}';
+
+-- 2) Storage 버킷 생성 (인증 사진, 공개 — 피드에서 누구나 볼 수 있어야 함)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('cert-photos', 'cert-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 3) Storage 정책: 로그인 사용자만 업로드, 누구나 조회(공개 버킷)
+DROP POLICY IF EXISTS "cert_photos_insert_auth" ON storage.objects;
+CREATE POLICY "cert_photos_insert_auth" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'cert-photos' AND auth.uid() IS NOT NULL
+);
+DROP POLICY IF EXISTS "cert_photos_select_all" ON storage.objects;
+CREATE POLICY "cert_photos_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'cert-photos'
+);

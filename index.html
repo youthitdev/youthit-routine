@@ -2183,15 +2183,36 @@ function renderNadaeum() {
   els.forEach(el=>el.textContent=n+'N');
 }
 
+function _dataURLtoBlob(dataURL) {
+  const [meta, b64] = dataURL.split(',');
+  const mime = meta.match(/:(.*?);/)[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0; i<bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
 async function submitCert() {
   // Supabase에 인증 기록 저장
   if (currentUser && currentCertId) {
-    const certText = document.getElementById('certText')?.value || '';
+    const certText = document.getElementById('certMemo')?.value || '';
+    const btn=document.getElementById('certSubmitBtn');
+    if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
+    const photoUrls = [];
+    for (let i=0; i<certPhotos.length; i++) {
+      const blob = _dataURLtoBlob(certPhotos[i]);
+      const path = `${currentUser.id}/${Date.now()}_${i}.jpg`;
+      const { error: upErr } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
+      if(upErr){ alert('사진 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='인증하기';} return; }
+      photoUrls.push(sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl);
+    }
     const { error } = await sb.from('certifications').insert({
       routine_id: currentCertId,
       user_id: currentUser.id,
       content: certText,
+      photo_url: photoUrls[0] || null,
+      photo_urls: photoUrls,
     });
+    if(btn){ btn.disabled=false; btn.textContent='인증하기'; }
     if(error){ alert('인증 저장 실패: '+error.message); return; }
   }
   const isYouth = state.currentRole === 'youth';
