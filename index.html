@@ -2801,7 +2801,13 @@ async function openCreateRoutine() {
     const sel=document.getElementById('rLeader');
     sel.innerHTML='<option value="">불러오는 중...</option>';
     const { data, error } = await sb.from('profiles').select('id,name').eq('role','kkutjjang').eq('kkutjjang_status','approved').order('name');
-    sel.innerHTML='<option value="">담당 끗짱 선택</option>'+(error?'':(data||[]).map(p=>`<option value="${p.id}">${p.name}</option>`).join(''));
+    if(error) {
+      sel.innerHTML=`<option value="">불러오기 실패 — 새로고침 후 다시 시도해주세요</option>`;
+    } else if(!data || data.length===0) {
+      sel.innerHTML=`<option value="">승인된 끗짱이 없어요 (MY 탭에서 먼저 승인해주세요)</option>`;
+    } else {
+      sel.innerHTML='<option value="">담당 끗짱 선택</option>'+data.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    }
   } else {
     leaderField.style.display='none';
   }
