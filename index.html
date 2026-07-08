@@ -1454,6 +1454,9 @@ function _greeting() {
   if(h < 18) return '오늘 하루도 한끗씩 ✦';
   return '하루 마무리 잘 하고 있나요 🌙';
 }
+function _myActiveRoutines() {
+  return state.routines.filter(r => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
+}
 function renderHome() {
   const lv = getYLevel(state.youth.certCount);
   document.getElementById('homeGreeting').textContent = _greeting();
@@ -1483,7 +1486,7 @@ function renderHome() {
        </div>`
     : `<div style="font-size:11px;color:rgba(255,255,255,0.8);">🌲 최고 레벨이에요! 숲이 되어주셔서 고마워요</div>`;
 
-  const active = state.routines.filter(r=>r.status==='active');
+  const active = _myActiveRoutines();
 
   // 온라인 모임(OT/클로징) 배너 — 내가 참여한 루틴 중 모임이 오늘이거나 다가오는 것
   const myRoutines = state.routines.filter(r =>
@@ -2043,7 +2046,7 @@ async function submitApplyRoutine(){
 let currentCertId=null, certHasPhoto=false;
 function renderCert() { renderCertTab(); }
 function renderCertTab() {
-  const active=state.routines.filter(r=>r.status==='active');
+  const active=_myActiveRoutines();
   const el=document.getElementById('certRoutineList');
   if(!el) return;
   if(active.length===0){
@@ -2494,7 +2497,7 @@ async function openReport() {
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       model:'claude-sonnet-4-6',max_tokens:1000,
       system:'탈학교 청소년의 생활 루틴 형성을 돕는 따뜻한 AI 코치예요. 아래 JSON 형식으로만 응답하세요.\n{"analysis":"루틴 분석 (2~3문장)","books":[{"title":"책 제목","author":"저자","reason":"이유 한 문장"},{"title":"책 제목","author":"저자","reason":"이유"}]}',
-      messages:[{role:'user',content:`사용자: ${state.youth.name} (레벨${lv.level} ${lv.name})\n총 인증: ${state.youth.certCount}회 / 소통: ${state.youth.commCount}회\n참여 중: ${state.routines.filter(r=>r.status==='active').map(r=>r.title).join(', ')}\n완주: ${state.routines.filter(r=>r.status==='done').map(r=>r.title).join(', ')}\n루틴 분석과 어울리는 책 2권을 추천해줘.`}]
+      messages:[{role:'user',content:`사용자: ${state.youth.name} (레벨${lv.level} ${lv.name})\n총 인증: ${state.youth.certCount}회 / 소통: ${state.youth.commCount}회\n참여 중: ${_myActiveRoutines().map(r=>r.title).join(', ')}\n완주: ${state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)).map(r=>r.title).join(', ')}\n루틴 분석과 어울리는 책 2권을 추천해줘.`}]
     })});
     const data=await res.json();
     const parsed=JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
@@ -3108,7 +3111,7 @@ function kRenderMy() {
     :`<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 받은 편지가 없어요</div>`;
 
   // 오늘 인증 현황
-  const activeRoutines = state.routines.filter(r=>r.status==='active');
+  const activeRoutines = _kMyRoutines().filter(r=>r.status==='active');
   document.getElementById('kTodayCertStatus').innerHTML = activeRoutines.length > 0
     ? activeRoutines.map(r => {
         const total = r.participants.length;
