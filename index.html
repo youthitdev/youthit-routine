@@ -47,6 +47,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .role-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .role-btn { flex: 1; padding: 11px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: transparent; color: rgba(255,255,255,0.55); font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .role-btn.active { background: rgba(255,255,255,0.22); color: white; border-color: rgba(255,255,255,0.55); }
+.overlay-body .role-btn { border-color: #ddd; color: #666; background: #fff; }
+.overlay-body .role-btn.active { background: #2E33BC; color: #fff; border-color: #2E33BC; }
 .auth-msg { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; text-align: center; min-height: 18px; }
 
 /* 앱 구조 */
@@ -324,6 +326,7 @@ input:focus { outline: none; border-color: #2E33BC; }
         <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
       </div>
+      <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <div id="signupYouthExtra">
         <select id="signupSchoolStatus" class="auth-input">
           <option value="">재학 상태 선택</option>
@@ -336,6 +339,15 @@ input:focus { outline: none; border-color: #2E33BC; }
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
     </div>
     <div class="auth-msg" id="authMsg"></div>
+  </div>
+
+  <!-- 끗짱 승인 대기 화면 -->
+  <div class="splash" id="kkPendingScreen" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 32px;">
+    <div id="kkPendingIcon" style="font-size:52px;margin-bottom:18px;">⏳</div>
+    <div id="kkPendingTitle" style="font-size:19px;font-weight:700;color:#fff;margin-bottom:10px;"></div>
+    <div id="kkPendingBody" style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:28px;"></div>
+    <a href="mailto:soon@youthvoice.or.kr" style="font-size:13px;color:#fff;text-decoration:underline;margin-bottom:18px;">soon@youthvoice.or.kr 문의하기</a>
+    <button class="splash-btn splash-btn-primary" style="width:auto;padding:11px 28px;" onclick="kkPendingLogout()">로그아웃</button>
   </div>
 
   <!-- 헤더 -->
@@ -575,7 +587,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div class="chip" onclick="kFilterRoutine('recruit',this)">모집 중</div>
             <div class="chip" onclick="kFilterRoutine('done',this)">완료</div>
           </div>
-          <button onclick="openCreateRoutine()" style="flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
+          <button id="kCreateBtn" onclick="openCreateRoutine()" style="display:none;flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
             <i class="ti ti-plus" style="font-size:20px;color:#2E33BC;"></i>
           </button>
         </div>
@@ -629,6 +641,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             </div>
           </div>
 
+          <div id="adminKkutjjangSection"></div>
           <div id="adminVerifySection"></div>
 
           <div class="section-card">
@@ -766,6 +779,7 @@ input:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">루틴 이모지 <span class="required">* 필수</span></div><div class="emoji-grid" id="emojiGrid"></div></div>
       <div><div class="field-label">루틴 이름 <span class="required">* 필수</span></div><input type="text" id="rName" placeholder="예) 아침 루틴 21일" maxlength="20" oninput="updateCreatePreview();document.getElementById('nameCount').textContent=this.value.length"><div class="char-end"><span id="nameCount">0</span>/20</div></div>
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
+      <div id="rLeaderField" style="display:none;"><div class="field-label">담당 끗짱 <span class="required">* 필수</span></div><select id="rLeader"><option value="">담당 끗짱 선택</option></select></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">청소년 누구나</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">학교 밖 청소년</button></div></div>
       <div><div class="field-label">기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
@@ -1077,6 +1091,7 @@ async function loadProfileAndEnter() {
       region_sigugun: meta.region_sigugun || null,
       school_status: meta.school_status || null,
       signup_reason: meta.signup_reason || null,
+      kkutjjang_status: meta.kkutjjang_status || 'none',
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
     profile = created;
@@ -1097,12 +1112,31 @@ async function loadProfileAndEnter() {
   state.youth.regionSigugun = profile.region_sigugun || '';
   state.youth.schoolStatus = profile.school_status || null;
   state.kkutjjang.name = profile.name;
+  state.kkutjjang.status = profile.kkutjjang_status || 'none';
   const ADMINS = ['soon@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  if (profile.role === 'kkutjjang' && !isAdmin && profile.kkutjjang_status !== 'approved') {
+    showKkutjjangPending(profile.kkutjjang_status || 'pending');
+    return;
+  }
   try { await loadRoutines(); await loadPosts(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
+}
+function showKkutjjangPending(status) {
+  document.getElementById('splashScreen').classList.add('hide');
+  const el = document.getElementById('kkPendingScreen');
+  const isRejected = status === 'rejected';
+  document.getElementById('kkPendingIcon').textContent = isRejected ? '😥' : '⏳';
+  document.getElementById('kkPendingTitle').textContent = isRejected ? '가입이 승인되지 않았어요' : '가입 승인 대기 중이에요';
+  document.getElementById('kkPendingBody').textContent = isRejected
+    ? '문의사항이 있다면 아래 이메일로 연락해주세요.'
+    : '관리자 확인 후 끗짱으로 이용할 수 있어요. 조금만 기다려주세요.';
+  el.style.display = 'flex';
+}
+async function kkPendingLogout() {
+  await sb.auth.signOut();
 }
 
 async function doLogin() {
@@ -1140,6 +1174,7 @@ async function doSignup() {
       region_sido: sido, region_sigugun: sigugun,
       school_status: signupRole === 'youth' ? schoolStatus : null,
       signup_reason: signupRole === 'youth' ? reason : null,
+      kkutjjang_status: signupRole === 'kkutjjang' ? 'pending' : 'none',
     } }
   });
   if (error) showAuthMsg('⚠️ ' + error.message);
@@ -1159,6 +1194,7 @@ function selectSignupRole(role) {
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
   document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
+  document.getElementById('kkHint').style.display = role === 'kkutjjang' ? '' : 'none';
 }
 
 function showAuthMsg(msg) {
@@ -1269,7 +1305,7 @@ async function loadRoutines() {
       desc: r.description || '', tag: r.tag || '생활', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
-      certCount: rCerts.length, avgRate: 0, createdBy: r.created_by,
+      certCount: rCerts.length, avgRate: 0, createdBy: r.created_by, ledBy: r.led_by || null,
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
       participants: approved.map(p => ({
@@ -1330,7 +1366,7 @@ function getKLevel(n) {
   return {level:1,name:'씨앗',emoji:'🌱',next:3,pct:Math.round(n/3*100)};
 }
 function kStats() {
-  const all = state.routines;
+  const all = _kMyRoutines();
   return {
     routineCount: all.length,
     totalCert: all.reduce((a,r)=>a+r.certCount,0),
@@ -2452,12 +2488,13 @@ function kRenderHome() {
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   document.getElementById('kHomeName').textContent=(state.kkutjjang.name||'끗짱')+'님';
-  const active=state.routines.filter(r=>r.status==='active');
+  const myRoutines = _kMyRoutines();
+  const active=myRoutines.filter(r=>r.status==='active');
 
   // 오늘 요약 3칸
   const allParts = active.flatMap(r=>r.participants||[]);
   const doneToday = allParts.filter(p=>p.todayDone).length;
-  const pendingApps = state.routines.flatMap(r=>(r.applicants||[]).filter(a=>a.status==='pending').map(a=>({...a, routineId:r.id, routineTitle:r.title})));
+  const pendingApps = myRoutines.flatMap(r=>(r.applicants||[]).filter(a=>a.status==='pending').map(a=>({...a, routineId:r.id, routineTitle:r.title})));
   document.getElementById('kStatCert').textContent = `${doneToday}/${allParts.length}`;
   document.getElementById('kStatPending').textContent = pendingApps.length;
   document.getElementById('kStatActive').textContent = active.length;
@@ -2465,7 +2502,7 @@ function kRenderHome() {
   // 승인 대기 알림 카드
   // 오늘 온라인 모임(OT/클로징) 배너
   const todayMeets=[];
-  state.routines.filter(r=>r.status!=='done').forEach(r=>{
+  myRoutines.filter(r=>r.status!=='done').forEach(r=>{
     [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징']].forEach(([f,icon,label])=>{
       if(r[f]&&_isToday(r[f])) todayMeets.push({r,iso:r[f],icon,label});
     });
@@ -2518,7 +2555,7 @@ function kRenderHome() {
     : `<div style="padding:26px 16px;text-align:center;">
         <div style="font-size:28px;margin-bottom:8px;">🌱</div>
         <div style="font-size:13px;color:#888;margin-bottom:12px;">진행 중인 루틴이 없어요</div>
-        <button onclick="openCreateRoutine()" style="padding:9px 20px;background:#FF006C;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">새 루틴 만들기</button>
+        ${state.loginType==='both'?`<button onclick="openCreateRoutine()" style="padding:9px 20px;background:#FF006C;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">새 루틴 만들기</button>`:''}
       </div>`;
 
   // 오늘 인증 현황 — 미인증 우선 정렬
@@ -2539,7 +2576,7 @@ function kRenderHome() {
 // 끗짱 인증 (오늘 인증 현황)
 // ════════════════════════════════════════════════════════
 function kRenderCertTab() {
-  const active=state.routines.filter(r=>r.status==='active');
+  const active=_kMyRoutines().filter(r=>r.status==='active');
   const rows=active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
   rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
   const doneToday=rows.filter(x=>x.p.todayDone).length;
@@ -2561,14 +2598,19 @@ function kRenderCertTab() {
 // ════════════════════════════════════════════════════════
 // 끗짱 루틴
 // ════════════════════════════════════════════════════════
+function _kMyRoutines() {
+  return state.loginType==='both' ? state.routines : state.routines.filter(r=>r.ledBy===currentUser?.id);
+}
 function kRenderRoutineTab() {
+  document.getElementById('kCreateBtn').style.display = state.loginType==='both' ? '' : 'none';
   document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#kRoutineFilterBar .chip').classList.add('active');
   kFilterRoutine('all',null);
 }
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-  const filtered=type==='all'?state.routines:state.routines.filter(r=>r.status===type);
+  const base=_kMyRoutines();
+  const filtered=type==='all'?base:base.filter(r=>r.status===type);
   // 진행중 루틴 항상 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
     if(a.status==='active' && b.status!=='active') return -1;
@@ -2715,9 +2757,19 @@ function selectEligibility(v){
   document.getElementById('rEligAll').classList.toggle('active', v==='all');
   document.getElementById('rEligOos').classList.toggle('active', v==='out_of_school');
 }
-function openCreateRoutine() {
+async function openCreateRoutine() {
   selectedEmoji='🌱'; createHasPhoto=false;
   renderEmojiGrid(); updateCreatePreview();
+  const leaderField=document.getElementById('rLeaderField');
+  if(state.loginType==='both') {
+    leaderField.style.display='';
+    const sel=document.getElementById('rLeader');
+    sel.innerHTML='<option value="">불러오는 중...</option>';
+    const { data, error } = await sb.from('profiles').select('id,name').eq('role','kkutjjang').eq('kkutjjang_status','approved').order('name');
+    sel.innerHTML='<option value="">담당 끗짱 선택</option>'+(error?'':(data||[]).map(p=>`<option value="${p.id}">${p.name}</option>`).join(''));
+  } else {
+    leaderField.style.display='none';
+  }
   openOverlay('createRoutineOverlay');
 }
 function renderEmojiGrid() {
@@ -2759,7 +2811,9 @@ async function submitCreateRoutine(){
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
   const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
   const meetLink=document.getElementById('rMeetingLink').value.trim();
+  const leader=state.loginType==='both'?document.getElementById('rLeader').value:currentUser?.id;
   if(!n){alert('루틴 이름을 입력해주세요.');return;}
+  if(state.loginType==='both'&&!leader){alert('담당 끗짱을 선택해주세요.');return;}
   if((kickoff||closing)&&!meetLink){alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.');return;}
   if(!s||!e||e<s){alert('기간을 올바르게 설정해주세요.');return;}
   if(!p||p<1){alert('참여 인원을 입력해주세요.');return;}
@@ -2781,7 +2835,7 @@ async function submitCreateRoutine(){
     closing_at:closing?new Date(closing).toISOString():null,
     meeting_link:meetLink||null,
     start_date:s, end_date:e, max_people:parseInt(p),
-    status:'recruit', created_by:currentUser.id, cover_image_url:coverUrl,
+    status:'recruit', created_by:currentUser.id, led_by:leader, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
   if(error){ alert('루틴 등록 실패: '+error.message); return; }
@@ -2792,7 +2846,7 @@ async function submitCreateRoutine(){
 function closeCreateSuccess(){
   document.getElementById('createSuccess').classList.remove('open');
   closeOverlay('createRoutineOverlay');
-  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
@@ -2913,6 +2967,48 @@ async function adminRejectVerify(userId) {
 }
 
 // ════════════════════════════════════════════════════════
+// 관리자: 끗짱 가입 승인
+// ════════════════════════════════════════════════════════
+async function renderAdminKkutjjangSection() {
+  const el = document.getElementById('adminKkutjjangSection');
+  if(!el) return;
+  if(state.loginType !== 'both') { el.innerHTML=''; return; }
+  el.innerHTML = `<div class="section-card"><div class="section-hd"><div class="section-hd-title">💪 끗짱 가입 승인</div></div><div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">불러오는 중...</div></div>`;
+  const { data: pending, error } = await sb.from('profiles').select('*').eq('kkutjjang_status','pending').eq('role','kkutjjang');
+  if(error) { el.innerHTML = `<div class="section-card"><div style="padding:16px;color:#c00;font-size:12px;">불러오기 실패: ${error.message}</div></div>`; return; }
+  if(!pending || pending.length===0) {
+    el.innerHTML = `<div class="section-card"><div class="section-hd"><div class="section-hd-title">💪 끗짱 가입 승인</div></div><div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">승인 대기 중인 끗짱이 없어요</div></div>`;
+    return;
+  }
+  const rows = pending.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:0.5px solid #f0f0f0;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#FBEAF0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#FF006C;flex-shrink:0;">${(p.name||'?')[0]}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${p.name}${p.real_name?` · ${p.real_name}`:''}</div>
+        <div style="font-size:11px;color:#888;">${p.phone||'연락처 없음'}</div>
+      </div>
+      <button onclick="adminApproveKkutjjang('${p.id}')" style="padding:6px 12px;background:#FF006C;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">승인</button>
+      <button onclick="adminRejectKkutjjang('${p.id}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;flex-shrink:0;">반려</button>
+    </div>`).join('');
+  el.innerHTML = `<div class="section-card">
+    <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="section-hd-title">💪 끗짱 가입 승인</div>
+      <span style="font-size:11px;color:#FF006C;font-weight:600;">${pending.length}건 대기</span>
+    </div>
+    ${rows}
+  </div>`;
+}
+async function adminApproveKkutjjang(userId) {
+  const { error } = await sb.from('profiles').update({ kkutjjang_status:'approved' }).eq('id', userId);
+  if(error){ alert('승인 실패: '+error.message); return; }
+  renderAdminKkutjjangSection();
+}
+async function adminRejectKkutjjang(userId) {
+  const { error } = await sb.from('profiles').update({ kkutjjang_status:'rejected' }).eq('id', userId);
+  if(error){ alert('반려 실패: '+error.message); return; }
+  renderAdminKkutjjangSection();
+}
+
+// ════════════════════════════════════════════════════════
 // 끗짱 MY
 // ════════════════════════════════════════════════════════
 function kRenderMy() {
@@ -2928,6 +3024,7 @@ function kRenderMy() {
   document.getElementById('kMyLevelNext').textContent=lv.next?`다음 레벨까지 루틴 ${lv.next-s.routineCount}개`:'최고 레벨이에요!';
   setTimeout(()=>{ const b=document.getElementById('kMyLevelBar'); if(b) b.style.width=lv.pct+'%'; },100);
 
+  renderAdminKkutjjangSection();
   renderAdminVerifySection();
 
   // 받은 편지

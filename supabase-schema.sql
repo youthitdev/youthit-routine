@@ -200,7 +200,7 @@ CREATE POLICY "nadaeum_insert" ON nadaeum_log FOR INSERT WITH CHECK (auth.uid() 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -211,7 +211,8 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    NEW.raw_user_meta_data->>'signup_reason'
+    NEW.raw_user_meta_data->>'signup_reason',
+    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
   );
   RETURN NEW;
 END;
@@ -328,7 +329,7 @@ ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS application_note text;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason)
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
@@ -339,7 +340,8 @@ BEGIN
     NEW.raw_user_meta_data->>'region_sido',
     NEW.raw_user_meta_data->>'region_sigugun',
     NEW.raw_user_meta_data->>'school_status',
-    NEW.raw_user_meta_data->>'signup_reason'
+    NEW.raw_user_meta_data->>'signup_reason',
+    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
   );
   RETURN NEW;
 END;
@@ -359,3 +361,85 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school_status text CHECK (school_s
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS kickoff_at timestamptz;
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS closing_at timestamptz;
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS meeting_link text;
+
+-- =====================================================
+-- [마이그레이션 2026-07-10] 끗짱 가입 승인제 + 루틴 담당 끗짱 지정
+-- 기존 프로젝트는 아래만 실행하세요.
+-- =====================================================
+
+-- 1) 끗짱 가입 승인 상태 (관리자 승인 전엔 앱 진입 불가)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kkutjjang_status text DEFAULT 'none' CHECK (kkutjjang_status IN ('none','pending','approved','rejected'));
+
+-- 1-1) 신규 가입 트리거 갱신 (kkutjjang_status까지 함께 저장)
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, signup_reason, kkutjjang_status)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', '익명'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    NEW.raw_user_meta_data->>'school_status',
+    NEW.raw_user_meta_data->>'signup_reason',
+    COALESCE(NEW.raw_user_meta_data->>'kkutjjang_status', 'none')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2) 본인이 승인 상태를 임의로 바꾸지 못하게 가드 (관리자만 승인/반려 가능)
+CREATE OR REPLACE FUNCTION guard_kkutjjang_status() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.kkutjjang_status IS DISTINCT FROM OLD.kkutjjang_status THEN
+    IF NOT is_admin() AND NEW.kkutjjang_status <> 'pending' THEN
+      RAISE EXCEPTION '끗짱 승인 상태는 관리자만 변경할 수 있어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_guard_kkutjjang_status ON profiles;
+CREATE TRIGGER trg_guard_kkutjjang_status BEFORE UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION guard_kkutjjang_status();
+
+-- 3) 루틴 담당 끗짱(리더) 지정 — 관리자가 루틴 생성 시 선택
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS led_by uuid REFERENCES auth.users ON DELETE SET NULL;
+
+-- 4) 루틴 생성은 관리자만 (당분간 — 추후 끗짱 자율 개설 허용 예정)
+DROP POLICY IF EXISTS "routines_insert" ON routines;
+CREATE POLICY "routines_insert" ON routines FOR INSERT WITH CHECK (is_admin());
+
+-- 5) 담당 끗짱도 자신이 이끄는 루틴을 관리(수정)할 수 있도록
+DROP POLICY IF EXISTS "routines_update" ON routines;
+CREATE POLICY "routines_update" ON routines FOR UPDATE USING (
+  auth.uid() = created_by OR auth.uid() = led_by OR is_admin()
+);
+
+-- 6) 참여 신청 승인/거절 — 담당 끗짱 + 관리자도 가능하도록 확장
+DROP POLICY IF EXISTS "rp_update" ON routine_participants;
+CREATE POLICY "rp_update" ON routine_participants FOR UPDATE USING (
+  auth.uid() = user_id
+  OR auth.uid() IN (SELECT created_by FROM routines WHERE id = routine_id)
+  OR auth.uid() IN (SELECT led_by FROM routines WHERE id = routine_id)
+  OR is_admin()
+);
+
+-- 7) 편지 조회/응답 — 담당 끗짱 + 관리자도 가능하도록 확장
+DROP POLICY IF EXISTS "letters_select" ON letters;
+CREATE POLICY "letters_select" ON letters FOR SELECT USING (
+  auth.uid() = from_user_id
+  OR auth.uid() IN (SELECT created_by FROM routines WHERE id = routine_id)
+  OR auth.uid() IN (SELECT led_by FROM routines WHERE id = routine_id)
+  OR is_admin()
+);
+DROP POLICY IF EXISTS "letters_update" ON letters;
+CREATE POLICY "letters_update" ON letters FOR UPDATE USING (
+  auth.uid() IN (SELECT created_by FROM routines WHERE id = routine_id)
+  OR auth.uid() IN (SELECT led_by FROM routines WHERE id = routine_id)
+  OR is_admin()
+);
