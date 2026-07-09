@@ -531,7 +531,7 @@ input:focus { outline: none; border-color: #2E33BC; }
             <div id="completedList"></div>
           </div>
           <div class="menu-card">
-            <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
+            <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
@@ -683,7 +683,7 @@ input:focus { outline: none; border-color: #2E33BC; }
           </div>
 
           <div class="menu-card">
-            <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
+            <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openOverlay('inquiryOverlay')"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
@@ -955,12 +955,20 @@ input:focus { outline: none; border-color: #2E33BC; }
           <option value="alternative">대안학교를 다녀요</option>
         </select>
       </div>
-      <div id="pushToggleWrap" style="margin-bottom:14px;display:none;">
-        <div class="field-label">푸시 알림</div>
-        <button type="button" id="pushToggleBtn" onclick="togglePush()" style="width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">🔔 알림 켜기</button>
-        <div id="pushHint" style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.5;"></div>
-      </div>
       <button class="primary-btn" onclick="saveProfile()">저장하기</button>
+    </div>
+  </div>
+
+  <!-- 바텀시트: 알림 설정 -->
+  <div class="sheet-bg" id="notifSettingBg" onclick="closeSheet('notifSettingBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:6px;">알림 설정</div>
+      <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:16px;">루틴 소식을 푸시 알림으로 받아보세요.<br>기기(브라우저)마다 따로 켤 수 있어요.</div>
+      <div id="pushToggleWrap" style="margin-bottom:6px;display:none;">
+        <button type="button" id="pushToggleBtn" onclick="togglePush()" style="width:100%;padding:13px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">🔔 알림 켜기</button>
+        <div id="pushHint" style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.5;"></div>
+      </div>
     </div>
   </div>
 
@@ -2631,8 +2639,11 @@ function openEditProfile() {
   document.getElementById('editSigugun').value = p.regionSigugun || '';
   document.getElementById('editYouthExtra').style.display = isYouth ? '' : 'none';
   document.getElementById('editSchoolStatus').value = isYouth ? (p.schoolStatus || '') : '';
-  refreshPushToggle();
   openSheet('editProfileBg');
+}
+function openNotifSetting() {
+  refreshPushToggle();
+  openSheet('notifSettingBg');
 }
 async function saveProfile() {
   const n=document.getElementById('editNickname').value.trim();
@@ -2686,13 +2697,11 @@ async function refreshPushToggle() {
   const btn = document.getElementById('pushToggleBtn');
   const hint = document.getElementById('pushHint');
   if (!_pushSupported()) {
-    if (_isIOSNeedsInstall()) {
-      wrap.style.display = '';
-      btn.style.display = 'none';
-      hint.textContent = '아이폰은 Safari 공유 버튼 → "홈 화면에 추가" 후 앱에서 알림을 켤 수 있어요.';
-    } else {
-      wrap.style.display = 'none';
-    }
+    wrap.style.display = '';
+    btn.style.display = 'none';
+    hint.textContent = _isIOSNeedsInstall()
+      ? '아이폰은 Safari 공유 버튼 → "홈 화면에 추가" 후 앱에서 알림을 켤 수 있어요.'
+      : '이 브라우저는 푸시 알림을 지원하지 않아요.';
     return;
   }
   wrap.style.display = '';
@@ -2713,7 +2722,8 @@ async function refreshPushToggle() {
       }
     }
   } catch (e) {
-    wrap.style.display = 'none';
+    btn.style.display = 'none';
+    hint.textContent = '알림 상태를 확인하지 못했어요. 새로고침 후 다시 시도해주세요.';
   }
 }
 async function togglePush() {
