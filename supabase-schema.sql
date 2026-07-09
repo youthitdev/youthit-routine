@@ -212,7 +212,7 @@ BEGIN
     NEW.raw_user_meta_data->>'school_status',
     CASE
       WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
-      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
       ELSE 'pending'
     END
   );
@@ -242,7 +242,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS verify_doc_url text;
 
 -- 2) 관리자 판별 함수 (하드코딩된 관리자 이메일 — index.html의 ADMINS와 동일하게 유지)
 CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
-  SELECT auth.email() IN ('soon@youthvoice.or.kr', 'yv@youthvoice.or.kr');
+  SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr');
 $$ LANGUAGE sql STABLE;
 
 -- 3) 본인이 verify_status를 임의로 'approved'로 바꾸지 못하게 가드
@@ -344,7 +344,7 @@ BEGIN
     NEW.raw_user_meta_data->>'school_status',
     CASE
       WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
-      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
       ELSE 'pending'
     END
   );
@@ -392,7 +392,7 @@ BEGIN
     NEW.raw_user_meta_data->>'school_status',
     CASE
       WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
-      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
       ELSE 'pending'
     END
   );
@@ -500,7 +500,7 @@ BEGIN
     NEW.raw_user_meta_data->>'school_status',
     CASE
       WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
-      WHEN NEW.email IN ('soon@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
       ELSE 'pending'
     END
   );
@@ -516,3 +516,10 @@ CREATE POLICY "posts_delete" ON posts FOR DELETE USING (auth.uid() = author_id O
 
 DROP POLICY IF EXISTS "cc_delete" ON cert_comments;
 CREATE POLICY "cc_delete" ON cert_comments FOR DELETE USING (auth.uid() = user_id OR is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-09b] 관리자 이메일 변경 (soon@ → dev@)
+-- =====================================================
+CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
+  SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr');
+$$ LANGUAGE sql STABLE;
