@@ -1771,6 +1771,7 @@ function renderRoutineGrid(type, q) {
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
+    const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     const cardBg=isDone?'#fafafa':'#fff';
     const cardBorder=isDone?'#e8e8e8':isActive?'#2E33BC':isPending?'#FFD600':'#e8e8e8';
     const bw=isActive||isPending?'1.5px':'0.5px';
@@ -1804,7 +1805,7 @@ function renderRoutineGrid(type, q) {
     const coverInner = r.coverImageUrl
       ? `<img src="${r.coverImageUrl}" style="${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
       : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
-    return `<div class="routine-card" onclick="${isActive?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
+    return `<div class="routine-card" onclick="${isActive&&isMine?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
       <div class="rc-cover">
         ${coverInner}
         <div class="rc-scrim"></div>
@@ -1924,7 +1925,8 @@ function openRoutineFeed(routineId) {
       </div>`;
   document.getElementById('feedOverlayBody').innerHTML=html;
   const myR=state.routines.find(x=>x.id===routineId);
-  document.getElementById('certFloatingBtn').style.display='block';
+  const isMyRoutine = currentUser && (myR.participants||[]).some(p=>p.userId===currentUser.id);
+  document.getElementById('certFloatingBtn').style.display=isMyRoutine?'block':'none';
   document.getElementById('certFloatingAction').style.display=myR.todayCert?'none':'flex';
   document.getElementById('certFloatingDone').style.display=myR.todayCert?'block':'none';
   openOverlay('routineFeedOverlay');

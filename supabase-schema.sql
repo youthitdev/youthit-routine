@@ -523,3 +523,25 @@ CREATE POLICY "cc_delete" ON cert_comments FOR DELETE USING (auth.uid() = user_i
 CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
   SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr');
 $$ LANGUAGE sql STABLE;
+
+-- =====================================================
+-- [마이그레이션 2026-07-09c] 인증은 승인된 참여자만 가능하도록 서버측 검증
+-- (기존엔 로그인만 하면 신청 안 한 루틴도 인증 가능했음)
+-- =====================================================
+DROP POLICY IF EXISTS "cert_insert" ON certifications;
+CREATE POLICY "cert_insert" ON certifications FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (
+    EXISTS (
+      SELECT 1 FROM routine_participants rp
+      WHERE rp.routine_id = certifications.routine_id
+        AND rp.user_id = auth.uid()
+        AND rp.status = 'approved'
+    )
+    OR EXISTS (
+      SELECT 1 FROM routines r
+      WHERE r.id = certifications.routine_id
+        AND (r.created_by = auth.uid() OR r.led_by = auth.uid())
+    )
+    OR is_admin()
+  )
+);
