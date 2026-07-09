@@ -955,6 +955,11 @@ input:focus { outline: none; border-color: #2E33BC; }
           <option value="alternative">대안학교를 다녀요</option>
         </select>
       </div>
+      <div id="pushToggleWrap" style="margin-bottom:14px;display:none;">
+        <div class="field-label">푸시 알림</div>
+        <button type="button" id="pushToggleBtn" onclick="togglePush()" style="width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">🔔 알림 켜기</button>
+        <div id="pushHint" style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.5;"></div>
+      </div>
       <button class="primary-btn" onclick="saveProfile()">저장하기</button>
     </div>
   </div>
@@ -1026,6 +1031,7 @@ const H = 3600000;
 // ════════════════════════════════════════════════════════
 // Supabase
 // ════════════════════════════════════════════════════════
+const VAPID_PUBLIC_KEY = 'BOhhw_2_VTQbea00R2F1eTa59jzz-vRs3oi4t-pFKZmoUKYxsVwnaRIumKE07tfuOqEJFK611XSDPmsS1koAY3k';
 const SB_URL = 'https://ynqvhsffoesjzefitafv.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlucXZoc2Zmb2VzanplZml0YWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjMxNDIsImV4cCI6MjA5ODg5OTE0Mn0.l16KP5amowhtrtoBaKL1M8wtcPMgUxniVcjoLC6YOIQ';
 const sb = supabase.createClient(SB_URL, SB_KEY);
@@ -2625,6 +2631,7 @@ function openEditProfile() {
   document.getElementById('editSigugun').value = p.regionSigugun || '';
   document.getElementById('editYouthExtra').style.display = isYouth ? '' : 'none';
   document.getElementById('editSchoolStatus').value = isYouth ? (p.schoolStatus || '') : '';
+  refreshPushToggle();
   openSheet('editProfileBg');
 }
 async function saveProfile() {
@@ -2656,6 +2663,91 @@ async function saveProfile() {
   closeSheet('editProfileBg');
   if(isYouth) { renderMy(); renderHome(); }
   else { kRenderMy(); kRenderHome(); }
+}
+
+// ════════════════════════════════════════════════════════
+// Web Push 알림 구독
+// ════════════════════════════════════════════════════════
+function _urlB64ToUint8Array(s) {
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+function _pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+function _isIOSNeedsInstall() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  return isIOS && !standalone;
+}
+async function refreshPushToggle() {
+  const wrap = document.getElementById('pushToggleWrap');
+  const btn = document.getElementById('pushToggleBtn');
+  const hint = document.getElementById('pushHint');
+  if (!_pushSupported()) {
+    if (_isIOSNeedsInstall()) {
+      wrap.style.display = '';
+      btn.style.display = 'none';
+      hint.textContent = '아이폰은 Safari 공유 버튼 → "홈 화면에 추가" 후 앱에서 알림을 켤 수 있어요.';
+    } else {
+      wrap.style.display = 'none';
+    }
+    return;
+  }
+  wrap.style.display = '';
+  btn.style.display = '';
+  hint.textContent = '';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      btn.textContent = '🔕 알림 끄기';
+      btn.style.color = '#888'; btn.style.borderColor = '#ddd';
+      hint.textContent = '이 기기에서 푸시 알림을 받는 중이에요.';
+    } else {
+      btn.textContent = '🔔 알림 켜기';
+      btn.style.color = '#2E33BC'; btn.style.borderColor = '#2E33BC';
+      if (Notification.permission === 'denied') {
+        hint.textContent = '알림이 브라우저에서 차단돼 있어요. 브라우저 설정에서 이 사이트의 알림을 허용해주세요.';
+      }
+    }
+  } catch (e) {
+    wrap.style.display = 'none';
+  }
+}
+async function togglePush() {
+  if (!currentUser) { alert('로그인이 필요해요.'); return; }
+  const btn = document.getElementById('pushToggleBtn');
+  btn.disabled = true;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      await sb.from('push_subscriptions').delete().eq('endpoint', existing.endpoint);
+      await existing.unsubscribe();
+    } else {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        if (perm === 'denied') alert('알림이 차단됐어요. 브라우저 설정에서 이 사이트의 알림을 허용한 후 다시 시도해주세요.');
+        return;
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const j = sub.toJSON();
+      const { error } = await sb.from('push_subscriptions').upsert({
+        user_id: currentUser.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+      }, { onConflict: 'endpoint' });
+      if (error) { await sub.unsubscribe(); alert('알림 등록 실패: ' + error.message); return; }
+    }
+  } catch (e) {
+    alert('알림 설정 중 문제가 생겼어요: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    refreshPushToggle();
+  }
 }
 
 // AI 리포트

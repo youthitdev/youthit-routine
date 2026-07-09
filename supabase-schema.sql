@@ -553,3 +553,25 @@ ALTER TABLE routines ADD COLUMN IF NOT EXISTS archived boolean DEFAULT false;
 
 DROP POLICY IF EXISTS "routines_delete" ON routines;
 CREATE POLICY "routines_delete" ON routines FOR DELETE USING (is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-09e] Web Push 구독 저장
+-- 사용자가 "알림 켜기"를 누르면 브라우저 푸시 구독 정보를 저장.
+-- 발송은 Edge Function(send-push)이 service_role로 읽어서 처리.
+-- endpoint는 기기·브라우저마다 고유하므로 UNIQUE — 같은 기기에서
+-- 다시 켜면 upsert로 갱신됨 (upsert에 UPDATE 정책 필요)
+-- =====================================================
+CREATE TABLE push_subscriptions (
+  id          bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  user_id     uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  endpoint    text NOT NULL UNIQUE,
+  p256dh      text NOT NULL,
+  auth        text NOT NULL,
+  created_at  timestamptz DEFAULT now()
+);
+
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ps_select" ON push_subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "ps_insert" ON push_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "ps_update" ON push_subscriptions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "ps_delete" ON push_subscriptions FOR DELETE USING (auth.uid() = user_id);
