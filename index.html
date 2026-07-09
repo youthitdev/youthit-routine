@@ -1009,25 +1009,7 @@ input:focus { outline: none; border-color: #2E33BC; }
 // ════════════════════════════════════════════════════════
 // 데이터
 // ════════════════════════════════════════════════════════
-const now = Date.now(), H = 3600000;
-const CERT_FEED = [
-  {id:1,routineId:1,name:'지민',day:'14일째',text:'오늘도 6시에 일어났어요! 스트레칭하고 나니 개운해요.',ts:now-2*H,likes:5,liked:false,color:'#B5D4F4',comments:[
-    {id:1,author:'현우',text:'대박 👍 나도 해야겠다!',ts:now-1*H},
-    {id:2,author:'서연',text:'짱이다 💪',ts:now-30*60000},
-  ]},
-  {id:2,routineId:1,name:'현우',day:'14일째',text:'3일 연속이에요. 생각보다 어렵지 않아요!',ts:now-4*H,likes:8,liked:false,color:'#C0DD97',comments:[
-    {id:1,author:'지민',text:'오 대단해요!',ts:now-3*H},
-  ]},
-  {id:3,routineId:4,name:'서연',day:'8일째',text:'계란 후라이 처음 만들었어요. 뿌듯!',ts:now-6*H,likes:12,liked:false,color:'#FAC775',comments:[
-    {id:1,author:'나연',text:'맛있겠다 ㅋㅋ',ts:now-5*H},
-    {id:2,author:'준서',text:'요리 고수!',ts:now-4*H},
-  ]},
-  {id:4,routineId:1,name:'나연',day:'12일째',text:'오늘 할 일 3가지 적고 나니 하루가 더 알차요.',ts:now-10*H,likes:6,liked:false,color:'#F4C0D1',comments:[]},
-  {id:5,routineId:4,name:'준서',day:'6일째',text:'라면이라도 직접 끓여먹었어요 ㅋㅋ',ts:now-15*H,likes:9,liked:false,color:'#B5D4F4',comments:[
-    {id:1,author:'서연',text:'라면도 요리죠 ㅎㅎ',ts:now-14*H},
-  ]},
-  {id:6,routineId:1,name:'민지',day:'10일째',text:'스트레칭 5분이 이제 습관이 됐어요.',ts:now-20*H,likes:7,liked:false,color:'#C0DD97',comments:[]},
-];
+const H = 3600000;
 
 // ════════════════════════════════════════════════════════
 // Supabase
@@ -1147,7 +1129,7 @@ async function loadProfileAndEnter() {
     showKkutjjangPending(profile.kkutjjang_status || 'pending');
     return;
   }
-  try { await loadRoutines(); await loadPosts(); } catch(e) { console.error('데이터 로드 실패', e); }
+  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
 }
 function showKkutjjangPending(status) {
@@ -1244,6 +1226,7 @@ const DEFAULT = {
     {id:2,type:'review',title:'아침루틴 2주째 후기예요',content:'처음엔 정말 힘들었는데 이제는 알람 없이도 일어나지게 됐어요!',author:'지민',date:'6월 20일',likes:12,liked:false},
     {id:3,type:'review',title:'혼자였으면 못 했을 것 같아요',content:'같이 하는 사람들이 있어서 포기하지 않을 수 있었어요.',author:'현우',date:'6월 19일',likes:8,liked:false},
   ],
+  certFeed: [],
   reviews: [
     {name:'지민',routine:'아침 루틴 21일',text:'"루틴을 하면서 하루가 달라진 것 같아요."',date:'6월 20일'},
     {name:'현우',routine:'아침 루틴 21일',text:'"혼자였으면 3일도 못 했을 것 같은데, 같이 하니까 계속 하게 됐어요."',date:'6월 19일'},
@@ -1362,6 +1345,38 @@ async function loadPosts() {
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
   }));
+}
+
+async function loadCertFeed() {
+  const [certRes, likeRes, commentRes, profRes] = await Promise.all([
+    sb.from('certifications').select('id,routine_id,user_id,content,photo_url,photo_urls,created_at').order('created_at', { ascending: false }).limit(500),
+    sb.from('cert_likes').select('cert_id,user_id'),
+    sb.from('cert_comments').select('id,cert_id,user_id,content,created_at').order('created_at', { ascending: true }),
+    sb.from('profiles').select('id,name'),
+  ]);
+  const certs = certRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
+  const nameById = {};
+  (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  state.certFeed = certs.map(c => {
+    const r = state.routines.find(x => x.id === c.routine_id);
+    const cLikes = likes.filter(l => l.cert_id === c.id);
+    const cComments = comments.filter(cm => cm.cert_id === c.id).map(cm => ({
+      id: cm.id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+    }));
+    const photos = (c.photo_urls && c.photo_urls.length) ? c.photo_urls : (c.photo_url ? [c.photo_url] : []);
+    return {
+      id: c.id, routineId: c.routine_id, userId: c.user_id,
+      name: nameById[c.user_id] || '익명',
+      day: r ? _dayLabel(r.startDate) : '',
+      text: c.content || '',
+      ts: new Date(c.created_at).getTime(),
+      likes: cLikes.length,
+      liked: currentUser ? cLikes.some(l => l.user_id === currentUser.id) : false,
+      color: _avColor(nameById[c.user_id] || '?'),
+      photos,
+      comments: cComments,
+    };
+  });
 }
 
 // ════════════════════════════════════════════════════════
@@ -1611,14 +1626,14 @@ function renderHome() {
   }).join('');
   document.getElementById('weekGrassCount').textContent = weekDone>0 ? `이번 주 ${weekDone}일 인증 🌱` : '';
   document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
-    const todayCerts = CERT_FEED.filter(c=>c.routineId===r.id && isWithin24h(c.ts));
+    const todayCerts = (state.certFeed||[]).filter(c=>c.routineId===r.id && isWithin24h(c.ts));
     const previewHtml = todayCerts.length > 0
       ? `<div style="margin-top:10px;"><div style="font-size:11px;color:#888;margin-bottom:6px;">오늘 인증한 친구들 👀</div>
          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;">
            ${todayCerts.slice(0,4).map(c=>`
              <div onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="flex-shrink:0;width:64px;cursor:pointer;">
-               <div style="width:64px;height:64px;border-radius:10px;background:${c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-                 <i class="ti ti-photo" style="font-size:20px;color:rgba(0,0,0,0.15);"></i>
+               <div style="width:64px;height:64px;border-radius:10px;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+                 ${c.photos&&c.photos[0]?`<img src="${c.photos[0]}" style="width:100%;height:100%;object-fit:cover;">`:`<i class="ti ti-photo" style="font-size:20px;color:rgba(0,0,0,0.15);"></i>`}
                  <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.45));padding:3px 5px;">
                    <div style="font-size:9px;color:white;font-weight:500;">${c.name}</div>
                  </div>
@@ -1674,7 +1689,7 @@ function renderRoutineGrid(type, q) {
   if(q) {
     const lq=q.toLowerCase();
     const byTitle=base.filter(r=>r.title.toLowerCase().includes(lq));
-    const byNick=base.filter(r=>CERT_FEED.some(c=>c.routineId===r.id&&c.name.toLowerCase().includes(lq)));
+    const byNick=base.filter(r=>(state.certFeed||[]).some(c=>c.routineId===r.id&&c.name.toLowerCase().includes(lq)));
     filtered=[...new Set([...byTitle,...byNick])];
   }
   const empty=document.getElementById('searchEmpty');
@@ -1721,7 +1736,7 @@ function renderRoutineGrid(type, q) {
            <span style="font-size:10px;color:#888;flex-shrink:0;">${r.people}/${r.maxPeople}명</span>
          </div>`
       : `<div style="margin-top:9px;font-size:10px;color:#aaa;">🏅 완주 · ${r.people}명 함께함</div>`;
-    const matchedNicks=q?CERT_FEED.filter(c=>c.routineId===r.id&&c.name.toLowerCase().includes(q.toLowerCase())).map(c=>c.name):[];
+    const matchedNicks=q?(state.certFeed||[]).filter(c=>c.routineId===r.id&&c.name.toLowerCase().includes(q.toLowerCase())).map(c=>c.name):[];
     const nickHtml=matchedNicks.length>0?`<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${matchedNicks.map(n=>`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:10px;">${hl(n)}</span>`).join('')}</div>`:'';
     // 참여 인원(이미지 위 오버레이)
     const peopleTxt = `${r.people}명`;
@@ -1817,14 +1832,14 @@ function openRoutineFeed(routineId) {
   // 역할 색상 헤더에 직접 적용
   const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
   document.querySelector('#routineFeedOverlay .overlay-hd').style.background = roleColor;
-  const certs=CERT_FEED.filter(c=>c.routineId===routineId&&isWithin24h(c.ts));
+  const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId&&isWithin24h(c.ts));
   let html=certs.length===0
     ?`<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;">아직 오늘 인증한 친구가 없어요.<br>첫 번째로 인증해볼까요?</div>`
     :`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:12px 16px 16px;">
         ${certs.map(c=>`
           <div onclick="openCertFeedDetail(${c.id})" style="border-radius:12px;overflow:hidden;border:0.5px solid #e8e8e8;cursor:pointer;background:#fff;">
-            <div style="aspect-ratio:1;background:${c.color};display:flex;align-items:center;justify-content:center;position:relative;">
-              <i class="ti ti-photo" style="font-size:28px;color:rgba(0,0,0,0.15);"></i>
+            <div style="aspect-ratio:1;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+              ${c.photos&&c.photos[0]?`<img src="${c.photos[0]}" style="width:100%;height:100%;object-fit:cover;">`:`<i class="ti ti-photo" style="font-size:28px;color:rgba(0,0,0,0.15);"></i>`}
               <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:6px 8px 7px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                   <span style="font-size:11px;color:white;font-weight:500;">${c.name}</span>
@@ -1859,20 +1874,35 @@ function openCertFromFeed() {
   closeOverlay('routineFeedOverlay');
   openCertForm(r.id,r.title);
 }
-function toggleCertLike(id) {
-  const c=CERT_FEED.find(x=>x.id===id);
-  c.liked=!c.liked; c.likes+=c.liked?1:-1;
-  if(c.liked) state.youth.commCount++;
-  save();
+async function toggleCertLike(id) {
+  const c=(state.certFeed||[]).find(x=>x.id===id);
+  if(!c || !currentUser) return;
+  const wasLiked = c.liked;
+  c.liked=!wasLiked; c.likes+=c.liked?1:-1;
   ['feed','rd'].forEach(pre=>{
     const hi=document.getElementById(pre+'Heart_'+id);
     const li=document.getElementById(pre+'Like_'+id);
     if(hi){hi.className='ti ti-heart'+(c.liked?'-filled':'');hi.style.color=c.liked?'#FF006C':'#ccc';}
     if(li) li.textContent=c.likes;
   });
+  const { error } = wasLiked
+    ? await sb.from('cert_likes').delete().eq('cert_id', id).eq('user_id', currentUser.id)
+    : await sb.from('cert_likes').insert({ cert_id: id, user_id: currentUser.id });
+  if(error) {
+    c.liked=wasLiked; c.likes+=wasLiked?1:-1;
+    ['feed','rd'].forEach(pre=>{
+      const hi=document.getElementById(pre+'Heart_'+id);
+      const li=document.getElementById(pre+'Like_'+id);
+      if(hi){hi.className='ti ti-heart'+(c.liked?'-filled':'');hi.style.color=c.liked?'#FF006C':'#ccc';}
+      if(li) li.textContent=c.likes;
+    });
+    return;
+  }
+  if(wasLiked===false) state.youth.commCount++;
+  save();
 }
 function openCertFeedDetail(id) {
-  const c = CERT_FEED.find(x=>x.id===id);
+  const c = (state.certFeed||[]).find(x=>x.id===id);
   const r = state.routines.find(x=>x.id===c.routineId);
   document.getElementById('rdSub').textContent = r.title+' · '+c.day;
   document.getElementById('rdTitle').textContent = c.name;
@@ -1884,7 +1914,7 @@ let currentCertDetailId = null;
 
 function renderCertDetail(id) {
   currentCertDetailId = id;
-  const c = CERT_FEED.find(x=>x.id===id);
+  const c = (state.certFeed||[]).find(x=>x.id===id);
   const comments = c.comments||[];
 
   // 고정 댓글 입력바 표시
@@ -1892,13 +1922,16 @@ function renderCertDetail(id) {
   const avatar = document.getElementById('rdCommentAvatar');
   const input = document.getElementById('rdCommentInput');
   if(bar) { bar.style.display=''; }
-  if(avatar) avatar.textContent = state.youth.name[0];
+  if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
   if(input) input.value='';
 
+  const photoHtml = (c.photos && c.photos.length)
+    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;">`).join('')}</div>`
+    : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
+      </div>`;
   document.getElementById('rdBody').innerHTML = `
-    <div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
-      <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
-    </div>
+    ${photoHtml}
     <div style="font-size:14px;color:#111;line-height:1.7;">${c.text}</div>
     <div style="font-size:12px;color:#aaa;">${timeAgo(c.ts)}</div>
 
@@ -1929,16 +1962,19 @@ function renderCertDetail(id) {
     </div>`;
 }
 
-function submitCommentFromBar() {
-  if(!currentCertDetailId) return;
+async function submitCommentFromBar() {
+  if(!currentCertDetailId || !currentUser) return;
   const input = document.getElementById('rdCommentInput');
   const text = input.value.trim();
   if(!text) return;
-  const c = CERT_FEED.find(x=>x.id===currentCertDetailId);
+  const c = (state.certFeed||[]).find(x=>x.id===currentCertDetailId);
+  if(!c) return;
+  const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+  const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text }).select().single();
+  if(error){ alert('댓글 등록 실패: '+error.message); return; }
   if(!c.comments) c.comments=[];
-  c.comments.push({id:Date.now(), author:state.youth.name, text, ts:Date.now()});
-  state.youth.commCount++;
-  earnNadaeum('comment');
+  c.comments.push({id:data.id, author:authorName, text, ts:new Date(data.created_at).getTime()});
+  if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
   save();
   input.value='';
   // 댓글 목록 업데이트
@@ -1946,9 +1982,9 @@ function submitCommentFromBar() {
   const newComment = document.createElement('div');
   newComment.style.cssText='display:flex;gap:8px;';
   newComment.innerHTML=`
-    <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${state.youth.name[0]}</div>
+    <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${authorName[0]}</div>
     <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${state.youth.name}</div>
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${authorName}</div>
       <div style="font-size:13px;color:#333;line-height:1.5;">${text}</div>
       <div style="font-size:10px;color:#aaa;margin-top:4px;">방금</div>
     </div>`;
@@ -1965,27 +2001,6 @@ function submitCommentFromBar() {
   // 피드 카운트도 업데이트
   const feedEl=document.getElementById('feedComment_'+currentCertDetailId);
   if(feedEl) feedEl.textContent=cnt;
-}
-
-function submitComment(certId) {
-  const input = document.getElementById('commentInput_'+certId);
-  const text = input.value.trim();
-  if(!text) return;
-  const c = CERT_FEED.find(x=>x.id===certId);
-  if(!c.comments) c.comments=[];
-  c.comments.push({
-    id: Date.now(),
-    author: state.youth.name,
-    text,
-    ts: Date.now()
-  });
-  state.youth.commCount++;
-  earnNadaeum('comment');
-  save();
-  renderCertDetail(certId);
-  // 피드 카운트 업데이트
-  const li = document.getElementById('feedLike_'+certId);
-  if(li) li.textContent = c.likes;
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
@@ -2253,6 +2268,7 @@ async function submitCert() {
   }
   save();
   await loadRoutines();
+  await loadCertFeed();
   closeOverlay('certFormOverlay');
   document.getElementById('certNadaeumBadge').style.display = isYouth ? '' : 'none';
   document.getElementById('certSuccess').classList.add('open');
@@ -2850,14 +2866,15 @@ function openKCertDetail(rid,name) {
   const r=state.routines.find(x=>x.id===rid);
   const p=r.participants.find(x=>x.name===name);
   if(!p||!p.todayDone) return;
-  const colors=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
-  const idx=r.participants.indexOf(p);
+  const cert=(state.certFeed||[]).filter(c=>c.routineId===rid && c.userId===p.userId).sort((a,b)=>b.ts-a.ts)[0];
   document.getElementById('rdSub').textContent=r.title+' · '+p.day;
   document.getElementById('rdTitle').textContent=p.name;
-  document.getElementById('rdBody').innerHTML=`
-    <div style="background:${colors[idx%4]};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;"><i class="ti ti-photo" style="font-size:40px;color:rgba(0,0,0,0.2);"></i></div>
-    <div style="font-size:14px;color:#111;line-height:1.7;margin-bottom:8px;">오늘도 열심히 했어요!</div>
-    <div style="background:#EAF3DE;border-radius:10px;padding:10px 14px;font-size:13px;color:#3B6D11;display:flex;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:14px;"></i> 인증 완료 · 목표의 2/3 이상 달성 중</div>`;
+  if(cert) {
+    renderCertDetail(cert.id);
+  } else {
+    document.getElementById('rdBody').innerHTML=`<div style="padding:40px 16px;text-align:center;color:#aaa;font-size:13px;">인증 내용을 불러올 수 없어요</div>`;
+    const bar=document.getElementById('rdCommentBar'); if(bar) bar.style.display='none';
+  }
   openOverlay('routineDetailOverlay');
 }
 
