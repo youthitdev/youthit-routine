@@ -26,12 +26,25 @@ function json(status: number, data: unknown): Response {
   });
 }
 
+// 토큰이 진짜 service 키인지 검증: 문자열 비교(레거시 JWT) 또는
+// 그 키로 관리자 전용 API가 실제로 호출되는지 확인 (신형 sb_secret 키 대응)
+async function isServiceKey(token: string): Promise<boolean> {
+  if (!token) return false;
+  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) return true;
+  try {
+    const probe = createClient(Deno.env.get("SUPABASE_URL")!, token);
+    const { error } = await probe.auth.admin.listUsers({ page: 1, perPage: 1 });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "POST만 지원해요" });
 
   const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
-  const isServiceRole = token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!isServiceRole) {
+  if (!(await isServiceKey(token))) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user || !ADMINS.includes(user.email ?? "")) {
       return json(403, { error: "관리자만 발송할 수 있어요" });

@@ -59,13 +59,12 @@
 
 ## 남은 작업 (우선순위순)
 
-1. **알림 인프라 (Web Push) — 1단계 인프라 구축 완료, 실기기 테스트 검증 중**
-   - 방향 확정: 인앱 알림 없이 **바로 Web Push**로 감 (사용자 결정 — 잠금화면 알림이라야 의미 있음)
-   - 로드맵: ①구독+테스트 발송 파이프라인(이번) → ②트리거 연결(참여 승인/거절, 좋아요, 댓글) → ③관리자 수동 공지 발송 → ④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러)
-   - **구축 완료**: `push_subscriptions` 테이블+RLS(마이그레이션 2026-07-09e, 실행됨), `send-push` Edge Function 배포됨(관리자 JWT 또는 service_role만 발송 가능, 만료 구독 자동 정리), VAPID 시크릿 설정됨, index.html 프로필 편집 시트에 "푸시 알림" 토글, service-worker.js push/notificationclick 핸들러(캐시 v4)
-   - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록이라 쓸 때 `export PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"` 필요. VAPID 키 원본은 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
-   - **남은 것**: 배포된 사이트에서 알림 켜고 실제 기기로 테스트 푸시 수신 확인
-   - iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+) — 안내 문구는 토글에 있음, 유도 배너는 별도 단계
+1. **알림 인프라 (Web Push) — ✅ 1단계 완료 (2026-07-10 아이폰 잠금화면 수신 검증됨)**
+   - 로드맵: ~~①구독+테스트 발송 파이프라인~~(완료) → **②트리거 연결(참여 승인/거절, 좋아요, 댓글) ← 다음** → ③관리자 수동 공지 발송 → ④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러)
+   - 구축된 것: `push_subscriptions` 테이블+RLS(마이그레이션 2026-07-09e), `send-push` Edge Function(관리자 JWT 또는 service 키만 발송 가능 — 신형 sb_secret 키는 문자열 비교가 안 돼서 auth.admin API 프로브 방식으로 검증함, 만료 구독 자동 정리), VAPID 시크릿 설정됨, 마이페이지 "알림 설정" 메뉴→시트에 알림 켜기/끄기 토글, service-worker.js push/notificationclick 핸들러(캐시 v4)
+   - 발송 방법(2단계에서 재사용): `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids", "title", "body", "url"}`
+   - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
+   - 주의사항: 새 테이블 만들면 API 스키마 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음. SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 꼭 확인**(한 번 다른 프로젝트 approval에 실행하는 사고 있었음 — 그쪽에 생긴 push_subscriptions 테이블은 DROP 예정). iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+), 집중 모드 중엔 배너 없이 알림 센터에만 쌓임
 2. 카테고리 필터 활성화 — 지금 루틴 태그가 전부 `생활`로 고정, 실제 카테고리 선택 기능 필요
 3. OT 때 "함께 인증" 실습 모드 — 첫날 줌에서 다 같이 인증 폼 작성해보기
 4. 거절 사유 안내 — 서류/신청 반려 시 이유·재제출 안내
