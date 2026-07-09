@@ -1346,7 +1346,7 @@ async function loadRoutines() {
     sb.from('certifications').select('id,routine_id,user_id,created_at'),
     sb.from('profiles').select('id,name'),
   ]);
-  const routines = rRes.data || [], parts = pRes.data || [], certs = cRes.data || [];
+  const routines = (rRes.data || []).filter(r => !r.archived), parts = pRes.data || [], certs = cRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   const today = new Date().toISOString().slice(0, 10);

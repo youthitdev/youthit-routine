@@ -78,6 +78,7 @@
   <div class="tabs">
     <button class="tab-btn active" id="tabYouthBtn" onclick="switchTab('youth')">청소년</button>
     <button class="tab-btn" id="tabKkBtn" onclick="switchTab('kkutjjang')">끗짱</button>
+    <button class="tab-btn" id="tabRoutineBtn" onclick="switchTab('routine')">루틴</button>
   </div>
 
   <div class="filter-bar" id="youthFilters">
@@ -112,6 +113,18 @@
     </select>
     <span class="count-badge" id="kCount"></span>
     <button class="export-btn" onclick="exportCSV('kkutjjang')">📥 CSV 내보내기</button>
+  </div>
+
+  <div class="filter-bar" id="routineFilters" style="display:none;">
+    <input type="text" id="rSearch" placeholder="루틴명 검색" oninput="renderTable()">
+    <select id="rStatusFilter" onchange="renderTable()">
+      <option value="">전체 상태</option>
+      <option value="recruit">모집 중</option>
+      <option value="active">진행 중</option>
+      <option value="done">완료</option>
+      <option value="archived">보관됨</option>
+    </select>
+    <span class="count-badge" id="rCount"></span>
   </div>
 
   <div class="bulk-bar" id="bulkBar">
@@ -156,7 +169,7 @@ const REGION_DATA = {
 
 let currentUser = null;
 let currentTab = 'youth';
-let youthRows = [], kkRows = [];
+let youthRows = [], kkRows = [], routineRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
 
@@ -211,17 +224,29 @@ async function loadData() {
   const [profRes, rpRes, routRes] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status'),
-    sb.from('routines').select('id,title'),
+    sb.from('routines').select('id,title,status,start_date,end_date,max_people,archived,led_by,created_by'),
   ]);
   const profiles = profRes.data || [];
   const rps = rpRes.data || [];
   const routines = routRes.data || [];
+  const nameById = {};
+  profiles.forEach(p => nameById[p.id] = p.name);
   const routineTitleById = {};
   routines.forEach(r => routineTitleById[r.id] = r.title);
   const routinesByUser = {};
   rps.filter(p => p.status === 'approved').forEach(p => {
     (routinesByUser[p.user_id] = routinesByUser[p.user_id] || []).push(routineTitleById[p.routine_id] || '');
   });
+  const approvedCountByRoutine = {};
+  rps.filter(p => p.status === 'approved').forEach(p => {
+    approvedCountByRoutine[p.routine_id] = (approvedCountByRoutine[p.routine_id] || 0) + 1;
+  });
+
+  routineRows = routines.map(r => ({
+    id: r.id, title: r.title, status: r.status, startDate: r.start_date || '', endDate: r.end_date || '',
+    maxPeople: r.max_people || 0, people: approvedCountByRoutine[r.id] || 0,
+    archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
+  }));
 
   youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
     id: p.id, name: p.name, realName: p.real_name || '', birthDate: p.birth_date || '',
@@ -247,8 +272,10 @@ function switchTab(tab) {
   selectedIds.clear();
   document.getElementById('tabYouthBtn').classList.toggle('active', tab === 'youth');
   document.getElementById('tabKkBtn').classList.toggle('active', tab === 'kkutjjang');
+  document.getElementById('tabRoutineBtn').classList.toggle('active', tab === 'routine');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
+  document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
   sortKey = null;
   renderTable();
 }
@@ -279,6 +306,17 @@ function _filteredKk() {
     return true;
   });
 }
+function _filteredRoutines() {
+  const q = document.getElementById('rSearch').value.trim().toLowerCase();
+  const status = document.getElementById('rStatusFilter').value;
+  return routineRows.filter(r => {
+    if (q && !r.title.toLowerCase().includes(q)) return false;
+    if (status === 'archived' && !r.archived) return false;
+    if (status && status !== 'archived' && (r.status !== status || r.archived)) return false;
+    if (!status && r.archived) return false;
+    return true;
+  });
+}
 
 function sortRows(rows) {
   if (!sortKey) return rows;
@@ -293,7 +331,50 @@ function toggleSort(key) {
 }
 
 function renderTable() {
-  if (currentTab === 'youth') renderYouthTable(); else renderKkTable();
+  if (currentTab === 'youth') renderYouthTable();
+  else if (currentTab === 'kkutjjang') renderKkTable();
+  else renderRoutineTable();
+}
+const R_STATUS_LABEL = { recruit: '모집 중', active: '진행 중', done: '완료' };
+function renderRoutineTable() {
+  document.getElementById('bulkBar').style.display = 'none';
+  let rows = sortRows(_filteredRoutines());
+  document.getElementById('rCount').textContent = `${rows.length}개`;
+  document.getElementById('tableHead').innerHTML = `<tr>
+    <th onclick="toggleSort('title')">제목</th>
+    <th onclick="toggleSort('status')">상태</th>
+    <th>기간</th>
+    <th onclick="toggleSort('people')">참여인원</th>
+    <th onclick="toggleSort('leaderName')">담당 끗짱</th>
+    <th>보관</th>
+    <th></th>
+  </tr>`;
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${r.title}</td>
+      <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span></td>
+      <td>${r.startDate} ~ ${r.endDate}</td>
+      <td>${r.people}/${r.maxPeople}</td>
+      <td>${r.leaderName}</td>
+      <td>${r.archived?'<span class="pill pill-rejected">보관됨</span>':'-'}</td>
+      <td>
+        <button onclick="toggleArchiveRoutine(${r.id},${!r.archived})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.archived?'복원':'보관'}</button>
+        <button onclick="deleteRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
+      </td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="7">조건에 맞는 루틴이 없어요</td></tr>`;
+}
+async function toggleArchiveRoutine(id, archive) {
+  if (!confirm(archive ? '이 루틴을 보관할까요? 청소년·끗짱 화면에서 보이지 않게 돼요.' : '이 루틴을 복원할까요?')) return;
+  const { error } = await sb.from('routines').update({ archived: archive }).eq('id', id);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  await loadData();
+}
+async function deleteRoutineAdmin(id, title) {
+  if (!confirm(`"${title}" 루틴을 완전히 삭제할까요?\n참여자·인증·댓글 기록이 모두 함께 삭제되며 되돌릴 수 없어요.`)) return;
+  if (!confirm('정말로 삭제하시겠어요? 이 작업은 취소할 수 없어요.')) return;
+  const { error } = await sb.from('routines').delete().eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  await loadData();
 }
 
 function renderYouthTable() {

@@ -545,3 +545,11 @@ CREATE POLICY "cert_insert" ON certifications FOR INSERT WITH CHECK (
     OR is_admin()
   )
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-09d] 루틴 보관(archived) + 관리자 삭제 권한
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS archived boolean DEFAULT false;
+
+DROP POLICY IF EXISTS "routines_delete" ON routines;
+CREATE POLICY "routines_delete" ON routines FOR DELETE USING (is_admin());
