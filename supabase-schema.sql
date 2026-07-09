@@ -507,3 +507,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-09] 게시글/댓글 삭제 권한 (본인 또는 관리자)
+-- =====================================================
+DROP POLICY IF EXISTS "posts_delete" ON posts;
+CREATE POLICY "posts_delete" ON posts FOR DELETE USING (auth.uid() = author_id OR is_admin());
+
+DROP POLICY IF EXISTS "cc_delete" ON cert_comments;
+CREATE POLICY "cc_delete" ON cert_comments FOR DELETE USING (auth.uid() = user_id OR is_admin());

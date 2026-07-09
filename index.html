@@ -1401,7 +1401,7 @@ async function loadPosts() {
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
     id: p.id, type: p.type || 'review', title: p.title, content: p.content,
-    author: nameById[p.author_id] || '익명', date: _relDate(p.created_at),
+    author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
   }));
@@ -1421,7 +1421,7 @@ async function loadCertFeed() {
     const r = state.routines.find(x => x.id === c.routine_id);
     const cLikes = likes.filter(l => l.cert_id === c.id);
     const cComments = comments.filter(cm => cm.cert_id === c.id).map(cm => ({
-      id: cm.id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+      id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
     }));
     const photos = (c.photo_urls && c.photo_urls.length) ? c.photo_urls : (c.photo_url ? [c.photo_url] : []);
     return {
@@ -2010,10 +2010,13 @@ function renderCertDetail(id) {
 
     <div id="commentList_${c.id}" style="display:flex;flex-direction:column;gap:10px;">
       ${comments.map(cm=>`
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;" id="commentRow_${cm.id}">
           <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
           <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-            <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
+              ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deleteCertComment(${c.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+            </div>
             <div style="font-size:13px;color:#333;line-height:1.5;">${cm.text}</div>
             <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
           </div>
@@ -2060,6 +2063,22 @@ async function submitCommentFromBar() {
   });
   // 피드 카운트도 업데이트
   const feedEl=document.getElementById('feedComment_'+currentCertDetailId);
+  if(feedEl) feedEl.textContent=cnt;
+}
+async function deleteCertComment(certId, commentId) {
+  if(!confirm('이 댓글을 삭제할까요?')) return;
+  const { error } = await sb.from('cert_comments').delete().eq('id', commentId);
+  if(error){ alert('삭제 실패: '+error.message); return; }
+  const c = (state.certFeed||[]).find(x=>x.id===certId);
+  if(c) c.comments = (c.comments||[]).filter(cm=>cm.id!==commentId);
+  const row = document.getElementById('commentRow_'+commentId);
+  if(row) row.remove();
+  const cnt = c ? c.comments.length : 0;
+  ['rdCommentCount_','rdCommentCountLabel_'].forEach(pre=>{
+    const el=document.getElementById(pre+certId);
+    if(el) el.textContent=cnt;
+  });
+  const feedEl=document.getElementById('feedComment_'+certId);
   if(feedEl) feedEl.textContent=cnt;
 }
 function openRoutineDetail(id) {
@@ -2345,8 +2364,14 @@ function closeCertSuccess() {
 let commFilter='all';
 const AVATAR_COLORS=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1','#D4C5F9','#A8E0D4'];
 function _avColor(name){let h=0;for(const ch of (name||'?'))h=(h*31+ch.charCodeAt(0))>>>0;return AVATAR_COLORS[h%AVATAR_COLORS.length];}
+function _canModerate(authorId) {
+  if (!currentUser) return false;
+  if (ADMINS.includes(currentUser.email)) return true;
+  return currentUser.id === authorId;
+}
 function _postCard(p, likeFn) {
   const isNotice=p.type==='notice';
+  const canDelete=_canModerate(p.authorId);
   return `<div style="background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
       ${isNotice
@@ -2354,6 +2379,7 @@ function _postCard(p, likeFn) {
         :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
+      ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
     <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
@@ -2363,6 +2389,14 @@ function _postCard(p, likeFn) {
       </span>
     </div>
   </div>`;
+}
+async function deletePost(id) {
+  if(!confirm('이 게시글을 삭제할까요?')) return;
+  const { error } = await sb.from('posts').delete().eq('id', id);
+  if(error){ alert('삭제 실패: '+error.message); return; }
+  await loadPosts();
+  if(state.currentRole==='youth') renderComm(commFilter);
+  else kRenderReviewTab(kReviewFilter);
 }
 function renderComm(f) {
   commFilter=f;
