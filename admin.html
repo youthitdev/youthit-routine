@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>한끗루틴 · 관리자</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background:#f5f5f7; color:#111; }
@@ -49,6 +50,18 @@
   .bulk-bar button { padding:6px 14px; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
   .bulk-approve { background:#2E33BC; color:#fff; }
   .bulk-reject { background:#fff; color:#333; }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .kpi-card { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .kpi-card .kpi-label { font-size:12px; color:#888; margin-bottom:6px; }
+  .kpi-card .kpi-val { font-size:26px; font-weight:700; color:#111; }
+  .kpi-card .kpi-sub { font-size:11px; color:#aaa; margin-top:4px; }
+  .stats-grid { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:12px; margin-bottom:16px; }
+  .chart-card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .chart-card h3 { font-size:13px; font-weight:700; color:#333; margin:0 0 12px; }
+  .chart-card .chart-box { position:relative; height:220px; }
+  .chart-card .chart-empty { text-align:center; color:#aaa; font-size:12px; padding:60px 0; }
+  @media (max-width:900px) { .kpi-row { grid-template-columns:repeat(2,1fr); } .stats-grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -79,6 +92,7 @@
     <button class="tab-btn active" id="tabYouthBtn" onclick="switchTab('youth')">청소년</button>
     <button class="tab-btn" id="tabKkBtn" onclick="switchTab('kkutjjang')">끗짱</button>
     <button class="tab-btn" id="tabRoutineBtn" onclick="switchTab('routine')">루틴</button>
+    <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 통계</button>
   </div>
 
   <div class="filter-bar" id="youthFilters">
@@ -133,11 +147,34 @@
     <button class="bulk-reject" onclick="bulkAction('rejected')">일괄 반려</button>
   </div>
 
-  <div style="overflow-x:auto;">
+  <div style="overflow-x:auto;" id="tableWrap">
     <table>
       <thead id="tableHead"></thead>
       <tbody id="tableBody"></tbody>
     </table>
+  </div>
+
+  <div id="statsView" style="display:none;">
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">청소년</div><div class="kpi-val" id="kpiYouth">0</div><div class="kpi-sub" id="kpiYouthSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">끗짱</div><div class="kpi-val" id="kpiKk">0</div><div class="kpi-sub" id="kpiKkSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">진행 중 루틴</div><div class="kpi-val" id="kpiActiveRoutine">0</div><div class="kpi-sub" id="kpiRoutineSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">전체 완주율</div><div class="kpi-val" id="kpiCompletion">0%</div><div class="kpi-sub" id="kpiCompletionSub"></div></div>
+    </div>
+    <div class="stats-grid">
+      <div class="chart-card"><h3>지역별 청소년 분포</h3><div class="chart-box"><canvas id="chartRegion"></canvas><div class="chart-empty" id="chartRegionEmpty" style="display:none;">데이터가 없어요</div></div></div>
+      <div class="chart-card"><h3>재학상태 비율</h3><div class="chart-box"><canvas id="chartSchool"></canvas><div class="chart-empty" id="chartSchoolEmpty" style="display:none;">데이터가 없어요</div></div></div>
+      <div class="chart-card"><h3>루틴 상태 분포</h3><div class="chart-box"><canvas id="chartRoutineStatus"></canvas><div class="chart-empty" id="chartRoutineStatusEmpty" style="display:none;">데이터가 없어요</div></div></div>
+    </div>
+    <div class="chart-card">
+      <h3>루틴별 완주율</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>루틴</th><th>상태</th><th>기간</th><th>참여인원</th><th>완주 인원</th><th>완주율</th></tr></thead>
+          <tbody id="routineCompletionBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -172,6 +209,8 @@ let currentTab = 'youth';
 let youthRows = [], kkRows = [], routineRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
+let rawParticipants = [], rawCerts = [];
+let charts = {};
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -221,14 +260,17 @@ const STATUS_CLASS = { approved: 'pill-approved', pending: 'pill-pending', rejec
 
 async function loadData() {
   document.getElementById('tableBody').innerHTML = '<tr class="empty-row"><td colspan="10">불러오는 중...</td></tr>';
-  const [profRes, rpRes, routRes] = await Promise.all([
+  const [profRes, rpRes, routRes, certRes] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status'),
     sb.from('routines').select('id,title,status,start_date,end_date,max_people,archived,led_by,created_by'),
+    sb.from('certifications').select('routine_id,user_id'),
   ]);
   const profiles = profRes.data || [];
   const rps = rpRes.data || [];
   const routines = routRes.data || [];
+  rawParticipants = rps;
+  rawCerts = certRes.data || [];
   const nameById = {};
   profiles.forEach(p => nameById[p.id] = p.name);
   const routineTitleById = {};
@@ -273,11 +315,16 @@ function switchTab(tab) {
   document.getElementById('tabYouthBtn').classList.toggle('active', tab === 'youth');
   document.getElementById('tabKkBtn').classList.toggle('active', tab === 'kkutjjang');
   document.getElementById('tabRoutineBtn').classList.toggle('active', tab === 'routine');
+  document.getElementById('tabStatsBtn').classList.toggle('active', tab === 'stats');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
+  document.getElementById('tableWrap').style.display = tab === 'stats' ? 'none' : 'block';
+  document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
+  document.getElementById('bulkBar').style.display = 'none';
   sortKey = null;
-  renderTable();
+  if (tab === 'stats') renderStatsView();
+  else renderTable();
 }
 
 function _filteredYouth() {
@@ -375,6 +422,114 @@ async function deleteRoutineAdmin(id, title) {
   const { error } = await sb.from('routines').delete().eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
   await loadData();
+}
+
+function _routineDayCount(start, end) {
+  if (!start || !end) return 21;
+  const s = new Date(start + 'T00:00:00').getTime(), e = new Date(end + 'T00:00:00').getTime();
+  if (e <= s) return 21;
+  return Math.round((e - s) / 86400000) + 1;
+}
+function computeRoutineCompletion() {
+  const certByRoutineUser = {};
+  rawCerts.forEach(c => {
+    const key = c.routine_id + '_' + c.user_id;
+    certByRoutineUser[key] = (certByRoutineUser[key] || 0) + 1;
+  });
+  return routineRows.filter(r => !r.archived && (r.status === 'active' || r.status === 'done')).map(r => {
+    const approvedUserIds = rawParticipants.filter(p => p.routine_id === r.id && p.status === 'approved').map(p => p.user_id);
+    const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
+    const achievers = approvedUserIds.filter(uid => (certByRoutineUser[r.id + '_' + uid] || 0) >= certGoal).length;
+    const rate = approvedUserIds.length ? Math.round(achievers / approvedUserIds.length * 100) : 0;
+    return { id: r.id, title: r.title, status: r.status, period: `${r.startDate || '-'} ~ ${r.endDate || '-'}`, approvedCount: approvedUserIds.length, achievers, rate };
+  });
+}
+function toggleChartEmpty(id, isEmpty) {
+  document.getElementById(id).style.display = isEmpty ? 'none' : 'block';
+  const empty = document.getElementById(id + 'Empty');
+  if (empty) empty.style.display = isEmpty ? 'block' : 'none';
+}
+function renderRegionChart() {
+  const counts = {};
+  youthRows.forEach(r => { const key = r.sido || '미입력'; counts[key] = (counts[key] || 0) + 1; });
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  toggleChartEmpty('chartRegion', entries.length === 0);
+  if (!entries.length) return;
+  if (charts.region) charts.region.destroy();
+  charts.region = new Chart(document.getElementById('chartRegion'), {
+    type: 'bar',
+    data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: '#2E33BC', borderRadius: 6, maxBarThickness: 28 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, maintainAspectRatio: false },
+  });
+}
+function renderSchoolChart() {
+  const counts = { out_of_school: 0, enrolled: 0, alternative: 0, none: 0 };
+  youthRows.forEach(r => { const k = r.schoolStatus || 'none'; counts[k] = (counts[k] || 0) + 1; });
+  const labels = ['학교 밖 청소년', '재학 중', '대안학교', '미입력'];
+  const data = [counts.out_of_school, counts.enrolled, counts.alternative, counts.none];
+  toggleChartEmpty('chartSchool', data.reduce((a, b) => a + b, 0) === 0);
+  if (!data.reduce((a, b) => a + b, 0)) return;
+  if (charts.school) charts.school.destroy();
+  charts.school = new Chart(document.getElementById('chartSchool'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: ['#2E33BC', '#83CA00', '#FAC775', '#ddd'] }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, maintainAspectRatio: false },
+  });
+}
+function renderRoutineStatusChart() {
+  const notArchived = routineRows.filter(r => !r.archived);
+  const counts = { recruit: 0, active: 0, done: 0 };
+  notArchived.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+  const archivedCount = routineRows.filter(r => r.archived).length;
+  const labels = ['모집 중', '진행 중', '완료', '보관됨'];
+  const data = [counts.recruit, counts.active, counts.done, archivedCount];
+  toggleChartEmpty('chartRoutineStatus', data.reduce((a, b) => a + b, 0) === 0);
+  if (!data.reduce((a, b) => a + b, 0)) return;
+  if (charts.routineStatus) charts.routineStatus.destroy();
+  charts.routineStatus = new Chart(document.getElementById('chartRoutineStatus'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: ['#F7C948', '#2E33BC', '#83CA00', '#ccc'] }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, maintainAspectRatio: false },
+  });
+}
+function renderCompletionTable(list) {
+  const body = document.getElementById('routineCompletionBody');
+  const sorted = [...list].sort((a, b) => b.rate - a.rate);
+  body.innerHTML = sorted.length ? sorted.map(c => `
+    <tr>
+      <td>${c.title}</td>
+      <td><span class="pill" style="background:${c.status === 'active' ? '#E6F1FB' : '#f0f0f0'};color:${c.status === 'active' ? '#185FA5' : '#aaa'};">${R_STATUS_LABEL[c.status] || c.status}</span></td>
+      <td>${c.period}</td>
+      <td>${c.approvedCount}명</td>
+      <td>${c.achievers}명</td>
+      <td>${c.rate}%</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="6">진행 중·완료된 루틴이 없어요</td></tr>`;
+}
+function renderStatsView() {
+  const verifiedYouth = youthRows.filter(r => r.verifyStatus === 'approved').length;
+  const approvedKk = kkRows.filter(r => r.status === 'approved').length;
+  const activeRoutines = routineRows.filter(r => r.status === 'active' && !r.archived);
+  const doneRoutines = routineRows.filter(r => r.status === 'done' && !r.archived);
+  const recruitRoutines = routineRows.filter(r => r.status === 'recruit' && !r.archived);
+
+  document.getElementById('kpiYouth').textContent = `${youthRows.length}명`;
+  document.getElementById('kpiYouthSub').textContent = `서류승인 ${verifiedYouth}명`;
+  document.getElementById('kpiKk').textContent = `${kkRows.length}명`;
+  document.getElementById('kpiKkSub').textContent = `승인 ${approvedKk}명`;
+  document.getElementById('kpiActiveRoutine').textContent = `${activeRoutines.length}개`;
+  document.getElementById('kpiRoutineSub').textContent = `완료 ${doneRoutines.length}개 · 모집중 ${recruitRoutines.length}개`;
+
+  const completion = computeRoutineCompletion();
+  const totalApproved = completion.reduce((s, c) => s + c.approvedCount, 0);
+  const totalAchievers = completion.reduce((s, c) => s + c.achievers, 0);
+  const overallRate = totalApproved ? Math.round(totalAchievers / totalApproved * 100) : 0;
+  document.getElementById('kpiCompletion').textContent = `${overallRate}%`;
+  document.getElementById('kpiCompletionSub').textContent = `진행중·완료 루틴 ${completion.length}개 기준`;
+
+  renderRegionChart();
+  renderSchoolChart();
+  renderRoutineStatusChart();
+  renderCompletionTable(completion);
 }
 
 function renderYouthTable() {
