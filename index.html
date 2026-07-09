@@ -1296,14 +1296,20 @@ async function loadRoutines() {
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   const today = new Date().toISOString().slice(0, 10);
+  const isAdmin = currentUser ? ADMINS.includes(currentUser.email) : false;
   state.routines = routines.map(r => {
     const rParts = parts.filter(p => p.routine_id === r.id);
     const rCerts = certs.filter(c => c.routine_id === r.id);
     const approved = rParts.filter(p => p.status === 'approved');
     const certOf = uid => rCerts.filter(c => c.user_id === uid).length;
     const doneToday = uid => rCerts.some(c => c.user_id === uid && (c.created_at || '').slice(0, 10) === today);
+    // 종료일이 지난 진행중 루틴은 완주로 간주 (날짜 기반 자동 전환)
+    const effectiveStatus = (r.status === 'active' && r.end_date && r.end_date < today) ? 'done' : r.status;
+    if (effectiveStatus !== r.status && currentUser && (isAdmin || r.created_by === currentUser.id || r.led_by === currentUser.id)) {
+      sb.from('routines').update({ status: effectiveStatus }).eq('id', r.id).then(() => {});
+    }
     return {
-      id: r.id, status: r.status, title: r.title, emoji: r.emoji || '🌱',
+      id: r.id, status: effectiveStatus, title: r.title, emoji: r.emoji || '🌱',
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       people: approved.length, maxPeople: r.max_people || 10,
