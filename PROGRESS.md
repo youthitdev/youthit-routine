@@ -66,7 +66,7 @@
    - 디버깅용: 발송 시도 로그는 `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 5;`
    - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
    - 주의사항: SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 꼭 확인**(다른 프로젝트 approval에 실행한 사고 있었음 — 그쪽 push_subscriptions 테이블 DROP 필요). iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+), 집중 모드 중엔 배너 없이 알림 센터에만 쌓임. 새 테이블 만들면 API 스키마 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음
-2. **화면 새로고침 문제** — 승인/변경 후 다른 화면(청소년 쪽 등)에 자동 반영이 안 됨(2026-07-10 사용자 보고, 재현 화면 특정 필요 — 앱이 열 때 한 번만 데이터를 불러오는 구조라 실시간 반영이 없음)
+2. ~~화면 새로고침 문제~~ — ✅ 완료 (2026-07-10). 앱이 백그라운드→포그라운드로 돌아올 때(`visibilitychange`/`focus`) `loadRoutines/loadPosts/loadCertFeed`를 자동 재실행하고 현재 탭을 다시 렌더링. 8초 디바운스로 과도한 재조회 방지. 단, 여전히 실시간(Supabase Realtime)은 아니라서 앱을 계속 켜놓은 채 화면을 안 벗어나면 반영 안 됨 — 필요해지면 Realtime 구독 고려
 3. ~~아이폰(PWA) 화면 잘림 수정~~ — ✅ 완료 (safe-area 대응, 2026-07-10)
 4. 카테고리 필터 활성화 — 지금 루틴 태그가 전부 `생활`로 고정, 실제 카테고리 선택 기능 필요
 5. OT 때 "함께 인증" 실습 모드 — 첫날 줌에서 다 같이 인증 폼 작성해보기
