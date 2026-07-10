@@ -93,6 +93,7 @@
     <button class="tab-btn" id="tabKkBtn" onclick="switchTab('kkutjjang')">끗짱</button>
     <button class="tab-btn" id="tabRoutineBtn" onclick="switchTab('routine')">루틴</button>
     <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 통계</button>
+    <button class="tab-btn" id="tabNotifyBtn" onclick="switchTab('notify')">🔔 알림 보내기</button>
   </div>
 
   <div class="filter-bar" id="youthFilters">
@@ -174,6 +175,39 @@
           <tbody id="routineCompletionBody"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div id="notifyView" style="display:none;max-width:560px;">
+    <div class="chart-card">
+      <h3>🔔 푸시 알림 보내기</h3>
+      <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:16px;">알림을 켜둔 사용자에게만 전달돼요. 앱을 안 열어봤거나 알림을 끈 사용자에게는 가지 않아요.</div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">보낼 대상</div>
+        <select id="notifyTarget" onchange="onNotifyTargetChange()" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <option value="all">전체 구독자</option>
+          <option value="routine">특정 루틴 참여자(승인됨)</option>
+        </select>
+      </div>
+
+      <div id="notifyRoutineWrap" style="margin-bottom:14px;display:none;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">루틴 선택</div>
+        <select id="notifyRoutine" onchange="onNotifyTargetChange()" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;"></select>
+        <div id="notifyRoutineHint" style="font-size:11px;color:#aaa;margin-top:6px;"></div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">제목</div>
+        <input type="text" id="notifyTitle" maxlength="60" placeholder="예: 오늘 저녁 8시 클로징 모임이 있어요!" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">내용 (선택)</div>
+        <textarea id="notifyBody" maxlength="200" rows="3" placeholder="알림을 눌렀을 때 보일 짧은 설명" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+      </div>
+
+      <button id="notifySendBtn" onclick="sendBroadcast()" style="width:100%;padding:12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">📨 발송하기</button>
+      <div id="notifyResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
     </div>
   </div>
 </div>
@@ -316,14 +350,17 @@ function switchTab(tab) {
   document.getElementById('tabKkBtn').classList.toggle('active', tab === 'kkutjjang');
   document.getElementById('tabRoutineBtn').classList.toggle('active', tab === 'routine');
   document.getElementById('tabStatsBtn').classList.toggle('active', tab === 'stats');
+  document.getElementById('tabNotifyBtn').classList.toggle('active', tab === 'notify');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
-  document.getElementById('tableWrap').style.display = tab === 'stats' ? 'none' : 'block';
+  document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify') ? 'none' : 'block';
   document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
+  document.getElementById('notifyView').style.display = tab === 'notify' ? 'block' : 'none';
   document.getElementById('bulkBar').style.display = 'none';
   sortKey = null;
   if (tab === 'stats') renderStatsView();
+  else if (tab === 'notify') renderNotifyView();
   else renderTable();
 }
 
@@ -530,6 +567,60 @@ function renderStatsView() {
   renderSchoolChart();
   renderRoutineStatusChart();
   renderCompletionTable(completion);
+}
+
+function renderNotifyView() {
+  const sel = document.getElementById('notifyRoutine');
+  const notArchived = routineRows.filter(r => !r.archived);
+  sel.innerHTML = notArchived.length
+    ? notArchived.map(r => `<option value="${r.id}">${r.title} (참여 ${r.people}명)</option>`).join('')
+    : '<option value="">루틴이 없어요</option>';
+  onNotifyTargetChange();
+  document.getElementById('notifyResult').textContent = '';
+}
+function onNotifyTargetChange() {
+  const target = document.getElementById('notifyTarget').value;
+  document.getElementById('notifyRoutineWrap').style.display = target === 'routine' ? 'block' : 'none';
+  if (target === 'routine') {
+    const r = routineRows.find(x => x.id === Number(document.getElementById('notifyRoutine').value));
+    document.getElementById('notifyRoutineHint').textContent = r ? `승인된 참여자 ${r.people}명 중, 알림을 켜둔 사람에게만 전달돼요.` : '';
+  }
+}
+async function sendBroadcast() {
+  const target = document.getElementById('notifyTarget').value;
+  const title = document.getElementById('notifyTitle').value.trim();
+  const body = document.getElementById('notifyBody').value.trim();
+  const resultEl = document.getElementById('notifyResult');
+  if (!title) { alert('제목을 입력해주세요.'); return; }
+
+  const payload = { title, body };
+  let confirmMsg;
+  if (target === 'all') {
+    payload.target = 'all';
+    confirmMsg = '전체 구독자에게 알림을 보낼까요?';
+  } else {
+    const routineId = document.getElementById('notifyRoutine').value;
+    if (!routineId) { alert('루틴을 선택해주세요.'); return; }
+    payload.target = 'routine';
+    payload.routine_id = Number(routineId);
+    const r = routineRows.find(x => x.id === Number(routineId));
+    confirmMsg = `"${r ? r.title : ''}" 참여자에게 알림을 보낼까요?`;
+  }
+  if (!confirm(confirmMsg)) return;
+
+  const btn = document.getElementById('notifySendBtn');
+  btn.disabled = true; btn.textContent = '발송 중...';
+  resultEl.style.color = '#888';
+  resultEl.textContent = '발송 중이에요...';
+  const { data, error } = await sb.functions.invoke('send-push', { body: payload });
+  btn.disabled = false; btn.textContent = '📨 발송하기';
+  if (error) {
+    resultEl.style.color = '#c00';
+    resultEl.textContent = '발송 실패: ' + error.message;
+    return;
+  }
+  resultEl.style.color = '#3B6D11';
+  resultEl.textContent = `발송 완료 — 성공 ${data.sent}명 · 만료 구독 정리 ${data.removed}건 · 실패 ${data.failed}건 (대상 ${data.total}명)`;
 }
 
 function renderYouthTable() {

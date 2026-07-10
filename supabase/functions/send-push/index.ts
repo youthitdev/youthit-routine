@@ -1,5 +1,5 @@
 // 한끗루틴 Web Push 발송 Edge Function
-// 호출: POST { user_id | user_ids, title, body?, url? }
+// 호출: POST { user_id | user_ids | (target:'all') | (target:'routine', routine_id), title, body?, url? }
 // 권한: 관리자 계정 JWT 또는 service_role 키만 발송 가능
 //   (anon 키는 클라이언트에 공개돼 있어, 그것만으로 발송을 허용하면
 //    누구나 임의 사용자에게 푸시를 보낼 수 있음)
@@ -51,21 +51,39 @@ Deno.serve(async (req) => {
     }
   }
 
-  let body: { user_id?: string; user_ids?: string[]; title?: string; body?: string; url?: string };
+  let body: {
+    user_id?: string; user_ids?: string[]; target?: "all" | "routine"; routine_id?: number;
+    title?: string; body?: string; url?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return json(400, { error: "JSON 본문이 필요해요" });
   }
-  const targets = body.user_ids ?? (body.user_id ? [body.user_id] : null);
-  if (!targets?.length || !body.title) {
-    return json(400, { error: "user_id(또는 user_ids)와 title은 필수예요" });
-  }
+  if (!body.title) return json(400, { error: "title은 필수예요" });
 
-  const { data: subs, error: subErr } = await supabase
-    .from("push_subscriptions")
-    .select("id,endpoint,p256dh,auth")
-    .in("user_id", targets);
+  let subs: { id: number; endpoint: string; p256dh: string; auth: string }[] | null = null;
+  let subErr: { message: string } | null = null;
+
+  if (body.target === "all") {
+    ({ data: subs, error: subErr } = await supabase
+      .from("push_subscriptions").select("id,endpoint,p256dh,auth"));
+  } else if (body.target === "routine") {
+    if (!body.routine_id) return json(400, { error: "routine_id가 필요해요" });
+    const { data: approved, error: rpErr } = await supabase
+      .from("routine_participants").select("user_id")
+      .eq("routine_id", body.routine_id).eq("status", "approved");
+    if (rpErr) return json(500, { error: rpErr.message });
+    const ids = (approved ?? []).map((p) => p.user_id);
+    ({ data: subs, error: subErr } = ids.length
+      ? await supabase.from("push_subscriptions").select("id,endpoint,p256dh,auth").in("user_id", ids)
+      : { data: [], error: null });
+  } else {
+    const targets = body.user_ids ?? (body.user_id ? [body.user_id] : null);
+    if (!targets?.length) return json(400, { error: "user_id·user_ids 또는 target이 필요해요" });
+    ({ data: subs, error: subErr } = await supabase
+      .from("push_subscriptions").select("id,endpoint,p256dh,auth").in("user_id", targets));
+  }
   if (subErr) return json(500, { error: subErr.message });
 
   const payload = JSON.stringify({
