@@ -171,13 +171,12 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">루틴별 완주율</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <select id="statsRoutineSel" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:#fff;"></select>
-          <button class="export-btn" onclick="exportRoutineMonitoringCSV()">📥 루틴별 CSV</button>
+          <button class="export-btn" onclick="exportRoutineMonitoringCSV()">📥 체크한 루틴 CSV</button>
         </div>
       </div>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>루틴</th><th>상태</th><th>기간</th><th>참여인원</th><th>완주 인원</th><th>완주율</th></tr></thead>
+          <thead><tr><th style="width:24px;"><input type="checkbox" id="statsCheckAll" onchange="toggleAllStatsRoutines(this)"></th><th>루틴</th><th>상태</th><th>기간</th><th>참여인원</th><th>완주 인원</th><th>완주율</th></tr></thead>
           <tbody id="routineCompletionBody"></tbody>
         </table>
       </div>
@@ -548,18 +547,36 @@ function renderRoutineStatusChart() {
     options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, maintainAspectRatio: false },
   });
 }
+let statsSelectedRoutines = new Set();
+let _lastCompletionList = [];
 function renderCompletionTable(list) {
+  _lastCompletionList = list;
   const body = document.getElementById('routineCompletionBody');
   const sorted = [...list].sort((a, b) => b.rate - a.rate);
   body.innerHTML = sorted.length ? sorted.map(c => `
     <tr>
+      <td><input type="checkbox" onchange="toggleStatsRoutine(${c.id},this)" ${statsSelectedRoutines.has(c.id)?'checked':''}></td>
       <td>${c.title}</td>
       <td><span class="pill" style="background:${c.status === 'active' ? '#E6F1FB' : '#f0f0f0'};color:${c.status === 'active' ? '#185FA5' : '#aaa'};">${R_STATUS_LABEL[c.status] || c.status}</span></td>
       <td>${c.period}</td>
       <td>${c.approvedCount}명</td>
       <td>${c.achievers}명</td>
       <td>${c.rate}%</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="6">진행 중·완료된 루틴이 없어요</td></tr>`;
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="7">진행 중·완료된 루틴이 없어요</td></tr>`;
+  _syncStatsCheckAll();
+}
+function toggleStatsRoutine(id, el) {
+  if (el.checked) statsSelectedRoutines.add(id); else statsSelectedRoutines.delete(id);
+  _syncStatsCheckAll();
+}
+function toggleAllStatsRoutines(el) {
+  if (el.checked) _lastCompletionList.forEach(c => statsSelectedRoutines.add(c.id));
+  else _lastCompletionList.forEach(c => statsSelectedRoutines.delete(c.id));
+  renderCompletionTable(_lastCompletionList);
+}
+function _syncStatsCheckAll() {
+  const all = document.getElementById('statsCheckAll');
+  if (all) all.checked = _lastCompletionList.length > 0 && _lastCompletionList.every(c => statsSelectedRoutines.has(c.id));
 }
 function renderStatsView() {
   const verifiedYouth = youthRows.filter(r => r.verifyStatus === 'approved').length;
@@ -586,26 +603,39 @@ function renderStatsView() {
   renderSchoolChart();
   renderRoutineStatusChart();
   renderCompletionTable(completion);
-
-  const rsel = document.getElementById('statsRoutineSel');
-  const selectable = routineRows.filter(r => !r.archived);
-  rsel.innerHTML = selectable.length
-    ? selectable.map(r => `<option value="${r.id}">${r.title}</option>`).join('')
-    : '<option value="">루틴 없음</option>';
 }
 
-// 루틴 하나를 골라 "참가자 × 날짜" 출석부 형태로 내보내기 (일별 인증 체크 + 합계)
+// 체크한 루틴들의 "참가자 × 날짜" 출석부 내보내기 (일별 인증 체크 + 합계)
 function _localDayKey(d) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 function exportRoutineMonitoringCSV() {
-  const id = Number(document.getElementById('statsRoutineSel').value);
+  const ids = [...statsSelectedRoutines];
+  if (!ids.length) { alert('내보낼 루틴을 표에서 체크해주세요.'); return; }
+  const rows = [];
+  let exported = 0;
+  ids.forEach(id => {
+    const section = _monitoringSection(id);
+    if (!section) return;
+    if (exported > 0) rows.push([]); // 루틴 사이 빈 줄
+    rows.push(...section);
+    exported++;
+  });
+  if (!exported) { alert('체크한 루틴에 승인된 참여자가 없어요.'); return; }
+  const label = exported === 1
+    ? `모니터링_${routineRows.find(x => x.id === ids[0])?.title || ''}`
+    : `모니터링_루틴${exported}개`;
+  _downloadCSVRows(label, rows);
+}
+
+// 한 루틴의 출석부 행들(제목 행 + 헤더 + 참가자 행)을 만들어 반환. 참여자 없으면 null.
+function _monitoringSection(id) {
   const r = routineRows.find(x => x.id === id);
-  if (!r) { alert('루틴을 선택해주세요.'); return; }
+  if (!r) return null;
 
   const members = rawParticipants.filter(p => p.routine_id === id && p.status === 'approved');
-  if (!members.length) { alert('이 루틴에는 승인된 참여자가 없어요.'); return; }
+  if (!members.length) return null;
 
   const certs = rawCerts.filter(c => c.routine_id === id);
   // 날짜 컬럼: 루틴 기간과 실제 인증 날짜를 모두 포함하는 범위
@@ -638,7 +668,7 @@ function exportRoutineMonitoringCSV() {
     const total = certCountBy[m.user_id] || 0;
     return [prof.name, prof.realName, ...dates.map(d => days.has(d) ? '✓' : ''), total, goal, total >= goal ? 'O' : ''];
   });
-  _downloadCSV(`모니터링_${r.title}`, headers, lines);
+  return [[`[${r.title}] ${r.startDate || '-'} ~ ${r.endDate || '-'}`], headers, ...lines];
 }
 
 let notifyTemplates = [];
@@ -825,8 +855,8 @@ async function bulkAction(status) {
   await loadData();
 }
 
-function _downloadCSV(label, headers, lines) {
-  const csv = [headers, ...lines].map(row => row.map(v => `"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+function _downloadCSVRows(label, rows) {
+  const csv = rows.map(row => row.map(v => `"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -834,6 +864,7 @@ function _downloadCSV(label, headers, lines) {
   a.click();
   URL.revokeObjectURL(url);
 }
+function _downloadCSV(label, headers, lines) { _downloadCSVRows(label, [headers, ...lines]); }
 
 function exportCSV(tab) {
   const rows = tab === 'youth' ? sortRows(_filteredYouth()) : sortRows(_filteredKk());
