@@ -168,7 +168,13 @@
       <div class="chart-card"><h3>루틴 상태 분포</h3><div class="chart-box"><canvas id="chartRoutineStatus"></canvas><div class="chart-empty" id="chartRoutineStatusEmpty" style="display:none;">데이터가 없어요</div></div></div>
     </div>
     <div class="chart-card">
-      <h3>루틴별 완주율</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="margin:0;">루틴별 완주율</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="export-btn" onclick="exportStatsCSV('routine')">📥 루틴별 CSV</button>
+          <button class="export-btn" onclick="exportStatsCSV('participant')">📥 참가자별 CSV</button>
+        </div>
+      </div>
       <div style="overflow-x:auto;">
         <table>
           <thead><tr><th>루틴</th><th>상태</th><th>기간</th><th>참여인원</th><th>완주 인원</th><th>완주율</th></tr></thead>
@@ -182,6 +188,16 @@
     <div class="chart-card">
       <h3>🔔 푸시 알림 보내기</h3>
       <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:16px;">알림을 켜둔 사용자에게만 전달돼요. 앱을 안 열어봤거나 알림을 끈 사용자에게는 가지 않아요.</div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">저장된 메시지</div>
+        <div style="display:flex;gap:8px;">
+          <select id="notifyTemplate" onchange="applyTemplate()" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+            <option value="">직접 입력</option>
+          </select>
+          <button onclick="deleteTemplate()" title="선택한 메시지 삭제" style="padding:9px 12px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:12px;cursor:pointer;">🗑</button>
+        </div>
+      </div>
 
       <div style="margin-bottom:14px;">
         <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">보낼 대상</div>
@@ -207,6 +223,7 @@
       </div>
 
       <button id="notifySendBtn" onclick="sendBroadcast()" style="width:100%;padding:12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">📨 발송하기</button>
+      <button onclick="saveTemplate()" style="width:100%;padding:10px;margin-top:8px;background:#fff;color:#2E33BC;border:1px solid #2E33BC;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">💾 현재 제목·내용을 저장해두기</button>
       <div id="notifyResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
     </div>
   </div>
@@ -569,6 +586,7 @@ function renderStatsView() {
   renderCompletionTable(completion);
 }
 
+let notifyTemplates = [];
 function renderNotifyView() {
   const sel = document.getElementById('notifyRoutine');
   const notArchived = routineRows.filter(r => !r.archived);
@@ -577,6 +595,46 @@ function renderNotifyView() {
     : '<option value="">루틴이 없어요</option>';
   onNotifyTargetChange();
   document.getElementById('notifyResult').textContent = '';
+  loadTemplates();
+}
+async function loadTemplates() {
+  const { data, error } = await sb.from('notify_templates').select('id,title,body').order('created_at', { ascending: false });
+  const sel = document.getElementById('notifyTemplate');
+  if (error) { // 테이블이 아직 없으면(마이그레이션 전) 드롭다운만 비활성화
+    sel.innerHTML = '<option value="">직접 입력 (저장 기능은 마이그레이션 후 사용 가능)</option>';
+    notifyTemplates = [];
+    return;
+  }
+  notifyTemplates = data || [];
+  sel.innerHTML = '<option value="">직접 입력</option>' +
+    notifyTemplates.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+}
+function applyTemplate() {
+  const id = document.getElementById('notifyTemplate').value;
+  const t = notifyTemplates.find(x => String(x.id) === id);
+  if (!t) return;
+  document.getElementById('notifyTitle').value = t.title;
+  document.getElementById('notifyBody').value = t.body || '';
+}
+async function saveTemplate() {
+  const title = document.getElementById('notifyTitle').value.trim();
+  const body = document.getElementById('notifyBody').value.trim();
+  if (!title) { alert('저장할 제목을 먼저 입력해주세요.'); return; }
+  if (notifyTemplates.some(t => t.title === title && (t.body || '') === body)) { alert('이미 같은 내용이 저장돼 있어요.'); return; }
+  const { error } = await sb.from('notify_templates').insert({ title, body: body || null });
+  if (error) { alert('저장 실패: ' + error.message); return; }
+  await loadTemplates();
+  alert('저장했어요. 다음부터 "저장된 메시지"에서 불러올 수 있어요.');
+}
+async function deleteTemplate() {
+  const sel = document.getElementById('notifyTemplate');
+  const id = sel.value;
+  if (!id) { alert('삭제할 저장된 메시지를 먼저 선택해주세요.'); return; }
+  const t = notifyTemplates.find(x => String(x.id) === id);
+  if (!confirm(`"${t ? t.title : ''}" 메시지를 삭제할까요?`)) return;
+  const { error } = await sb.from('notify_templates').delete().eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  await loadTemplates();
 }
 function onNotifyTargetChange() {
   const target = document.getElementById('notifyTarget').value;
@@ -712,6 +770,16 @@ async function bulkAction(status) {
   await loadData();
 }
 
+function _downloadCSV(label, headers, lines) {
+  const csv = [headers, ...lines].map(row => row.map(v => `"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `한끗루틴_${label}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function exportCSV(tab) {
   const rows = tab === 'youth' ? sortRows(_filteredYouth()) : sortRows(_filteredKk());
   let headers, lines;
@@ -722,13 +790,39 @@ function exportCSV(tab) {
     headers = ['닉네임','실명','휴대폰','시도','시군구','승인상태','가입일'];
     lines = rows.map(r => [r.name, r.realName, r.phone, r.sido, r.sigugun, STATUS_LABEL[r.status]||'', (r.createdAt||'').slice(0,10)]);
   }
-  const csv = [headers, ...lines].map(row => row.map(v => `"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `한끗루틴_${tab==='youth'?'청소년':'끗짱'}_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  _downloadCSV(tab==='youth'?'청소년':'끗짱', headers, lines);
+}
+
+function exportStatsCSV(kind) {
+  if (kind === 'routine') {
+    const list = computeRoutineCompletion();
+    _downloadCSV('루틴별완주율',
+      ['루틴','상태','기간','참여인원','완주인원','완주율(%)'],
+      list.map(c => [c.title, R_STATUS_LABEL[c.status]||c.status, c.period, c.approvedCount, c.achievers, c.rate]));
+    return;
+  }
+  // 참가자별 집계: 승인된 참여 기준, 완주 기준은 루틴별 완주율과 동일(기간의 2/3 이상 인증)
+  const certCountBy = {}; // 'routineId_userId' → 인증 수
+  const totalCertsBy = {}; // userId → 전체 인증 수
+  rawCerts.forEach(c => {
+    certCountBy[c.routine_id + '_' + c.user_id] = (certCountBy[c.routine_id + '_' + c.user_id] || 0) + 1;
+    totalCertsBy[c.user_id] = (totalCertsBy[c.user_id] || 0) + 1;
+  });
+  const routineById = {};
+  routineRows.forEach(r => routineById[r.id] = r);
+  const lines = youthRows.map(y => {
+    const my = rawParticipants.filter(p => p.user_id === y.id && p.status === 'approved');
+    let completed = 0;
+    my.forEach(p => {
+      const r = routineById[p.routine_id]; if (!r) return;
+      const goal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
+      if ((certCountBy[p.routine_id + '_' + y.id] || 0) >= goal) completed++;
+    });
+    return [y.name, y.realName, my.length, my.map(p => routineById[p.routine_id]?.title || '').filter(Boolean).join('|'), totalCertsBy[y.id] || 0, completed];
+  });
+  _downloadCSV('참가자별집계',
+    ['닉네임','실명','참여 루틴 수','참여 루틴명','총 인증 수','완주 루틴 수'],
+    lines);
 }
 
 (async function init() {

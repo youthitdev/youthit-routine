@@ -670,3 +670,20 @@ DROP TRIGGER IF EXISTS trg_cert_comment_push ON cert_comments;
 CREATE TRIGGER trg_cert_comment_push
   AFTER INSERT ON cert_comments
   FOR EACH ROW EXECUTE FUNCTION on_cert_comment_push();
+
+-- =====================================================
+-- [마이그레이션 2026-07-10b] 알림 메시지 템플릿
+-- admin.html "알림 보내기" 탭에서 자주 쓰는 제목/내용을 저장해두고
+-- 드롭다운으로 불러 쓰는 용도. 관리자만 읽기/쓰기 가능.
+-- =====================================================
+CREATE TABLE notify_templates (
+  id          bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  title       text NOT NULL,
+  body        text,
+  created_at  timestamptz DEFAULT now()
+);
+
+ALTER TABLE notify_templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "nt_select" ON notify_templates FOR SELECT USING (is_admin());
+CREATE POLICY "nt_insert" ON notify_templates FOR INSERT WITH CHECK (is_admin());
+CREATE POLICY "nt_delete" ON notify_templates FOR DELETE USING (is_admin());
