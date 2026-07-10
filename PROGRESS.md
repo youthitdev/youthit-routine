@@ -60,12 +60,12 @@
 
 ## 남은 작업 (우선순위순)
 
-1. **알림 인프라 (Web Push) — ✅ 1·2단계 완료 (2026-07-10 승인 알림 아이폰 수신 실증됨)**
-   - 로드맵: ~~①구독+테스트 발송 파이프라인~~ → ~~②트리거 연결(참여 승인/거절, 좋아요, 댓글)~~ → **③관리자 수동 공지 발송 ← 다음**(admin.html에 "알림 보내기" 탭: 대상 전체/루틴별 선택 + 제목/내용 입력 → 관리자 JWT로 send-push 호출. 함수에 전체 발송(broadcast) 옵션 추가 필요) → ④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러)
-   - 구축된 것: `push_subscriptions` 테이블+RLS, `send-push` Edge Function(관리자 JWT 또는 service 키만 발송, 만료 구독 자동 정리), VAPID 시크릿, 마이페이지 "알림 설정" 토글, service-worker.js push/notificationclick 핸들러(캐시 v4), **DB 트리거 3종**(마이그레이션 2026-07-10: 참여 승인/거절→`notify_push()`, 인증 좋아요/댓글→작성자 알림) — pg_net으로 send-push를 비동기 호출, 키는 Vault(`sr_key_for_push`)에 보관
-   - 발송 방법(재사용): `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids", "title", "body", "url"}`. DB에서 직접 보낼 땐 `SELECT notify_push(user_id, title, body);`
-   - 디버깅용: 발송 시도 로그는 `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 5;`
-   - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
+1. **알림 인프라 (Web Push) — ✅ 1·2·3단계 완료 (2026-07-10, 관리자 알림 보내기까지 실기기 검증됨)**
+   - 로드맵: ~~①구독+테스트 발송 파이프라인~~ → ~~②트리거 연결(참여 승인/거절, 좋아요, 댓글)~~ → ~~③관리자 수동 공지 발송~~ → **④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러) ← 다음**
+   - 구축된 것: `push_subscriptions` 테이블+RLS, `send-push` Edge Function(관리자 JWT 또는 service 키만 발송, 만료 구독 자동 정리, `user_id`/`user_ids`/`target:'all'`/`target:'routine'+routine_id` 지원, CORS 헤더 포함), VAPID 시크릿, 마이페이지 "알림 설정" 토글, service-worker.js push/notificationclick 핸들러(캐시 v4), **DB 트리거 3종**(참여 승인/거절→`notify_push()`, 인증 좋아요/댓글→작성자 알림, pg_net으로 비동기 호출), **admin.html "🔔 알림 보내기" 탭**(전체/루틴별 대상 선택 + 제목·내용 입력 발송, `sb.functions.invoke` 사용)
+   - 발송 방법(재사용): `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids"|"target":"all"|{"target":"routine","routine_id":N}, "title", "body", "url"}`. DB에서 직접 보낼 땐 `SELECT notify_push(user_id, title, body);`
+   - 디버깅용: 발송 시도 로그는 `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 5;`. admin.html에서 브라우저로 함수 호출 시 CORS 헤더 필수(한 번 빠뜨려서 "Failed to send a request" 에러 났었음 — 이제 고쳐짐)
+   - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록, 새 터미널 열 때마다 `export PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"` 필요. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
    - 주의사항: SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 꼭 확인**(다른 프로젝트 approval에 실행한 사고 있었음 — 그쪽 push_subscriptions 테이블 DROP 필요). iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+), 집중 모드 중엔 배너 없이 알림 센터에만 쌓임. 새 테이블 만들면 API 스키마 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음
 2. ~~화면 새로고침 문제~~ — ✅ 완료 (2026-07-10). 앱이 백그라운드→포그라운드로 돌아올 때(`visibilitychange`/`focus`) `loadRoutines/loadPosts/loadCertFeed`를 자동 재실행하고 현재 탭을 다시 렌더링. 8초 디바운스로 과도한 재조회 방지. 단, 여전히 실시간(Supabase Realtime)은 아니라서 앱을 계속 켜놓은 채 화면을 안 벗어나면 반영 안 됨 — 필요해지면 Realtime 구독 고려
 3. ~~아이폰(PWA) 화면 잘림 수정~~ — ✅ 완료 (safe-area 대응, 2026-07-10)
