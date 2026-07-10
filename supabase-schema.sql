@@ -687,3 +687,73 @@ ALTER TABLE notify_templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "nt_select" ON notify_templates FOR SELECT USING (is_admin());
 CREATE POLICY "nt_insert" ON notify_templates FOR INSERT WITH CHECK (is_admin());
 CREATE POLICY "nt_delete" ON notify_templates FOR DELETE USING (is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-11] Web Push 4단계 — 마일스톤 축하 + 인증 리마인드
+-- ① 마일스톤: 인증 저장 시 해당 루틴 누적 인증이 5/10/15/20회면 축하 푸시 (트리거)
+-- ② 리마인드: 사용자가 고른 시간(reminder_hour, KST)에 아직 오늘 인증 전이면
+--    푸시 발송 — pg_cron이 매시 정각에 send_cert_reminders() 실행
+-- =====================================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS reminder_hour int
+  CHECK (reminder_hour >= 0 AND reminder_hour <= 23);
+
+-- ① 마일스톤 축하 트리거
+CREATE OR REPLACE FUNCTION on_cert_milestone()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_title text;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications
+   WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  IF cnt IN (5, 10, 15, 20) THEN
+    SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 ' || cnt || '번째 인증 달성!',
+      '"' || coalesce(r_title, '루틴') || '" 꾸준함이 빛나고 있어요. 계속 가봐요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cert_milestone_push ON certifications;
+CREATE TRIGGER trg_cert_milestone_push
+  AFTER INSERT ON certifications
+  FOR EACH ROW EXECUTE FUNCTION on_cert_milestone();
+
+-- ② 인증 리마인드 (pg_cron)
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+CREATE OR REPLACE FUNCTION send_cert_reminders()
+RETURNS void AS $$
+DECLARE
+  u record;
+BEGIN
+  FOR u IN
+    SELECT p.id FROM profiles p
+    WHERE p.reminder_hour = EXTRACT(hour FROM now() AT TIME ZONE 'Asia/Seoul')::int
+      -- 진행 중 루틴에 승인 참여 중인 사람만
+      AND EXISTS (
+        SELECT 1 FROM routine_participants rp
+        JOIN routines r ON r.id = rp.routine_id
+        WHERE rp.user_id = p.id AND rp.status = 'approved'
+          AND r.status = 'active' AND coalesce(r.archived, false) = false
+      )
+      -- 오늘(KST) 이미 인증했으면 제외
+      AND NOT EXISTS (
+        SELECT 1 FROM certifications c
+        WHERE c.user_id = p.id
+          AND (c.created_at AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+      )
+  LOOP
+    PERFORM notify_push(u.id, '🔔 오늘의 한끗, 잊지 않으셨죠?', '아직 오늘 인증 전이에요. 지금 한 끗 남겨봐요!');
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 매시 정각 실행 (이미 등록돼 있으면 교체)
+SELECT cron.unschedule('hankkut-cert-reminder')
+ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-cert-reminder');
+SELECT cron.schedule('hankkut-cert-reminder', '0 * * * *', 'SELECT send_cert_reminders()');

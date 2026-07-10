@@ -961,6 +961,11 @@ input:focus { outline: none; border-color: #2E33BC; }
         <button type="button" id="pushToggleBtn" onclick="togglePush()" style="width:100%;padding:13px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">🔔 알림 켜기</button>
         <div id="pushHint" style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.5;"></div>
       </div>
+      <div id="reminderWrap" style="margin-top:14px;display:none;">
+        <div class="field-label">⏰ 인증 리마인드 시간</div>
+        <select id="reminderHourSel" onchange="saveReminderHour()" style="width:100%;"></select>
+        <div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.5;">매일 이 시간까지 인증 전이면 알림으로 챙겨드려요. (알림을 켠 기기로만 와요)</div>
+      </div>
     </div>
   </div>
 
@@ -2627,7 +2632,32 @@ function openEditProfile() {
 }
 function openNotifSetting() {
   refreshPushToggle();
+  loadReminderHour();
   openSheet('notifSettingBg');
+}
+async function loadReminderHour() {
+  const wrap = document.getElementById('reminderWrap');
+  const sel = document.getElementById('reminderHourSel');
+  if (!currentUser || !_pushSupported()) { wrap.style.display = 'none'; return; }
+  if (!sel.options.length) {
+    const opts = ['<option value="">받지 않기</option>'];
+    for (let h = 6; h <= 23; h++) {
+      const label = h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`;
+      opts.push(`<option value="${h}">매일 ${label}</option>`);
+    }
+    sel.innerHTML = opts.join('');
+  }
+  wrap.style.display = '';
+  try {
+    const { data } = await sb.from('profiles').select('reminder_hour').eq('id', currentUser.id).single();
+    sel.value = (data && data.reminder_hour !== null && data.reminder_hour !== undefined) ? String(data.reminder_hour) : '';
+  } catch (e) { sel.value = ''; }
+}
+async function saveReminderHour() {
+  if (!currentUser) return;
+  const v = document.getElementById('reminderHourSel').value;
+  const { error } = await sb.from('profiles').update({ reminder_hour: v === '' ? null : Number(v) }).eq('id', currentUser.id);
+  if (error) alert('리마인드 설정 저장 실패: ' + error.message);
 }
 async function saveProfile() {
   const n=document.getElementById('editNickname').value.trim();
