@@ -19,10 +19,17 @@ webpush.setVapidDetails(
   Deno.env.get("VAPID_PRIVATE_KEY")!,
 );
 
+// admin.html(GitHub Pages)이 다른 도메인(supabase.co)의 함수를 fetch로 호출하므로
+// CORS 헤더가 없으면 브라우저가 요청 자체를 막아버림 ("Failed to send a request" 에러로 나타남)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 function json(status: number, data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
@@ -41,6 +48,7 @@ async function isServiceKey(token: string): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "POST만 지원해요" });
 
   const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
