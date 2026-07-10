@@ -168,9 +168,11 @@
       <div class="chart-card"><h3>루틴 상태 분포</h3><div class="chart-box"><canvas id="chartRoutineStatus"></canvas><div class="chart-empty" id="chartRoutineStatusEmpty" style="display:none;">데이터가 없어요</div></div></div>
     </div>
     <div class="chart-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">루틴별 완주율</h3>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="statsRoutineSel" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:#fff;"></select>
+          <button class="export-btn" onclick="exportRoutineMonitoringCSV()">📥 루틴 모니터링 CSV</button>
           <button class="export-btn" onclick="exportStatsCSV('routine')">📥 루틴별 CSV</button>
           <button class="export-btn" onclick="exportStatsCSV('participant')">📥 참가자별 CSV</button>
         </div>
@@ -261,6 +263,7 @@ let youthRows = [], kkRows = [], routineRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
 let rawParticipants = [], rawCerts = [];
+let profileById = {};
 let charts = {};
 
 async function doLogin() {
@@ -315,7 +318,7 @@ async function loadData() {
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status'),
     sb.from('routines').select('id,title,status,start_date,end_date,max_people,archived,led_by,created_by'),
-    sb.from('certifications').select('routine_id,user_id'),
+    sb.from('certifications').select('routine_id,user_id,created_at'),
   ]);
   const profiles = profRes.data || [];
   const rps = rpRes.data || [];
@@ -323,7 +326,8 @@ async function loadData() {
   rawParticipants = rps;
   rawCerts = certRes.data || [];
   const nameById = {};
-  profiles.forEach(p => nameById[p.id] = p.name);
+  profileById = {};
+  profiles.forEach(p => { nameById[p.id] = p.name; profileById[p.id] = { name: p.name, realName: p.real_name || '' }; });
   const routineTitleById = {};
   routines.forEach(r => routineTitleById[r.id] = r.title);
   const routinesByUser = {};
@@ -584,6 +588,53 @@ function renderStatsView() {
   renderSchoolChart();
   renderRoutineStatusChart();
   renderCompletionTable(completion);
+
+  const rsel = document.getElementById('statsRoutineSel');
+  const selectable = routineRows.filter(r => !r.archived);
+  rsel.innerHTML = selectable.length
+    ? selectable.map(r => `<option value="${r.id}">${r.title}</option>`).join('')
+    : '<option value="">루틴 없음</option>';
+}
+
+// 루틴 하나를 골라 "참가자 × 날짜" 출석부 형태로 내보내기 (일별 인증 체크 + 합계)
+function _localDayKey(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function exportRoutineMonitoringCSV() {
+  const id = Number(document.getElementById('statsRoutineSel').value);
+  const r = routineRows.find(x => x.id === id);
+  if (!r) { alert('루틴을 선택해주세요.'); return; }
+
+  const members = rawParticipants.filter(p => p.routine_id === id && p.status === 'approved');
+  if (!members.length) { alert('이 루틴에는 승인된 참여자가 없어요.'); return; }
+
+  const certs = rawCerts.filter(c => c.routine_id === id);
+  // 날짜 컬럼: 루틴 기간 전체. 기간 정보가 없으면 인증이 실제로 있었던 날짜만.
+  let dates = [];
+  if (r.startDate && r.endDate) {
+    const e = new Date(r.endDate + 'T00:00:00');
+    for (let d = new Date(r.startDate + 'T00:00:00'); d <= e; d.setDate(d.getDate() + 1)) dates.push(_localDayKey(d));
+  } else {
+    dates = [...new Set(certs.map(c => _localDayKey(new Date(c.created_at))))].sort();
+  }
+
+  const certDaysBy = {}; // userId → Set(날짜)
+  const certCountBy = {}; // userId → 총 인증 수
+  certs.forEach(c => {
+    (certDaysBy[c.user_id] = certDaysBy[c.user_id] || new Set()).add(_localDayKey(new Date(c.created_at)));
+    certCountBy[c.user_id] = (certCountBy[c.user_id] || 0) + 1;
+  });
+
+  const goal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
+  const headers = ['닉네임', '실명', ...dates.map(d => d.slice(5)), '총 인증 수', `완주기준(${goal}회)`, '완주'];
+  const lines = members.map(m => {
+    const prof = profileById[m.user_id] || { name: '(알 수 없음)', realName: '' };
+    const days = certDaysBy[m.user_id] || new Set();
+    const total = certCountBy[m.user_id] || 0;
+    return [prof.name, prof.realName, ...dates.map(d => days.has(d) ? '✓' : ''), total, goal, total >= goal ? 'O' : ''];
+  });
+  _downloadCSV(`모니터링_${r.title}`, headers, lines);
 }
 
 let notifyTemplates = [];
