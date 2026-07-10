@@ -403,14 +403,6 @@ input:focus { outline: none; border-color: #2E33BC; }
           <!-- 오늘의 미션 -->
           <div id="meetBannerArea"></div>
           <div id="todayMissionArea"></div>
-          <!-- 이번 주 한끗 -->
-          <div class="section-card">
-            <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
-              <div class="section-hd-title">이번 주 한끗</div>
-              <span id="weekGrassCount" style="font-size:11px;color:#888;"></span>
-            </div>
-            <div id="weekGrass" style="display:flex;justify-content:space-between;padding:10px 16px 14px;"></div>
-          </div>
           <!-- 참여 중인 루틴 -->
           <div class="section-card">
             <div class="section-hd"><div class="section-hd-title">참여 중인 루틴</div></div>
@@ -1666,29 +1658,6 @@ function renderHome() {
     </div>`;
   }
 
-  // 이번 주 잔디
-  const now = new Date();
-  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
-  const dayNames = ['월','화','수','목','금','토','일'];
-  const certSet = new Set(state.youth.certDates||[]);
-  const todayKey2 = now.toISOString().slice(0,10);
-  let weekDone = 0;
-  document.getElementById('weekGrass').innerHTML = dayNames.map((dn,i)=>{
-    const d = new Date(mon); d.setDate(mon.getDate()+i);
-    const k = d.toISOString().slice(0,10);
-    const done = certSet.has(k); if(done) weekDone++;
-    const isToday = k === todayKey2;
-    const isFuture = k > todayKey2;
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-      <div style="width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;
-        background:${done?'#83CA00':isFuture?'#fafafa':'#f0f0f0'};
-        ${isToday?'box-shadow:0 0 0 2px #2E33BC;':''}">
-        ${done?'✓':''}
-      </div>
-      <span style="font-size:10px;color:${isToday?'#2E33BC':'#aaa'};font-weight:${isToday?'700':'400'};">${dn}</span>
-    </div>`;
-  }).join('');
-  document.getElementById('weekGrassCount').textContent = weekDone>0 ? `이번 주 ${weekDone}일 인증 🌱` : '';
   document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
     const todayCerts = (state.certFeed||[]).filter(c=>c.routineId===r.id && isWithin24h(c.ts));
     const previewHtml = todayCerts.length > 0
@@ -1714,6 +1683,7 @@ function renderHome() {
       </div>
       <div style="font-size:11px;color:#aaa;">${r.period} · ${r.people}명 참여</div>
       <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
+      ${_weekGridHtml(r.id)}
       ${previewHtml}
     </div>`;
   }).join('') || `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 루틴이 아직 없어요</div>`;
@@ -1841,6 +1811,30 @@ function _fmtDT(iso) {
   const days=['일','월','화','수','목','금','토'];
   const hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0');
   return `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]}) ${hh}:${mm}`;
+}
+function _weekGridHtml(routineId) {
+  const now = new Date();
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const dayNames = ['월','화','수','목','금','토','일'];
+  const todayKey = now.toISOString().slice(0,10);
+  const myCertDays = new Set((state.certFeed||[])
+    .filter(c => c.routineId===routineId && currentUser && c.userId===currentUser.id)
+    .map(c => new Date(c.ts).toISOString().slice(0,10)));
+  return `<div style="display:flex;gap:4px;margin-top:10px;">
+    ${dayNames.map((dn,i)=>{
+      const d = new Date(mon); d.setDate(mon.getDate()+i);
+      const k = d.toISOString().slice(0,10);
+      const done = myCertDays.has(k);
+      const isToday = k === todayKey;
+      const isFuture = k > todayKey;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="width:100%;aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;
+          background:${done?'#83CA00':isFuture?'#fafafa':'#f0f0f0'};
+          ${isToday?'box-shadow:0 0 0 1.5px #2E33BC;':''}">${done?'✓':''}</div>
+        <span style="font-size:8px;color:${isToday?'#2E33BC':'#ccc'};">${dn}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 function _isToday(iso) {
   if(!iso) return false;
