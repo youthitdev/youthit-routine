@@ -59,17 +59,19 @@
 
 ## 남은 작업 (우선순위순)
 
-1. **알림 인프라 (Web Push) — ✅ 1단계 완료 (2026-07-10 아이폰 잠금화면 수신 검증됨)**
-   - 로드맵: ~~①구독+테스트 발송 파이프라인~~(완료) → **②트리거 연결(참여 승인/거절, 좋아요, 댓글) ← 다음** → ③관리자 수동 공지 발송(admin.html에 "알림 보내기" 탭: 대상 전체/루틴별 선택 + 제목/내용 입력 → 관리자 JWT로 send-push 호출. 함수에 전체 발송(broadcast) 옵션 추가 필요 — 사용자가 원하는 기능으로 확인됨) → ④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러)
-   - 구축된 것: `push_subscriptions` 테이블+RLS(마이그레이션 2026-07-09e), `send-push` Edge Function(관리자 JWT 또는 service 키만 발송 가능 — 신형 sb_secret 키는 문자열 비교가 안 돼서 auth.admin API 프로브 방식으로 검증함, 만료 구독 자동 정리), VAPID 시크릿 설정됨, 마이페이지 "알림 설정" 메뉴→시트에 알림 켜기/끄기 토글, service-worker.js push/notificationclick 핸들러(캐시 v4)
-   - 발송 방법(2단계에서 재사용): `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids", "title", "body", "url"}`
+1. **알림 인프라 (Web Push) — ✅ 1·2단계 완료 (2026-07-10 승인 알림 아이폰 수신 실증됨)**
+   - 로드맵: ~~①구독+테스트 발송 파이프라인~~ → ~~②트리거 연결(참여 승인/거절, 좋아요, 댓글)~~ → **③관리자 수동 공지 발송 ← 다음**(admin.html에 "알림 보내기" 탭: 대상 전체/루틴별 선택 + 제목/내용 입력 → 관리자 JWT로 send-push 호출. 함수에 전체 발송(broadcast) 옵션 추가 필요) → ④마일스톤(5일차/10일차)·리마인드 시간 설정(pg_cron 스케줄러)
+   - 구축된 것: `push_subscriptions` 테이블+RLS, `send-push` Edge Function(관리자 JWT 또는 service 키만 발송, 만료 구독 자동 정리), VAPID 시크릿, 마이페이지 "알림 설정" 토글, service-worker.js push/notificationclick 핸들러(캐시 v4), **DB 트리거 3종**(마이그레이션 2026-07-10: 참여 승인/거절→`notify_push()`, 인증 좋아요/댓글→작성자 알림) — pg_net으로 send-push를 비동기 호출, 키는 Vault(`sr_key_for_push`)에 보관
+   - 발송 방법(재사용): `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids", "title", "body", "url"}`. DB에서 직접 보낼 땐 `SELECT notify_push(user_id, title, body);`
+   - 디버깅용: 발송 시도 로그는 `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 5;`
    - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
-   - 주의사항: 새 테이블 만들면 API 스키마 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음. SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 꼭 확인**(한 번 다른 프로젝트 approval에 실행하는 사고 있었음 — 그쪽에 생긴 push_subscriptions 테이블은 DROP 예정). iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+), 집중 모드 중엔 배너 없이 알림 센터에만 쌓임
-2. **아이폰(PWA) 화면 잘림 수정** — ①상단이 잘려 보임: 헤더가 노치/다이내믹 아일랜드 영역까지 채워지도록 `env(safe-area-inset-top)` 패딩 적용 필요 ②하단 탭이 너무 아래 붙어 있음: `env(safe-area-inset-bottom)`으로 살짝 올리기. (manifest `display: standalone` 모드에서 발생, 2026-07-10 사용자 보고)
-3. 카테고리 필터 활성화 — 지금 루틴 태그가 전부 `생활`로 고정, 실제 카테고리 선택 기능 필요
-4. OT 때 "함께 인증" 실습 모드 — 첫날 줌에서 다 같이 인증 폼 작성해보기
-5. 거절 사유 안내 — 서류/신청 반려 시 이유·재제출 안내
-6. **인증 사진 타임스탬프 촬영 (선택 기능)** — 인증 시 카메라로 바로 찍은 사진에 촬영 시각 워터마크를 남기는 옵션 추가. 기존 갤러리 업로드 방식은 그대로 두고 "지금 찍기" 버튼을 추가 옵션으로만 제공 — 강제하지 않아 기존 사용성 유지
+   - 주의사항: SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 꼭 확인**(다른 프로젝트 approval에 실행한 사고 있었음 — 그쪽 push_subscriptions 테이블 DROP 필요). iOS는 "홈 화면에 추가"해야만 푸시 동작(16.4+), 집중 모드 중엔 배너 없이 알림 센터에만 쌓임. 새 테이블 만들면 API 스키마 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음
+2. **화면 새로고침 문제** — 승인/변경 후 다른 화면(청소년 쪽 등)에 자동 반영이 안 됨(2026-07-10 사용자 보고, 재현 화면 특정 필요 — 앱이 열 때 한 번만 데이터를 불러오는 구조라 실시간 반영이 없음)
+3. ~~아이폰(PWA) 화면 잘림 수정~~ — ✅ 완료 (safe-area 대응, 2026-07-10)
+4. 카테고리 필터 활성화 — 지금 루틴 태그가 전부 `생활`로 고정, 실제 카테고리 선택 기능 필요
+5. OT 때 "함께 인증" 실습 모드 — 첫날 줌에서 다 같이 인증 폼 작성해보기
+6. 거절 사유 안내 — 서류/신청 반려 시 이유·재제출 안내
+7. **인증 사진 타임스탬프 촬영 (선택 기능)** — 인증 시 카메라로 바로 찍은 사진에 촬영 시각 워터마크를 남기는 옵션 추가. 기존 갤러리 업로드 방식은 그대로 두고 "지금 찍기" 버튼을 추가 옵션으로만 제공 — 강제하지 않아 기존 사용성 유지
 
 ## 아이디어 백로그 (논의만 됨)
 
@@ -82,3 +84,4 @@
 - git 커밋 작성자 정보 미설정 (`git config --global user.name/email`) — 매 커밋마다 경고 뜸
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토
 - admin.html 데이터 로딩이 전체 테이블 select 방식 — 참가자 수천 명 규모 되면 페이지네이션 필요
+- 2026-07-10에 `routine-covers` Storage 버킷이 실제 DB엔 없어서(마이그레이션 누락) 루틴 이미지 업로드가 실패한 적 있었음 → 재실행으로 해결. `supabase-schema.sql`에 있는 마이그레이션이 실제로 다 적용됐는지 가끔 의심해볼 것
