@@ -172,9 +172,7 @@
         <h3 style="margin:0;">루틴별 완주율</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="statsRoutineSel" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:#fff;"></select>
-          <button class="export-btn" onclick="exportRoutineMonitoringCSV()">📥 루틴 모니터링 CSV</button>
-          <button class="export-btn" onclick="exportStatsCSV('routine')">📥 루틴별 CSV</button>
-          <button class="export-btn" onclick="exportStatsCSV('participant')">📥 참가자별 CSV</button>
+          <button class="export-btn" onclick="exportRoutineMonitoringCSV()">📥 루틴별 CSV</button>
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -844,37 +842,6 @@ function exportCSV(tab) {
   _downloadCSV(tab==='youth'?'청소년':'끗짱', headers, lines);
 }
 
-function exportStatsCSV(kind) {
-  if (kind === 'routine') {
-    const list = computeRoutineCompletion();
-    _downloadCSV('루틴별완주율',
-      ['루틴','상태','기간','참여인원','완주인원','완주율(%)'],
-      list.map(c => [c.title, R_STATUS_LABEL[c.status]||c.status, c.period, c.approvedCount, c.achievers, c.rate]));
-    return;
-  }
-  // 참가자별 집계: 승인된 참여 기준, 완주 기준은 루틴별 완주율과 동일(기간의 2/3 이상 인증)
-  const certCountBy = {}; // 'routineId_userId' → 인증 수
-  const totalCertsBy = {}; // userId → 전체 인증 수
-  rawCerts.forEach(c => {
-    certCountBy[c.routine_id + '_' + c.user_id] = (certCountBy[c.routine_id + '_' + c.user_id] || 0) + 1;
-    totalCertsBy[c.user_id] = (totalCertsBy[c.user_id] || 0) + 1;
-  });
-  const routineById = {};
-  routineRows.forEach(r => routineById[r.id] = r);
-  const lines = youthRows.map(y => {
-    const my = rawParticipants.filter(p => p.user_id === y.id && p.status === 'approved');
-    let completed = 0;
-    my.forEach(p => {
-      const r = routineById[p.routine_id]; if (!r) return;
-      const goal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
-      if ((certCountBy[p.routine_id + '_' + y.id] || 0) >= goal) completed++;
-    });
-    return [y.name, y.realName, my.length, my.map(p => routineById[p.routine_id]?.title || '').filter(Boolean).join('|'), totalCertsBy[y.id] || 0, completed];
-  });
-  _downloadCSV('참가자별집계',
-    ['닉네임','실명','참여 루틴 수','참여 루틴명','총 인증 수','완주 루틴 수'],
-    lines);
-}
 
 (async function init() {
   const { data: { session } } = await sb.auth.getSession();
