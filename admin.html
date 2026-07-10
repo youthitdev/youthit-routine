@@ -608,13 +608,19 @@ function exportRoutineMonitoringCSV() {
   if (!members.length) { alert('이 루틴에는 승인된 참여자가 없어요.'); return; }
 
   const certs = rawCerts.filter(c => c.routine_id === id);
-  // 날짜 컬럼: 루틴 기간 전체. 기간 정보가 없으면 인증이 실제로 있었던 날짜만.
+  // 날짜 컬럼: 루틴 기간과 실제 인증 날짜를 모두 포함하는 범위
+  // (기간 시작 전 인증 등 기간 밖 인증도 보이도록 — 기간만 쓰면 ✓가 전부 비어 나오는 버그 있었음)
+  const certDays = certs.map(c => _localDayKey(new Date(c.created_at))).sort();
+  let startKey = r.startDate || certDays[0] || null;
+  let endKey = r.endDate || certDays[certDays.length - 1] || null;
+  if (certDays.length) {
+    if (certDays[0] < startKey) startKey = certDays[0];
+    if (certDays[certDays.length - 1] > endKey) endKey = certDays[certDays.length - 1];
+  }
   let dates = [];
-  if (r.startDate && r.endDate) {
-    const e = new Date(r.endDate + 'T00:00:00');
-    for (let d = new Date(r.startDate + 'T00:00:00'); d <= e; d.setDate(d.getDate() + 1)) dates.push(_localDayKey(d));
-  } else {
-    dates = [...new Set(certs.map(c => _localDayKey(new Date(c.created_at))))].sort();
+  if (startKey && endKey) {
+    const e = new Date(endKey + 'T00:00:00');
+    for (let d = new Date(startKey + 'T00:00:00'); d <= e; d.setDate(d.getDate() + 1)) dates.push(_localDayKey(d));
   }
 
   const certDaysBy = {}; // userId → Set(날짜)
