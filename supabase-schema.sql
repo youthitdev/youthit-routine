@@ -575,3 +575,98 @@ CREATE POLICY "ps_select" ON push_subscriptions FOR SELECT USING (auth.uid() = u
 CREATE POLICY "ps_insert" ON push_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "ps_update" ON push_subscriptions FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "ps_delete" ON push_subscriptions FOR DELETE USING (auth.uid() = user_id);
+
+-- =====================================================
+-- [마이그레이션 2026-07-10] Web Push 2단계 — 자동 알림 트리거
+-- 참여 승인/거절, 인증 좋아요, 인증 댓글 발생 시 DB 트리거가
+-- pg_net으로 send-push Edge Function을 호출해 푸시 발송.
+--
+-- ★ 사전 준비 (이 블록 실행 전에 1회):
+--   대시보드 Settings → API 에서 service_role 키를 복사한 뒤 아래 실행
+--   SELECT vault.create_secret('<여기에 service_role 키>', 'sr_key_for_push');
+-- =====================================================
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+-- 공용 발송 헬퍼: Vault에서 키를 읽어 send-push 함수를 비동기 호출
+CREATE OR REPLACE FUNCTION notify_push(target_user uuid, push_title text, push_body text)
+RETURNS void AS $$
+DECLARE
+  sr_key text;
+BEGIN
+  SELECT decrypted_secret INTO sr_key FROM vault.decrypted_secrets WHERE name = 'sr_key_for_push';
+  IF sr_key IS NULL THEN RETURN; END IF;  -- 키 미설정 시 알림만 조용히 스킵 (본 동작엔 영향 없음)
+  PERFORM net.http_post(
+    url := 'https://ynqvhsffoesjzefitafv.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || sr_key),
+    body := jsonb_build_object('user_id', target_user, 'title', push_title, 'body', push_body, 'url', '/youthit-routine/')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 1) 루틴 참여 승인/거절 → 신청자에게
+CREATE OR REPLACE FUNCTION on_participant_status_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  r_title text;
+BEGIN
+  IF NEW.status IS NOT DISTINCT FROM OLD.status OR NEW.status NOT IN ('approved','rejected') THEN
+    RETURN NEW;
+  END IF;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  IF NEW.status = 'approved' THEN
+    PERFORM notify_push(NEW.user_id, '루틴 참여가 승인됐어요! 🎉', '"' || coalesce(r_title,'루틴') || '" 이제 함께 시작해요!');
+  ELSE
+    PERFORM notify_push(NEW.user_id, '루틴 참여 안내', '"' || coalesce(r_title,'루틴') || '" 참여가 이번엔 어려워요. 다른 루틴도 둘러봐요.');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_participant_status_push ON routine_participants;
+CREATE TRIGGER trg_participant_status_push
+  AFTER UPDATE ON routine_participants
+  FOR EACH ROW EXECUTE FUNCTION on_participant_status_change();
+
+-- 2) 인증 좋아요 → 인증 작성자에게 (본인이 본인 글에 누른 건 제외)
+CREATE OR REPLACE FUNCTION on_cert_like_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  cert_owner uuid;
+  liker_name text;
+BEGIN
+  SELECT user_id INTO cert_owner FROM certifications WHERE id = NEW.cert_id;
+  IF cert_owner IS NULL OR cert_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO liker_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(cert_owner, '❤️ 응원이 도착했어요', coalesce(liker_name,'누군가') || '님이 내 인증을 응원해요!');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cert_like_push ON cert_likes;
+CREATE TRIGGER trg_cert_like_push
+  AFTER INSERT ON cert_likes
+  FOR EACH ROW EXECUTE FUNCTION on_cert_like_push();
+
+-- 3) 인증 댓글 → 인증 작성자에게 (본인 댓글 제외, 내용은 40자까지만)
+CREATE OR REPLACE FUNCTION on_cert_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  cert_owner uuid;
+  commenter_name text;
+BEGIN
+  SELECT user_id INTO cert_owner FROM certifications WHERE id = NEW.cert_id;
+  IF cert_owner IS NULL OR cert_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(
+    cert_owner,
+    '💬 댓글이 달렸어요',
+    coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cert_comment_push ON cert_comments;
+CREATE TRIGGER trg_cert_comment_push
+  AFTER INSERT ON cert_comments
+  FOR EACH ROW EXECUTE FUNCTION on_cert_comment_push();
