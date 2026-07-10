@@ -1614,8 +1614,7 @@ function renderHome() {
     [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징 모임']].forEach(([field,icon,label])=>{
       const iso=r[field]; if(!iso) return;
       const diff=new Date(iso).getTime()-nowTs;
-      const dd=_dday(iso.slice(0,10));
-      if(_isToday(iso) && diff > -90*60000) { // 오늘, 종료 90분 전까지 노출
+      if(_isToday(iso) && diff > -90*60000) { // 오늘, 종료 90분 전까지만 노출 (사전 D-day 배너는 번잡해서 제거)
         banners.push(`<div style="background:linear-gradient(135deg,#FF006C,#FF6B00);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
           <div style="font-size:26px;">${icon}</div>
           <div style="flex:1;min-width:0;">
@@ -1623,15 +1622,6 @@ function renderHome() {
             <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title}</div>
           </div>
           ${r.meetingLink?`<a href="${r.meetingLink}" target="_blank" style="flex-shrink:0;padding:9px 14px;background:white;color:#FF006C;border-radius:12px;font-size:12px;font-weight:700;text-decoration:none;">줌 참여</a>`:''}
-        </div>`);
-      } else if(dd!==null && dd>0 && dd<=3) {
-        banners.push(`<div style="background:#FFF8E1;border:0.5px solid #FFD600;border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <div style="font-size:20px;">${icon}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;color:#111;">${label} D-${dd} · ${_fmtDT(iso)}</div>
-            <div style="font-size:11px;color:#888;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title} — 줌으로 만나요</div>
-          </div>
-          <a href="${_gcalLink(r.title+' '+label,iso,r.meetingLink)}" target="_blank" style="flex-shrink:0;font-size:11px;color:#2E33BC;font-weight:600;text-decoration:none;">📅 저장</a>
         </div>`);
       }
     });
@@ -3031,7 +3021,8 @@ function openKRoutineDetail(routineId) {
                 ${a.status==='pending'?`
                   <button onclick="approveApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#2E33BC;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">승인</button>
                   <button onclick="rejectApplicant(${routineId},'${a.userId}')" style="padding:6px 12px;background:#fff;color:#888;border:0.5px solid #ddd;border-radius:8px;font-size:12px;cursor:pointer;">거절</button>`
-                :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>`
+                :a.status==='approved'?`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 승인</span>
+                  <button onclick="cancelApproval(${routineId},'${a.userId}')" style="padding:6px 10px;background:#fff;color:#c00;border:0.5px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">취소</button>`
                 :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
               </div>
               ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;">💬 ${a.note}</div>`:''}
@@ -3060,6 +3051,16 @@ async function rejectApplicant(routineId, userId) {
   if(error){ alert('거절 실패: '+error.message); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);
+}
+
+async function cancelApproval(routineId, userId) {
+  if(!confirm('이 참여자의 승인을 취소할까요? 다시 대기 상태로 돌아가요.')) return;
+  const { error } = await sb.from('routine_participants')
+    .update({status:'pending'}).eq('routine_id',routineId).eq('user_id',userId);
+  if(error){ alert('취소 실패: '+error.message); return; }
+  await loadRoutines();
+  openKRoutineDetail(routineId);
+  kRenderRoutineTab();
 }
 function openKCertDetail(rid,name) {
   const r=state.routines.find(x=>x.id===rid);
