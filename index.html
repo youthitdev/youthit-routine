@@ -1141,6 +1141,7 @@ async function loadProfileAndEnter() {
   state.youth.certDates = profile.cert_dates || [];
   state.youth.verifyStatus = profile.verify_status || 'none';
   state.youth.verifyDocUrl = profile.verify_doc_url || null;
+  state.youth.verifyRejectReason = profile.verify_reject_reason || '';
   state.youth.realName = profile.real_name || '';
   state.youth.birthDate = profile.birth_date || null;
   state.youth.phone = profile.phone || '';
@@ -1158,20 +1159,21 @@ async function loadProfileAndEnter() {
   state.loginType = isAdmin ? 'both' : profile.role;
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
   if (profile.role === 'kkutjjang' && !isAdmin && profile.kkutjjang_status !== 'approved') {
-    showKkutjjangPending(profile.kkutjjang_status || 'pending');
+    showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
     return;
   }
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
 }
-function showKkutjjangPending(status) {
+function showKkutjjangPending(status, reason) {
   document.getElementById('splashScreen').classList.add('hide');
   const el = document.getElementById('kkPendingScreen');
   const isRejected = status === 'rejected';
   document.getElementById('kkPendingIcon').textContent = isRejected ? '😥' : '⏳';
   document.getElementById('kkPendingTitle').textContent = isRejected ? '가입이 승인되지 않았어요' : '가입 승인 대기 중이에요';
+  document.getElementById('kkPendingBody').style.whiteSpace = 'pre-wrap';
   document.getElementById('kkPendingBody').textContent = isRejected
-    ? '문의사항이 있다면 아래 이메일로 연락해주세요.'
+    ? (reason ? `반려 사유: ${reason}\n\n문의사항이 있다면 아래 이메일로 연락해주세요.` : '문의사항이 있다면 아래 이메일로 연락해주세요.')
     : '관리자 확인 후 끗짱으로 이용할 수 있어요. 조금만 기다려주세요.';
   el.style.display = 'flex';
 }
@@ -1391,6 +1393,7 @@ async function loadRoutines() {
       applicants: rParts.map(p => ({
         userId: p.user_id, name: nameById[p.user_id] || '익명',
         date: _relDate(p.joined_at), status: p.status, note: p.application_note || '',
+        rejectReason: p.reject_reason || '',
       })),
     };
   });
@@ -1398,6 +1401,9 @@ async function loadRoutines() {
     state.youth.pendingRoutines = parts
       .filter(p => p.user_id === currentUser.id && p.status === 'pending')
       .map(p => p.routine_id);
+    state.youth.rejectedRoutines = {};
+    parts.filter(p => p.user_id === currentUser.id && p.status === 'rejected')
+      .forEach(p => { state.youth.rejectedRoutines[p.routine_id] = p.reject_reason || ''; });
   }
 }
 
@@ -1750,14 +1756,15 @@ function renderRoutineGrid(type, q) {
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
+    const isRejectedApp=!isPending && Object.prototype.hasOwnProperty.call(state.youth.rejectedRoutines||{}, r.id);
     const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     const cardBg=isDone?'#fafafa':'#fff';
-    const cardBorder=isDone?'#e8e8e8':isActive?'#2E33BC':isPending?'#FFD600':'#e8e8e8';
-    const bw=isActive||isPending?'1.5px':'0.5px';
+    const cardBorder=isDone?'#e8e8e8':isActive?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
+    const bw=isActive||isPending||isRejectedApp?'1.5px':'0.5px';
     const tc=isDone?'#aaa':'#111';
-    const sl=isActive?'참여 중':isRecruit?(isPending?'⏳ 승인 대기':'모집 중'):'완주';
-    const bb=isActive?'#2E33BC':isRecruit?(isPending?'#FFF3CD':'#E6F1FB'):'#f0f0f0';
-    const bc=isActive?'#fff':isRecruit?(isPending?'#856404':'#185FA5'):'#aaa';
+    const sl=isActive?'참여 중':isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
+    const bb=isActive?'#2E33BC':isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
+    const bc=isActive?'#fff':isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
     // D-day
     const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
@@ -2099,6 +2106,8 @@ function openRoutineDetail(id) {
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
+  const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
+  const isRejectedApp = !isPending && rejectReason !== undefined;
   const needsDoc = r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved';
   const meetHtml = (r.kickoffAt||r.closingAt) ? `
     <div style="background:#f0f1fb;border-radius:12px;padding:12px 14px;margin-bottom:10px;">
@@ -2117,6 +2126,12 @@ function openRoutineDetail(id) {
       ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:14px;color:#888;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
           <i class="ti ti-clock" style="font-size:16px;color:#aaa;"></i> 승인 대기 중이에요
         </div>`
+      : isRejectedApp
+      ? `<div style="width:100%;padding:14px;background:#FBEAF0;border-radius:12px;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#993556;margin-bottom:4px;">😥 이번 신청은 승인되지 않았어요</div>
+          ${rejectReason?`<div style="font-size:12px;color:#993556;line-height:1.5;white-space:pre-wrap;">사유: ${rejectReason}</div>`:''}
+        </div>
+        <button class="primary-btn" onclick="openApplyOverlay(${r.id})">다시 신청하기</button>`
       : `<button class="primary-btn" onclick="openApplyOverlay(${r.id})">참여 신청하기</button>`
     }`;
   else if(r.status==='done') body+=`
@@ -2148,9 +2163,9 @@ async function submitApplyRoutine(){
   if((state.youth.pendingRoutines||[]).includes(id)) return;
   const btn=document.querySelector('#applyRoutineOverlay .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='신청 중...';}
-  const { error } = await sb.from('routine_participants').insert({
-    routine_id:id, user_id:currentUser.id, status:'pending', application_note:note,
-  });
+  const { error } = await sb.from('routine_participants').upsert({
+    routine_id:id, user_id:currentUser.id, status:'pending', application_note:note, reject_reason:null,
+  }, { onConflict:'routine_id,user_id' });
   if(btn){btn.disabled=false;btn.textContent='신청하기';}
   if(error){ alert('신청 실패: '+error.message); return; }
   await loadRoutines();
@@ -2582,6 +2597,7 @@ function renderVerifyCard() {
       <div style="font-size:20px;">${isRejected?'⚠️':'📄'}</div>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:600;color:#111;">${isRejected?'서류 반려됨 — 다시 제출해주세요':(isOutOfSchool?'학교 밖 청소년 확인 서류를 제출해주세요':'청소년 확인 서류를 제출해주세요')}</div>
+        ${isRejected && state.youth.verifyRejectReason?`<div style="font-size:11px;color:#993556;background:rgba(255,255,255,0.6);border-radius:8px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;">반려 사유: ${state.youth.verifyRejectReason}</div>`:''}
         ${docListHtml}
       </div>
     </div>
@@ -3049,6 +3065,7 @@ function openKRoutineDetail(routineId) {
                 :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
               </div>
               ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;">💬 ${a.note}</div>`:''}
+              ${a.status==='rejected'&&a.rejectReason?`<div style="margin-top:6px;padding:8px 10px;background:#FBEAF0;border-radius:8px;font-size:11px;color:#993556;line-height:1.5;white-space:pre-wrap;">거절 사유: ${a.rejectReason}</div>`:''}
             </div>`).join('')}
         </div>`}`;
   openOverlay('routineDetailOverlay');
@@ -3057,7 +3074,7 @@ function openKRoutineDetail(routineId) {
 async function approveApplicant(routineId, userId) {
   const r = state.routines.find(x=>x.id===routineId);
   const { error } = await sb.from('routine_participants')
-    .update({status:'approved'}).eq('routine_id',routineId).eq('user_id',userId);
+    .update({status:'approved', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId);
   if(error){ alert('승인 실패: '+error.message); return; }
   // 모집 중이던 루틴은 첫 승인 시 진행 중으로 전환
   if(r && r.status==='recruit') {
@@ -3069,8 +3086,10 @@ async function approveApplicant(routineId, userId) {
 }
 
 async function rejectApplicant(routineId, userId) {
+  const reason = prompt('거절 사유를 입력해주세요 (신청자에게 안내돼요, 비워두면 사유 없이 거절돼요):', '');
+  if (reason === null) return; // 취소
   const { error } = await sb.from('routine_participants')
-    .update({status:'rejected'}).eq('routine_id',routineId).eq('user_id',userId);
+    .update({status:'rejected', reject_reason: reason || null}).eq('routine_id',routineId).eq('user_id',userId);
   if(error){ alert('거절 실패: '+error.message); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);
@@ -3079,7 +3098,7 @@ async function rejectApplicant(routineId, userId) {
 async function cancelApproval(routineId, userId) {
   if(!confirm('이 참여자의 승인을 취소할까요? 다시 대기 상태로 돌아가요.')) return;
   const { error } = await sb.from('routine_participants')
-    .update({status:'pending'}).eq('routine_id',routineId).eq('user_id',userId);
+    .update({status:'pending', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId);
   if(error){ alert('취소 실패: '+error.message); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);

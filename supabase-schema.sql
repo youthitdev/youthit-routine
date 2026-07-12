@@ -757,3 +757,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 SELECT cron.unschedule('hankkut-cert-reminder')
  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-cert-reminder');
 SELECT cron.schedule('hankkut-cert-reminder', '0 * * * *', 'SELECT send_cert_reminders()');
+
+-- =====================================================
+-- [마이그레이션 2026-07-11b] 거절 사유 안내
+-- 서류 반려/끗짱 가입 반려/루틴 참여 거절 시 사유를 저장해서
+-- 신청자 본인에게 보여주기 위한 컬럼들
+-- =====================================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS verify_reject_reason text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kkutjjang_reject_reason text;
+ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS reject_reason text;

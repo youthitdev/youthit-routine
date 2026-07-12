@@ -846,9 +846,16 @@ function renderBulkBar() {
 async function bulkAction(status) {
   if (selectedIds.size === 0) return;
   const label = currentTab === 'youth' ? '청소년 서류를' : '끗짱 가입을';
+  const reasonField = currentTab === 'youth' ? 'verify_reject_reason' : 'kkutjjang_reject_reason';
+  let reason = null;
+  if (status === 'rejected') {
+    reason = prompt(`반려 사유를 입력해주세요 (선택한 ${selectedIds.size}명 모두에게 동일하게 안내돼요, 비워두면 사유 없이 반려):`, '');
+    if (reason === null) return; // 취소
+  }
   if (!confirm(`선택한 ${selectedIds.size}명의 ${label} ${status==='approved'?'승인':'반려'}할까요?`)) return;
   const ids = [...selectedIds];
   const payload = currentTab === 'youth' ? { verify_status: status } : { kkutjjang_status: status };
+  payload[reasonField] = status === 'rejected' ? (reason || null) : null;
   const { error } = await sb.from('profiles').update(payload).in('id', ids);
   if (error) { alert('처리 실패: ' + error.message); return; }
   selectedIds.clear();
