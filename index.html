@@ -1729,7 +1729,10 @@ function filterRoutine(type, el) {
 }
 
 function renderRoutineGrid(type, q) {
-  const base = type==='all' ? state.routines : state.routines.filter(r=>r.status===type);
+  // '참여 중'(active) 필터는 상태만이 아니라 "내가 참여자인" 루틴만 — 홈의 참여 중 목록과 기준 통일
+  const base = type==='all' ? state.routines
+    : type==='active' ? state.routines.filter(r=>r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id))
+    : state.routines.filter(r=>r.status===type);
   let filtered = base;
   if(q) {
     const lq=q.toLowerCase();
@@ -1759,12 +1762,12 @@ function renderRoutineGrid(type, q) {
     const isRejectedApp=!isPending && Object.prototype.hasOwnProperty.call(state.youth.rejectedRoutines||{}, r.id);
     const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     const cardBg=isDone?'#fafafa':'#fff';
-    const cardBorder=isDone?'#e8e8e8':isActive?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
-    const bw=isActive||isPending||isRejectedApp?'1.5px':'0.5px';
+    const cardBorder=isDone?'#e8e8e8':(isActive&&isMine)?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
+    const bw=(isActive&&isMine)||isPending||isRejectedApp?'1.5px':'0.5px';
     const tc=isDone?'#aaa':'#111';
-    const sl=isActive?'참여 중':isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
-    const bb=isActive?'#2E33BC':isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
-    const bc=isActive?'#fff':isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
+    const sl=isActive?(isMine?'참여 중':'진행 중'):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
+    const bb=isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
+    const bc=isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
     // D-day
     const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
