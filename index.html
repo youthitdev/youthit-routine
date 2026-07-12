@@ -404,6 +404,7 @@ select:focus { outline: none; border-color: #2E33BC; }
           </div>
           <!-- 오늘의 미션 -->
           <div id="meetBannerArea"></div>
+          <div id="pushNudgeArea"></div>
           <div id="todayMissionArea"></div>
           <!-- 참여 중인 루틴 -->
           <div class="section-card">
@@ -1700,6 +1701,8 @@ function renderHome() {
       ${previewHtml}
     </div>`;
   }).join('') || `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 루틴이 아직 없어요</div>`;
+
+  renderPushNudge(); // 알림 미설정자에게 켜기 유도 배너 (비동기)
 }
 function toggleLike(id) {
   const p = state.posts.find(x=>x.id===id);
@@ -2178,9 +2181,17 @@ async function submitApplyRoutine(){
   closeOverlay('routineDetailOverlay');
   document.getElementById('rdBody').innerHTML='';
   renderRoutine();
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     const otMsg = r&&r.kickoffAt ? `\n\n🚀 첫날 OT: ${_fmtDT(r.kickoffAt)}\n줌으로 함께 만나 첫 인증을 해볼 거예요!` : '';
     alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.'+otMsg);
+    // 승인 소식을 받을 동기가 가장 강한 순간 — 알림 미설정자에겐 설정 시트를 바로 열어줌
+    try {
+      if (_isIOSNeedsInstall()) { openNotifSetting(); return; }
+      if (!_pushSupported()) return;
+      if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return;
+      const sub = await _getPushSubscriptionSafe();
+      if (sub === null) openNotifSetting(); // 미구독 확실할 때만
+    } catch (e) {}
   }, 300);
 }
 
@@ -2760,6 +2771,28 @@ async function refreshPushToggle() {
     hint.textContent = '알림 상태를 확인하지 못했어요. 새로고침 후 다시 시도해주세요.';
   }
 }
+// 구독 시도 공용 로직 (알림 설정 시트·홈 배너에서 함께 사용)
+async function _subscribePush() {
+  const reg = await navigator.serviceWorker.ready;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return { ok: false, denied: perm === 'denied' };
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: _urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  const j = sub.toJSON();
+  const { error } = await sb.from('push_subscriptions').upsert({
+    user_id: currentUser.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+  }, { onConflict: 'endpoint' });
+  if (error) { await sub.unsubscribe(); return { ok: false, error: error.message }; }
+  return { ok: true };
+}
+// serviceWorker.ready가 영영 안 풀리는 환경(설치 실패 등) 대비 타임아웃 조회
+async function _getPushSubscriptionSafe() {
+  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 1500))]);
+  if (!reg) return undefined; // 확인 불가
+  return reg.pushManager.getSubscription();
+}
 async function togglePush() {
   if (!currentUser) { alert('로그인이 필요해요.'); return; }
   const btn = document.getElementById('pushToggleBtn');
@@ -2771,26 +2804,78 @@ async function togglePush() {
       await sb.from('push_subscriptions').delete().eq('endpoint', existing.endpoint);
       await existing.unsubscribe();
     } else {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        if (perm === 'denied') alert('알림이 차단됐어요. 브라우저 설정에서 이 사이트의 알림을 허용한 후 다시 시도해주세요.');
+      const r = await _subscribePush();
+      if (!r.ok) {
+        if (r.denied) alert('알림이 차단됐어요. 브라우저 설정에서 이 사이트의 알림을 허용한 후 다시 시도해주세요.');
+        else if (r.error) alert('알림 등록 실패: ' + r.error);
         return;
       }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: _urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-      const j = sub.toJSON();
-      const { error } = await sb.from('push_subscriptions').upsert({
-        user_id: currentUser.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
-      }, { onConflict: 'endpoint' });
-      if (error) { await sub.unsubscribe(); alert('알림 등록 실패: ' + error.message); return; }
+      renderPushNudge(); // 홈 배너도 함께 갱신
     }
   } catch (e) {
     alert('알림 설정 중 문제가 생겼어요: ' + (e.message || e));
   } finally {
     btn.disabled = false;
     refreshPushToggle();
+  }
+}
+
+// ── 알림 켜기 유도 배너 (홈) ─────────────────────────────
+const PUSH_NUDGE_KEY = 'hankkut_push_nudge_hide_until';
+function dismissPushNudge() {
+  localStorage.setItem(PUSH_NUDGE_KEY, String(Date.now() + 7 * 86400000)); // 7일간 숨김
+  const el = document.getElementById('pushNudgeArea');
+  if (el) el.innerHTML = '';
+}
+async function renderPushNudge() {
+  const el = document.getElementById('pushNudgeArea');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!currentUser) return;
+  if (Date.now() < Number(localStorage.getItem(PUSH_NUDGE_KEY) || 0)) return;
+  const closeBtn = `<button onclick="dismissPushNudge()" style="flex-shrink:0;background:none;border:none;color:#aab;font-size:15px;cursor:pointer;padding:4px;line-height:1;">✕</button>`;
+  if (!_pushSupported()) {
+    if (_isIOSNeedsInstall()) {
+      el.innerHTML = `<div style="background:#f0f1fb;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:20px;">📲</div>
+        <div style="flex:1;min-width:0;font-size:12px;color:#333;line-height:1.5;"><b>홈 화면에 추가</b>하면 앱처럼 쓰고<br>승인·응원 알림도 받을 수 있어요</div>
+        <button onclick="alert('Safari 하단의 공유 버튼(□↑)을 누르고\\n[홈 화면에 추가]를 선택해주세요!')" style="flex-shrink:0;padding:8px 12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">방법 보기</button>
+        ${closeBtn}
+      </div>`;
+    }
+    return;
+  }
+  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return; // 차단한 사람에겐 반복 노출 안 함
+  try {
+    const sub = await _getPushSubscriptionSafe();
+    if (sub || sub === undefined) return; // 이미 구독했거나 확인 불가면 숨김
+  } catch (e) { return; }
+  el.innerHTML = `<div style="background:#f0f1fb;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:10px;">
+    <div style="font-size:20px;">🔔</div>
+    <div style="flex:1;min-width:0;font-size:12px;color:#333;line-height:1.5;">알림을 켜면 <b>참여 승인·응원 소식</b>을<br>놓치지 않고 바로 받아요</div>
+    <button onclick="enablePushFromNudge(this)" style="flex-shrink:0;padding:8px 14px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">켜기</button>
+    ${closeBtn}
+  </div>`;
+}
+async function enablePushFromNudge(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '설정 중...'; }
+  try {
+    const r = await _subscribePush();
+    if (r.ok) {
+      const el = document.getElementById('pushNudgeArea');
+      if (el) el.innerHTML = `<div style="background:#EAF3DE;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:20px;">🎉</div><div style="font-size:12px;color:#3B6D11;font-weight:600;">알림이 켜졌어요! 이제 소식을 바로 받아요</div></div>`;
+      setTimeout(() => { const e2 = document.getElementById('pushNudgeArea'); if (e2) e2.innerHTML = ''; }, 3000);
+    } else if (r.denied) {
+      alert('알림이 차단됐어요. 브라우저 설정에서 이 사이트의 알림을 허용한 후 다시 시도해주세요.');
+      dismissPushNudge();
+    } else if (r.error) {
+      alert('알림 등록 실패: ' + r.error);
+      if (btn) { btn.disabled = false; btn.textContent = '켜기'; }
+    }
+  } catch (e) {
+    alert('알림 설정 중 문제가 생겼어요: ' + (e.message || e));
+    if (btn) { btn.disabled = false; btn.textContent = '켜기'; }
   }
 }
 
