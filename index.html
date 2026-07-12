@@ -115,6 +115,8 @@ textarea { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-rad
 textarea:focus { outline: none; border-color: #2E33BC; }
 input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="url"] { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; }
 input:focus { outline: none; border-color: #2E33BC; }
+select { width: 100%; padding: 10px 34px 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; }
+select:focus { outline: none; border-color: #2E33BC; }
 .auth-input[type="text"], .auth-input[type="date"], .auth-input[type="number"] { background: rgba(255,255,255,0.1); color: white; height: 48px; padding: 0 16px; border-radius: 12px; font-size: 15px; border: 1.5px solid rgba(255,255,255,0.22); box-sizing: border-box; }
 .auth-input[type="text"]:focus, .auth-input[type="date"]:focus, .auth-input[type="number"]:focus { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); }
 .count-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
@@ -1842,11 +1844,11 @@ function _weekGridHtml(routineId) {
       const done = myCertDays.has(k);
       const isToday = k === todayKey;
       const isFuture = k > todayKey;
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
-        <div style="width:100%;aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;
-          background:${done?'#83CA00':isFuture?'#fafafa':'#f0f0f0'};
-          ${isToday?'box-shadow:0 0 0 1.5px #2E33BC;':''}">${done?'✓':''}</div>
-        <span style="font-size:8px;color:${isToday?'#2E33BC':'#ccc'};">${dn}</span>
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <div style="width:100%;aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;
+          background:${done?'linear-gradient(135deg,#94DA1E,#76BE00)':isFuture?'#fafafa':'#f2f2f4'};
+          ${isToday?`box-shadow:0 0 0 2px #fff, 0 0 0 3.5px ${done?'#B5DE72':'#d9dbee'};`:''}">${done?'✓':''}</div>
+        <span style="font-size:8px;font-weight:${isToday?'700':'400'};color:${isToday?'#76BE00':'#ccc'};">${dn}</span>
       </div>`;
     }).join('')}
   </div>`;
