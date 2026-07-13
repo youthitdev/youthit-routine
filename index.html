@@ -1304,6 +1304,7 @@ function showAuthMsg(msg) {
 }
 
 async function doLogout() {
+  if (!confirm('로그아웃할까요?')) return;
   await sb.auth.signOut();
 }
 
