@@ -2170,13 +2170,19 @@ function openRoutineDetail(id) {
         <button class="primary-btn" onclick="openApplyOverlay(${r.id})">다시 신청하기</button>`
       : `<button class="primary-btn" onclick="openApplyOverlay(${r.id})">참여 신청하기</button>`
     }`;
-  else if(r.status==='done') body+=`
+  else if(r.status==='done') {
+    const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+    body+=`
     <div style="text-align:center;padding:16px 0 8px;">
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
-    <button class="primary-btn" onclick="closeOverlay('routineDetailOverlay');openCommWriteWithRoutine(${r.id},'review')" style="margin-bottom:10px;">✍️ 후기 남기기</button>
-    <button onclick="closeOverlay('routineDetailOverlay');openLetterOverlay(${r.id},'${r.title}')" style="width:100%;padding:14px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">💌 끗짱에게 편지 쓰기</button>`;
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeOverlay('routineDetailOverlay');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
+      <button onclick="closeOverlay('routineDetailOverlay');openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
+      ${isMyDone?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:13px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
+    </div>`;
+  }
   document.getElementById('rdBody').innerHTML=body;
   openOverlay('routineDetailOverlay');
 }
