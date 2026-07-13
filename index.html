@@ -2172,16 +2172,19 @@ function openRoutineDetail(id) {
     }`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+    // 완주 직후에만 의미있는 액션들이라 종료일로부터 7일까지만 노출
+    const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
+    const withinGrace = daysSinceEnd <= 7;
     body+=`
     <div style="text-align:center;padding:16px 0 8px;">
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
-    <div style="display:flex;gap:8px;">
+    ${withinGrace?`<div style="display:flex;gap:8px;">
       <button onclick="closeOverlay('routineDetailOverlay');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
       <button onclick="closeOverlay('routineDetailOverlay');openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
       ${isMyDone?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:13px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
-    </div>`;
+    </div>`:''}`;
   }
   document.getElementById('rdBody').innerHTML=body;
   openOverlay('routineDetailOverlay');
@@ -2606,7 +2609,11 @@ function renderMy() {
   const done=state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
   if(done.length>0){
     document.getElementById('completedSection').style.display='';
-    document.getElementById('completedList').innerHTML=done.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;"><button onclick="openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`).join('');
+    document.getElementById('completedList').innerHTML=done.map(r=>{
+      const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
+      const shareBtn = daysSinceEnd<=7 ? `<button onclick="openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
+    }).join('');
   }
   renderCal();
   renderSwitchBtn();
