@@ -163,6 +163,7 @@
       <div class="kpi-card"><div class="kpi-label">끗짱</div><div class="kpi-val" id="kpiKk">0</div><div class="kpi-sub" id="kpiKkSub"></div></div>
       <div class="kpi-card"><div class="kpi-label">진행 중 루틴</div><div class="kpi-val" id="kpiActiveRoutine">0</div><div class="kpi-sub" id="kpiRoutineSub"></div></div>
       <div class="kpi-card"><div class="kpi-label">전체 완주율</div><div class="kpi-val" id="kpiCompletion">0%</div><div class="kpi-sub" id="kpiCompletionSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">탈퇴</div><div class="kpi-val" id="kpiWithdrawal">0명</div><div class="kpi-sub" id="kpiWithdrawalSub"></div></div>
     </div>
     <div class="stats-grid">
       <div class="chart-card"><h3>지역별 청소년 분포</h3><div class="chart-box"><canvas id="chartRegion"></canvas><div class="chart-empty" id="chartRegionEmpty" style="display:none;">데이터가 없어요</div></div></div>
@@ -670,6 +671,16 @@ function renderStatsView() {
   renderSchoolChart();
   renderRoutineStatusChart();
   renderCompletionTable(completion);
+  renderWithdrawalKpi();
+}
+
+async function renderWithdrawalKpi() {
+  const { data } = await sb.from('withdrawal_log').select('role,withdrew_at');
+  const rows = data || [];
+  const cutoff30 = Date.now() - 30 * 86400000;
+  const recent = rows.filter(r => new Date(r.withdrew_at).getTime() >= cutoff30).length;
+  document.getElementById('kpiWithdrawal').textContent = `${rows.length}명`;
+  document.getElementById('kpiWithdrawalSub').textContent = `최근 30일 ${recent}명`;
 }
 
 // 체크한 루틴들의 "참가자 × 날짜" 출석부 내보내기 (일별 인증 체크 + 합계)

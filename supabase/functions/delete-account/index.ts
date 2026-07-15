@@ -30,6 +30,16 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
   if (authErr || !user) return json(401, { error: "로그인이 필요해요" });
 
+  // 0) 삭제 후에는 프로필을 읽을 수 없으므로 역할·닉네임을 미리 읽어둠
+  //    (익명 로그에는 역할만 저장, 닉네임은 관리자 푸시에만 쓰고 어디에도 남기지 않음)
+  let role: string | null = null;
+  let name: string | null = null;
+  try {
+    const { data: prof } = await supabase.from("profiles").select("role,name").eq("id", user.id).single();
+    role = prof?.role ?? null;
+    name = prof?.name ?? null;
+  } catch (_e) { /* 프로필 조회 실패가 탈퇴 자체를 막지는 않음 */ }
+
   // 1) 스토리지의 본인 파일 삭제 (증빙서류는 민감정보라 반드시 정리)
   for (const bucket of ["verify-docs", "cert-photos"]) {
     try {
@@ -43,6 +53,16 @@ Deno.serve(async (req) => {
   // 2) 계정 삭제 (연결된 DB 기록은 CASCADE로 함께 삭제)
   const { error: delErr } = await supabase.auth.admin.deleteUser(user.id);
   if (delErr) return json(500, { error: delErr.message });
+
+  // 3) 삭제 성공 후에만 익명 탈퇴 로그 + 운영진 푸시 (실패해도 탈퇴는 이미 완료)
+  try {
+    await supabase.from("withdrawal_log").insert({ role });
+    const roleLabel = role === "kkutjjang" ? "끗짱" : "청소년";
+    await supabase.rpc("notify_admins", {
+      push_title: "회원 탈퇴 알림",
+      push_body: `${roleLabel} "${name ?? "알 수 없음"}"님이 탈퇴했어요.`,
+    });
+  } catch (_e) { /* 로그·알림 실패는 무시 */ }
 
   return json(200, { ok: true });
 });

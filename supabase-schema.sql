@@ -1029,3 +1029,29 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-14f] 탈퇴 익명 로그 + 운영진 알림
+-- delete-account가 개인정보 포함 완전 삭제하는 방침은 유지하되,
+-- "몇 명이 언제 탈퇴했는지"만 남기는 익명 로그(역할+시각, 이름/연락처 없음)와
+-- 관리자 푸시 알림을 추가. insert는 Edge Function(service role)만 수행.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS withdrawal_log (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  role       text,
+  withdrew_at timestamptz DEFAULT now()
+);
+ALTER TABLE withdrawal_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "wl_admin_select" ON withdrawal_log FOR SELECT USING (is_admin());
+-- INSERT 정책 없음: service role(Edge Function)만 기록 가능
+
+-- 관리자 전원에게 푸시 (탈퇴 등 운영 알림용)
+CREATE OR REPLACE FUNCTION notify_admins(push_title text, push_body text)
+RETURNS void AS $$
+DECLARE a RECORD;
+BEGIN
+  FOR a IN SELECT id FROM auth.users WHERE email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') LOOP
+    PERFORM notify_push(a.id, push_title, push_body);
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
