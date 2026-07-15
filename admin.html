@@ -95,6 +95,7 @@
     <button class="tab-btn" id="tabRoutineBtn" onclick="switchTab('routine')">루틴</button>
     <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 통계</button>
     <button class="tab-btn" id="tabNotifyBtn" onclick="switchTab('notify')">🔔 알림 보내기</button>
+    <button class="tab-btn" id="tabRewardBtn" onclick="switchTab('reward')">🎁 리워드</button>
   </div>
 
   <div class="filter-bar" id="youthFilters">
@@ -227,6 +228,56 @@
       <div id="notifyResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
     </div>
   </div>
+
+  <div id="rewardView" style="display:none;">
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>🎁 리워드 등록</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="rwTitle" placeholder="리워드 이름 (예: 스타벅스 아메리카노)" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="number" id="rwCost" min="1" placeholder="필요 포인트" style="width:110px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="number" id="rwStock" min="0" placeholder="재고" style="width:90px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="rwDesc" placeholder="설명 (선택)" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="url" id="rwImage" placeholder="이미지 URL (선택)" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <button onclick="submitReward()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>리워드 목록</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>이름</th><th>필요 포인트</th><th>재고</th><th>상태</th><th></th></tr></thead>
+          <tbody id="rewardListBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>교환 신청</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>신청자</th><th>연락처</th><th>리워드</th><th>신청일</th><th>상태</th><th></th></tr></thead>
+          <tbody id="redemptionListBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>수동 포인트 지급</h3>
+      <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px;">이벤트 참여, 오프라인 활동 보상 등으로 특정 참가자에게 나다움 포인트를 직접 지급해요.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <select id="grantUser" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;"><option value="">청소년 선택</option></select>
+        <input type="number" id="grantAmount" placeholder="포인트 (음수 가능)" style="width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="grantReason" placeholder="지급 사유" style="flex:1;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <button onclick="grantNadaeum()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">지급하기</button>
+      </div>
+      <div id="grantResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -258,6 +309,7 @@ const REGION_DATA = {
 let currentUser = null;
 let currentTab = 'youth';
 let youthRows = [], kkRows = [], routineRows = [];
+let rewardRows = [], redemptionRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
 let rawParticipants = [], rawCerts = [];
@@ -315,7 +367,7 @@ async function loadData() {
   const [profRes, rpRes, routRes, certRes] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status'),
-    sb.from('routines').select('id,title,status,start_date,end_date,max_people,archived,led_by,created_by'),
+    sb.from('routines').select('id,title,status,start_date,end_date,max_people,min_people,archived,led_by,created_by'),
     sb.from('certifications').select('routine_id,user_id,created_at'),
   ]);
   const profiles = profRes.data || [];
@@ -325,7 +377,7 @@ async function loadData() {
   rawCerts = certRes.data || [];
   const nameById = {};
   profileById = {};
-  profiles.forEach(p => { nameById[p.id] = p.name; profileById[p.id] = { name: p.name, realName: p.real_name || '' }; });
+  profiles.forEach(p => { nameById[p.id] = p.name; profileById[p.id] = { name: p.name, realName: p.real_name || '', phone: p.phone || '' }; });
   const routineTitleById = {};
   routines.forEach(r => routineTitleById[r.id] = r.title);
   const routinesByUser = {};
@@ -339,7 +391,7 @@ async function loadData() {
 
   routineRows = routines.map(r => ({
     id: r.id, title: r.title, status: r.status, startDate: r.start_date || '', endDate: r.end_date || '',
-    maxPeople: r.max_people || 0, people: approvedCountByRoutine[r.id] || 0,
+    maxPeople: r.max_people || 0, minPeople: r.min_people || null, people: approvedCountByRoutine[r.id] || 0,
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
   }));
 
@@ -370,16 +422,19 @@ function switchTab(tab) {
   document.getElementById('tabRoutineBtn').classList.toggle('active', tab === 'routine');
   document.getElementById('tabStatsBtn').classList.toggle('active', tab === 'stats');
   document.getElementById('tabNotifyBtn').classList.toggle('active', tab === 'notify');
+  document.getElementById('tabRewardBtn').classList.toggle('active', tab === 'reward');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
-  document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify') ? 'none' : 'block';
+  document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify' || tab === 'reward') ? 'none' : 'block';
   document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
   document.getElementById('notifyView').style.display = tab === 'notify' ? 'block' : 'none';
+  document.getElementById('rewardView').style.display = tab === 'reward' ? 'block' : 'none';
   document.getElementById('bulkBar').style.display = 'none';
   sortKey = null;
   if (tab === 'stats') renderStatsView();
   else if (tab === 'notify') renderNotifyView();
+  else if (tab === 'reward') renderRewardView();
   else renderTable();
 }
 
@@ -438,7 +493,7 @@ function renderTable() {
   else if (currentTab === 'kkutjjang') renderKkTable();
   else renderRoutineTable();
 }
-const R_STATUS_LABEL = { recruit: '모집 중', active: '진행 중', done: '완료' };
+const R_STATUS_LABEL = { recruit: '모집 중', active: '진행 중', done: '완료', cancelled: '폐강' };
 function renderRoutineTable() {
   document.getElementById('bulkBar').style.display = 'none';
   let rows = sortRows(_filteredRoutines());
@@ -455,12 +510,13 @@ function renderRoutineTable() {
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
       <td>${r.title}</td>
-      <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span></td>
+      <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':r.status==='cancelled'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='cancelled'?'#aaa':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span></td>
       <td>${r.startDate} ~ ${r.endDate}</td>
-      <td>${r.people}/${r.maxPeople}</td>
+      <td>${r.people}/${r.maxPeople}${r.minPeople?` (최소 ${r.minPeople})`:''}</td>
       <td>${r.leaderName}</td>
       <td>${r.archived?'<span class="pill pill-rejected">보관됨</span>':'-'}</td>
       <td>
+        ${(r.status==='recruit'||r.status==='active')&&r.minPeople?`<button onclick="cancelRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">폐강 처리</button>`:''}
         <button onclick="toggleArchiveRoutine(${r.id},${!r.archived})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.archived?'복원':'보관'}</button>
         <button onclick="deleteRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
       </td>
@@ -470,6 +526,12 @@ async function toggleArchiveRoutine(id, archive) {
   if (!confirm(archive ? '이 루틴을 보관할까요? 청소년·끗짱 화면에서 보이지 않게 돼요.' : '이 루틴을 복원할까요?')) return;
   const { error } = await sb.from('routines').update({ archived: archive }).eq('id', id);
   if (error) { alert('처리 실패: ' + error.message); return; }
+  await loadData();
+}
+async function cancelRoutineAdmin(id, title) {
+  if (!confirm(`"${title}" 루틴을 폐강 처리할까요? 이미 신청한 청소년들에게 폐강 알림이 자동으로 발송돼요. 이 작업은 되돌릴 수 없어요.`)) return;
+  const { error } = await sb.from('routines').update({ status: 'cancelled' }).eq('id', id);
+  if (error) { alert('폐강 처리 실패: ' + error.message); return; }
   await loadData();
 }
 async function deleteRoutineAdmin(id, title) {
@@ -765,6 +827,111 @@ async function sendBroadcast() {
   }
   resultEl.style.color = '#3B6D11';
   resultEl.textContent = `발송 완료 — 성공 ${data.sent}명 · 만료 구독 정리 ${data.removed}건 · 실패 ${data.failed}건 (대상 ${data.total}명)`;
+}
+
+async function renderRewardView() {
+  const [rwRes, rdRes] = await Promise.all([
+    sb.from('rewards').select('*').order('created_at', { ascending: false }),
+    sb.from('reward_redemptions').select('*').order('requested_at', { ascending: false }),
+  ]);
+  rewardRows = rwRes.data || [];
+  redemptionRows = rdRes.data || [];
+  renderRewardList();
+  renderRedemptionList();
+  populateGrantUserSelect();
+}
+
+function renderRewardList() {
+  document.getElementById('rewardListBody').innerHTML = rewardRows.length ? rewardRows.map(r => `
+    <tr>
+      <td>${r.title}</td>
+      <td>${r.cost}</td>
+      <td>${r.stock}</td>
+      <td><span class="pill" style="background:${r.active?'#EAF3DE':'#f5f5f5'};color:${r.active?'#3B6D11':'#aaa'};">${r.active?'활성':'비활성'}</span></td>
+      <td>
+        <button onclick="toggleRewardActive(${r.id},${!r.active})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.active?'비활성화':'활성화'}</button>
+        <button onclick="deleteReward(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
+      </td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="5">등록된 리워드가 없어요</td></tr>`;
+}
+
+function renderRedemptionList() {
+  const sorted = [...redemptionRows].sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
+  document.getElementById('redemptionListBody').innerHTML = sorted.length ? sorted.map(rd => {
+    const p = profileById[rd.user_id] || {};
+    const rw = rewardRows.find(r => r.id === rd.reward_id);
+    return `<tr>
+      <td>${p.name || '-'}${p.realName ? ' (' + p.realName + ')' : ''}</td>
+      <td>${p.phone || '-'}</td>
+      <td>${rw ? rw.title : '(삭제된 리워드)'}</td>
+      <td>${(rd.requested_at || '').slice(0, 10)}</td>
+      <td><span class="pill" style="background:${rd.status === 'fulfilled' ? '#EAF3DE' : '#FFF3CD'};color:${rd.status === 'fulfilled' ? '#3B6D11' : '#856404'};">${rd.status === 'fulfilled' ? '발송완료' : '대기'}</span></td>
+      <td>${rd.status === 'pending' ? `<button onclick="fulfillRedemption(${rd.id})" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">발송완료 처리</button>` : '-'}</td>
+    </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="6">교환 신청이 없어요</td></tr>`;
+}
+
+async function submitReward() {
+  const title = document.getElementById('rwTitle').value.trim();
+  const cost = parseInt(document.getElementById('rwCost').value);
+  const stock = parseInt(document.getElementById('rwStock').value);
+  const description = document.getElementById('rwDesc').value.trim();
+  const image_url = document.getElementById('rwImage').value.trim();
+  if (!title) { alert('리워드 이름을 입력해주세요.'); return; }
+  if (!cost || cost < 1) { alert('필요 포인트를 입력해주세요.'); return; }
+  if (isNaN(stock) || stock < 0) { alert('재고를 입력해주세요.'); return; }
+  const { error } = await sb.from('rewards').insert({ title, cost, stock, description: description || null, image_url: image_url || null });
+  if (error) { alert('등록 실패: ' + error.message); return; }
+  ['rwTitle', 'rwCost', 'rwStock', 'rwDesc', 'rwImage'].forEach(id => document.getElementById(id).value = '');
+  await renderRewardView();
+}
+
+async function toggleRewardActive(id, active) {
+  const { error } = await sb.from('rewards').update({ active }).eq('id', id);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  await renderRewardView();
+}
+
+async function deleteReward(id, title) {
+  if (!confirm(`"${title}" 리워드를 삭제할까요? 교환 신청 기록도 함께 삭제돼요.`)) return;
+  const { error } = await sb.from('rewards').delete().eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  await renderRewardView();
+}
+
+async function fulfillRedemption(id) {
+  if (!confirm('발송 완료로 처리할까요?')) return;
+  const { error } = await sb.from('reward_redemptions').update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() }).eq('id', id);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  await renderRewardView();
+}
+
+function populateGrantUserSelect() {
+  const sel = document.getElementById('grantUser');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">청소년 선택</option>' + youthRows.map(y => `<option value="${y.id}">${y.name}${y.realName ? ' (' + y.realName + ')' : ''}</option>`).join('');
+  sel.value = current;
+}
+
+async function grantNadaeum() {
+  const userId = document.getElementById('grantUser').value;
+  const amount = parseInt(document.getElementById('grantAmount').value);
+  const reason = document.getElementById('grantReason').value.trim();
+  const resultEl = document.getElementById('grantResult');
+  if (!userId) { alert('참가자를 선택해주세요.'); return; }
+  if (!amount) { alert('포인트를 입력해주세요.'); return; }
+  if (!reason) { alert('지급 사유를 입력해주세요.'); return; }
+  if (!confirm(`이 참가자에게 ${amount}점을 지급할까요?\n사유: ${reason}`)) return;
+  const { data: prof, error: fetchErr } = await sb.from('profiles').select('nadaeum').eq('id', userId).single();
+  if (fetchErr) { alert('조회 실패: ' + fetchErr.message); return; }
+  const newBalance = (prof.nadaeum || 0) + amount;
+  const { error } = await sb.from('profiles').update({ nadaeum: newBalance }).eq('id', userId);
+  if (error) { alert('지급 실패: ' + error.message); return; }
+  await sb.from('nadaeum_log').insert({ user_id: userId, amount, reason: '관리자 수동 지급: ' + reason });
+  resultEl.style.color = '#3B6D11';
+  resultEl.textContent = `지급 완료 — 현재 잔액 ${newBalance}N`;
+  document.getElementById('grantAmount').value = '';
+  document.getElementById('grantReason').value = '';
 }
 
 function renderYouthTable() {

@@ -339,9 +339,64 @@ select:focus { outline: none; border-color: #2E33BC; }
           <option value="alternative">대안학교를 다녀요</option>
         </select>
       </div>
+      <div style="text-align:left;margin:4px 2px 0;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:8px;cursor:pointer;">
+          <input type="checkbox" id="agreeAge" style="margin-top:2px;flex-shrink:0;">
+          <span>[필수] 만 14세 이상입니다</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:8px;cursor:pointer;">
+          <input type="checkbox" id="agreePrivacy" style="margin-top:2px;flex-shrink:0;">
+          <span>[필수] 개인정보 수집 및 이용 동의 <a href="javascript:void(0)" onclick="event.preventDefault();event.stopPropagation();openSheet('policySheetBg')" style="color:#fff;text-decoration:underline;">자세히</a></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.6);margin-bottom:0;cursor:pointer;">
+          <input type="checkbox" id="agreeMarketing" style="margin-top:2px;flex-shrink:0;">
+          <span>[선택] 마케팅 정보 수신 동의</span>
+        </label>
+      </div>
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
     </div>
     <div class="auth-msg" id="authMsg"></div>
+  </div>
+
+  <!-- 바텀시트: 개인정보처리방침 -->
+  <div class="sheet-bg" id="policySheetBg" style="z-index:600;" onclick="closeSheet('policySheetBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:14px;">개인정보처리방침</div>
+      <div style="font-size:13px;color:#333;line-height:1.7;">
+        <p><b>1. 개인정보의 수집 및 이용 목적</b><br>
+        '한끗루틴'(이하 '서비스')은 다음의 목적을 위해 개인정보를 수집하고 이용합니다. 수집된 개인정보는 다음 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우 사전 동의를 구할 예정입니다.<br>
+        · 회원 가입 및 관리: 회원 식별, 가입 의사 확인, 만 14세 이상 여부 확인, 불량 회원 부정 이용 방지<br>
+        · 루틴 서비스 제공: 루틴 참여 신청·승인 처리, 담당 끗짱 매칭, 학교밖청소년 자격 확인을 위한 서류 심사, 루틴 인증(사진·소감) 저장 및 인증 피드·좋아요·댓글 등 커뮤니티 기능 제공<br>
+        · 알림 발송: 사용자 맞춤형 루틴 리마인더 및 서비스 알림(푸시 메시지) 발송<br>
+        · 고객 지원: 문의 사항 처리, 공지사항 전달<br>
+        · 마케팅 및 광고에의 활용(선택): 신규 프로그램 및 챌린지 홍보, 이벤트 정보 및 광고성 정보 발송</p>
+        <p><b>2. 만 14세 미만 아동의 가입 제한</b><br>
+        서비스는 만 14세 이상만 가입 및 이용할 수 있습니다. 가입 시 입력한 생년월일을 기준으로 만 14세 미만으로 확인되는 경우 가입이 제한됩니다.</p>
+        <p><b>3. 수집하는 개인정보의 항목</b><br>
+        · 필수 항목: 닉네임, 실명, 생년월일, 이메일 주소, 비밀번호, 휴대폰번호, 거주지역(시/도, 시/군/구), 회원 유형(청소년/끗짱), 청소년의 재학 상태<br>
+        · 학교밖청소년으로 가입한 경우: 재학상태 증빙서류(정원외관리증명서·검정고시합격증 등) 파일<br>
+        · 서비스 이용 과정에서 생성되는 항목: 루틴 참여 신청 시 각오·소감, 루틴 인증 사진 및 소감, 커뮤니티 게시물·댓글, 푸시 알림 발송을 위한 브라우저 구독 정보(알림 endpoint 및 암호화 키)<br>
+        · 선택 항목: 마케팅 및 광고성 정보 수신에 동의한 회원의 이메일 주소 및 푸시 알림 구독 정보<br>
+        · 서비스 이용 과정에서 자동 생성되는 항목: 서비스 이용 기록, 접속 로그</p>
+        <p><b>4. 개인정보의 보유 및 이용 기간</b><br>
+        이용자의 개인정보는 원칙적으로 회원 탈퇴 시 또는 목적이 달성된 후 지체 없이 파기합니다. 단, 관계 법령의 규정에 의하여 보존할 필요가 있는 경우 아래와 같이 관계 법령에서 정한 일정 기간 동안 회원 정보를 보관합니다.<br>
+        · 소비자의 불만 또는 분쟁처리에 관한 기록: 3년 (전자상거래법)<br>
+        · 웹사이트/앱 방문 기록(로그): 3개월 (통신비밀보호법)</p>
+        <p><b>5. 개인정보의 파기 절차 및 방법</b><br>
+        서비스는 이용자의 개인정보가 불필요하게 되었을 때 지체 없이 해당 정보를 파기합니다. 전자적 파일 형태의 정보는 기록을 재생할 수 없는 기술적 방법을 사용하여 삭제하며, 종이 문서에 출력된 정보는 분쇄하거나 소각합니다.</p>
+        <p><b>6. 이용자의 권리와 그 행사 방법</b><br>
+        이용자는 언제든지 등록되어 있는 자신의 개인정보를 조회하거나 수정할 수 있으며, 회원 탈퇴를 통해 개인정보 이용 동의를 철회할 수 있습니다. 마케팅 정보 수신 및 푸시 알림의 경우, 앱 내 알림 설정 메뉴를 통해 언제든지 동의를 철회(수신 거부)할 수 있습니다.</p>
+        <p><b>7. 개인정보의 기술적/관리적 보호 대책</b><br>
+        서비스는 이용자의 개인정보를 취급함에 있어 분실, 도난, 유출, 변조 또는 훼손되지 않도록 안전성 확보를 위해 데이터 암호화 등 최선의 기술적 대책을 강구하고 있습니다.</p>
+        <p><b>8. 개인정보 보호책임자 및 문의처</b><br>
+        서비스를 이용하시면서 발생하는 모든 개인정보 보호 관련 민원은 아래의 연락처로 문의하실 수 있습니다.<br>
+        · 책임자: 김재순<br>
+        · 문의 이메일: yv@youthvoice.or.kr</p>
+        <p style="color:#999;font-size:12px;">시행일자: 2026년 7월 14일</p>
+      </div>
+      <button class="primary-btn" style="margin-top:16px;" onclick="closeSheet('policySheetBg')">닫기</button>
+    </div>
   </div>
 
   <!-- 끗짱 승인 대기 화면 -->
@@ -490,6 +545,7 @@ select:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">인증 +10N · 댓글 +1N<br>후기 +30N</div>
             </div>
           </div>
+          <button onclick="openShop()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;">🎁 상점 — 나다움으로 리워드 교환하기</button>
           <div class="stats-grid-3" style="grid-template-columns:repeat(2,minmax(0,1fr));">
             <div class="stat-card"><span style="font-size:18px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label">총 인증 수</span></div>
             <div class="stat-card"><span style="font-size:18px;">🔥</span><span class="stat-val" id="myStreak">0</span><span class="stat-label">연속 인증</span></div>
@@ -801,6 +857,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <input type="url" id="rMeetingLink" placeholder="줌 링크 (예: https://zoom.us/j/...)" style="margin-top:8px;">
       </div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
+      <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 예시 사진 <span class="required" id="createPhotoRequiredMark">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;" id="createPhotoLockHint"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
       <div><div class="field-label">미리보기</div><div class="preview-rcard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:22px;" id="pvEmoji">🌱</span><span style="font-size:15px;font-weight:600;color:white;" id="pvName">루틴 이름을 입력해주세요</span></div><div id="pvPartner" style="display:none;font-size:11px;color:rgba(255,255,255,0.9);margin-bottom:6px;"></div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;" id="pvDesc">루틴 소개를 입력하면 여기에 표시돼요.</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;" id="pvPeriod">기간 미설정</span><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;"><span id="pvPeople">10</span>명 모집</span></div></div></div>
@@ -840,6 +897,25 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">받은 편지 💌</div></div>
     </div>
     <div class="overlay-body" id="letterAllBody"></div>
+  </div>
+
+  <!-- 상점 -->
+  <div class="overlay" id="shopOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('shopOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">🎁 상점</div></div>
+    </div>
+    <div class="overlay-body">
+      <div style="background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;margin-bottom:6px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px;">내 나다움 포인트</div>
+        <div style="font-size:22px;font-weight:700;color:white;" id="shopMyNadaeum">0N</div>
+        <div style="font-size:10.5px;color:rgba(255,255,255,0.55);margin-top:4px;">⏳ 적립 후 3개월이 지난 포인트는 소멸돼요</div>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:#111;margin:14px 0 8px;">교환 가능한 리워드</div>
+      <div id="shopRewardList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <div style="font-size:13px;font-weight:600;color:#111;margin:20px 0 8px;">내 교환 내역</div>
+      <div id="shopMyRedemptions" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
   </div>
 
   <!-- 편지 상세 -->
@@ -994,8 +1070,8 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div style="font-size:14px;color:#888;text-align:center;line-height:1.6;">오늘 하루도 한끗씩 해냈어요!</div>
     <div id="certNadaeumBadge" style="display:flex;align-items:center;gap:8px;background:#FFFBE6;border:1.5px solid #FFD600;border-radius:40px;padding:10px 22px;margin-top:8px;">
       <span style="font-size:20px;">✨</span>
-      <span style="font-size:15px;font-weight:700;color:#B8860B;">+10 나다움</span>
-      <span style="font-size:13px;color:#999;">적립됐어요</span>
+      <span style="font-size:15px;font-weight:700;color:#B8860B;" id="certNadaeumAmount">+10 나다움</span>
+      <span style="font-size:13px;color:#999;" id="certNadaeumNote">쌓이고 있어요 (완주하면 지급돼요)</span>
     </div>
     <button class="primary-btn" style="width:auto;padding:12px 32px;margin-top:4px;" onclick="closeCertSuccess()">확인</button>
   </div>
@@ -1195,6 +1271,7 @@ async function loadProfileAndEnter() {
   }
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
+  _maybeCelebrateCompletion();
 }
 function showKkutjjangPending(status, reason) {
   document.getElementById('splashScreen').classList.add('hide');
@@ -1267,7 +1344,14 @@ async function doSignup() {
   const sido = document.getElementById('signupSido').value;
   const sigugun = document.getElementById('signupSigugun').value;
   const schoolStatus = document.getElementById('signupSchoolStatus').value;
+  const agreeAge = document.getElementById('agreeAge').checked;
+  const agreePrivacy = document.getElementById('agreePrivacy').checked;
+  const agreeMarketing = document.getElementById('agreeMarketing').checked;
   if (!name || !realName || !birthDate || !email || !pw || !phone || !sido || !sigugun) return showAuthMsg('모든 항목을 입력해주세요');
+  if (!agreeAge || !agreePrivacy) return showAuthMsg('필수 동의 항목에 체크해주세요');
+  const ageMs = Date.now() - new Date(birthDate).getTime();
+  const age = Math.floor(ageMs / (365.25 * 24 * 60 * 60 * 1000));
+  if (age < 14) return showAuthMsg('만 14세 이상만 가입할 수 있어요');
   if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
   if (signupRole === 'youth' && !schoolStatus) return showAuthMsg('재학 상태를 선택해주세요');
   showAuthMsg('가입 중...');
@@ -1277,6 +1361,7 @@ async function doSignup() {
       name, role: signupRole, real_name: realName, birth_date: birthDate, phone,
       region_sido: sido, region_sigugun: sigugun,
       school_status: signupRole === 'youth' ? schoolStatus : null,
+      marketing_agreed: agreeMarketing,
     } }
   });
   if (error) showAuthMsg('⚠️ ' + error.message);
@@ -1344,11 +1429,12 @@ function loadState() {
 }
 function save() {
   localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  // nadaeum은 여기서 건드리지 않음: 인증은 완주 시점에 서버 트리거가 지급하고,
+  // 댓글/후기는 earnNadaeum()이 그때그때 직접 반영함. 여기서 덮어쓰면 트리거 지급분을 지워버림.
   if (currentUser && state.currentRole === 'youth') {
     sb.from('profiles').update({
       cert_count: state.youth.certCount,
       comm_count: state.youth.commCount,
-      nadaeum: state.youth.nadaeum,
       cert_dates: state.youth.certDates,
     }).eq('id', currentUser.id).then(() => {});
   }
@@ -1411,7 +1497,7 @@ async function loadRoutines() {
       id: r.id, status: effectiveStatus, title: r.title, emoji: r.emoji || '🌱',
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
-      people: approved.length, maxPeople: r.max_people || 10,
+      people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
@@ -1791,17 +1877,17 @@ function renderRoutineGrid(type, q) {
     return 0;
   });
   grid.innerHTML = sorted.map(r=>{
-    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
+    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
     const isRejectedApp=!isPending && Object.prototype.hasOwnProperty.call(state.youth.rejectedRoutines||{}, r.id);
     const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-    const cardBg=isDone?'#fafafa':'#fff';
-    const cardBorder=isDone?'#e8e8e8':(isActive&&isMine)?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
+    const cardBg=isDone||isCancelled?'#fafafa':'#fff';
+    const cardBorder=isDone||isCancelled?'#e8e8e8':(isActive&&isMine)?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
     const bw=(isActive&&isMine)||isPending||isRejectedApp?'1.5px':'0.5px';
-    const tc=isDone?'#aaa':'#111';
-    const sl=isActive?(isMine?'참여 중':'진행 중'):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
-    const bb=isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
-    const bc=isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
+    const tc=isDone||isCancelled?'#aaa':'#111';
+    const sl=isCancelled?'폐강':isActive?(isMine?'참여 중':'진행 중'):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
+    const bb=isCancelled?'#f0f0f0':isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
+    const bc=isCancelled?'#aaa':isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
     // D-day
     const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
@@ -2171,6 +2257,11 @@ function openRoutineDetail(id) {
         <button class="primary-btn" onclick="openApplyOverlay(${r.id})">다시 신청하기</button>`
       : `<button class="primary-btn" onclick="openApplyOverlay(${r.id})">참여 신청하기</button>`
     }`;
+  else if(r.status==='cancelled') body+=`
+    <div style="width:100%;padding:20px 14px;background:#f5f5f7;border-radius:12px;text-align:center;">
+      <div style="font-size:28px;margin-bottom:8px;">🙏</div>
+      <div style="font-size:13px;color:#888;line-height:1.6;">최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강됐어요</div>
+    </div>`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     // 완주 직후에만 의미있는 액션들이라 종료일로부터 7일까지만 노출
@@ -2350,15 +2441,16 @@ function resetTodayIfNeeded() {
     state.youth.nadaeumToday={date:todayKey(),certs:0,comments:0};
   }
 }
+// 댓글/후기는 1회성 행동이라 그때그때 즉시 지급(기존과 동일).
+// 인증(cert)만 예외: 여기서 지급하지 않고 서버 트리거가 완주 기준 달성 시 지급 —
+// submitCert()에서 인증 저장 직후 profiles.nadaeum을 다시 조회해서 반영함.
 function earnNadaeum(type, routineId) {
   if(!state.youth.nadaeum) state.youth.nadaeum=0;
   if(!state.youth.nadaeumReviews) state.youth.nadaeumReviews=[];
   resetTodayIfNeeded();
   const t=state.youth.nadaeumToday;
   let earned=0, msg='';
-  if(type==='cert') {
-    if(t.certs<1) { earned=10; t.certs++; msg='📸 인증 +10 나다움'; }
-  } else if(type==='comment') {
+  if(type==='comment') {
     if(t.comments<5) { earned=1; t.comments++; msg='💬 댓글 +1 나다움'; }
   } else if(type==='review') {
     if(routineId && !state.youth.nadaeumReviews.includes(routineId)) {
@@ -2367,6 +2459,11 @@ function earnNadaeum(type, routineId) {
   }
   if(earned>0) {
     state.youth.nadaeum+=earned;
+    if(currentUser) {
+      sb.from('profiles').update({ nadaeum: state.youth.nadaeum }).eq('id', currentUser.id).then(() => {});
+      // 소멸기간(3개월) 계산은 nadaeum_log 기준이라 적립 내역을 반드시 남겨야 함
+      sb.from('nadaeum_log').insert({ user_id: currentUser.id, amount: earned, reason: type==='comment'?'댓글 작성':'후기 작성' }).then(() => {});
+    }
     save();
     showNadaeumToast(msg+` → 총 ${state.youth.nadaeum}N`);
     renderNadaeum();
@@ -2376,6 +2473,55 @@ function renderNadaeum() {
   const n=state.youth.nadaeum||0;
   const els=document.querySelectorAll('.nadaeum-val');
   els.forEach(el=>el.textContent=n+'N');
+}
+
+// ── 상점 ─────────────────────────────
+async function openShop() {
+  document.getElementById('shopMyNadaeum').textContent = (state.youth.nadaeum||0)+'N';
+  document.getElementById('shopRewardList').innerHTML = `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;">불러오는 중...</div>`;
+  document.getElementById('shopMyRedemptions').innerHTML = '';
+  openOverlay('shopOverlay');
+  const [rwRes, rdRes] = await Promise.all([
+    sb.from('rewards').select('*').eq('active', true).order('cost', { ascending: true }),
+    sb.from('reward_redemptions').select('*, rewards(title)').eq('user_id', currentUser.id).order('requested_at', { ascending: false }),
+  ]);
+  renderShopRewards(rwRes.data || []);
+  renderShopRedemptions(rdRes.data || []);
+}
+function renderShopRewards(rewards) {
+  const myN = state.youth.nadaeum||0;
+  document.getElementById('shopRewardList').innerHTML = rewards.length ? rewards.map(r => {
+    const canAfford = myN >= r.cost && r.stock > 0;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:1px solid #e8e8e8;border-radius:14px;">
+      ${r.image_url ? `<img src="${r.image_url}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;">` : `<div style="width:52px;height:52px;border-radius:10px;background:#f0f1fb;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎁</div>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${r.title}</div>
+        ${r.description?`<div style="font-size:11px;color:#888;margin-top:2px;">${r.description}</div>`:''}
+        <div style="font-size:12px;color:#2E33BC;font-weight:700;margin-top:4px;">${r.cost}N ${r.stock<=0?'· 품절':''}</div>
+      </div>
+      <button ${canAfford?'':'disabled'} onclick="redeemReward(${r.id},${r.cost},'${r.title.replace(/'/g,"\\'")}')" style="flex-shrink:0;padding:9px 14px;background:${canAfford?'#2E33BC':'#e8e8e8'};color:${canAfford?'#fff':'#aaa'};border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:${canAfford?'pointer':'not-allowed'};">교환하기</button>
+    </div>`;
+  }).join('') : `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 교환할 수 있는 리워드가 없어요</div>`;
+}
+function renderShopRedemptions(redemptions) {
+  document.getElementById('shopMyRedemptions').innerHTML = redemptions.length ? redemptions.map(rd => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f5f5f7;border-radius:10px;">
+      <div>
+        <div style="font-size:12.5px;color:#111;font-weight:500;">${rd.rewards?.title || '(삭제된 리워드)'}</div>
+        <div style="font-size:11px;color:#999;margin-top:1px;">${(rd.requested_at||'').slice(0,10)} 신청</div>
+      </div>
+      <span style="font-size:11px;padding:3px 9px;border-radius:10px;background:${rd.status==='fulfilled'?'#EAF3DE':'#FFF3CD'};color:${rd.status==='fulfilled'?'#3B6D11':'#856404'};">${rd.status==='fulfilled'?'발송완료':'대기 중'}</span>
+    </div>`).join('') : `<div style="padding:16px;text-align:center;font-size:12.5px;color:#aaa;">아직 교환한 리워드가 없어요</div>`;
+}
+async function redeemReward(rewardId, cost, title) {
+  if(!confirm(`"${title}"(으)로 교환할까요?\n${cost}N이 차감돼요.`)) return;
+  const { error } = await sb.from('reward_redemptions').insert({ user_id: currentUser.id, reward_id: rewardId });
+  if(error){ alert('교환 실패: '+error.message); return; }
+  const { data: freshProfile } = await sb.from('profiles').select('nadaeum').eq('id', currentUser.id).single();
+  state.youth.nadaeum = freshProfile?.nadaeum ?? (state.youth.nadaeum - cost);
+  renderNadaeum();
+  alert('교환 신청 완료! 담당 끗짱/관리자가 확인 후 전달해드려요.');
+  openShop();
 }
 
 function _dataURLtoBlob(dataURL) {
@@ -2411,17 +2557,29 @@ async function submitCert() {
     if(error){ alert('인증 저장 실패: '+error.message); return; }
   }
   const isYouth = state.currentRole === 'youth';
+  const prevNadaeum = state.youth.nadaeum || 0;
   if(isYouth) {
     state.youth.certCount++;
     const todayStr=new Date().toISOString().slice(0,10);
     if(!state.youth.certDates) state.youth.certDates=[];
     if(!state.youth.certDates.includes(todayStr)) state.youth.certDates.push(todayStr);
-    earnNadaeum('cert');
   }
   save();
   await loadRoutines();
   await loadCertFeed();
   closeOverlay('certFormOverlay');
+  if(isYouth && currentUser) {
+    // 인증은 완주 기준 달성 시에만 서버 트리거가 실제 지급하므로, 저장 직후 다시 조회해서 반영
+    const { data: freshProfile } = await sb.from('profiles').select('nadaeum').eq('id', currentUser.id).single();
+    const newNadaeum = freshProfile?.nadaeum ?? prevNadaeum;
+    const gained = newNadaeum - prevNadaeum;
+    state.youth.nadaeum = newNadaeum;
+    renderNadaeum();
+    const amountEl = document.getElementById('certNadaeumAmount');
+    const noteEl = document.getElementById('certNadaeumNote');
+    if (gained > 0) { amountEl.textContent = `+${gained} 나다움`; noteEl.textContent = '완주 기준 달성! 지급됐어요'; }
+    else { amountEl.textContent = '+10 나다움'; noteEl.textContent = '쌓이고 있어요 (완주하면 지급돼요)'; }
+  }
   document.getElementById('certNadaeumBadge').style.display = isYouth ? '' : 'none';
   document.getElementById('certSuccess').classList.add('open');
 }
@@ -3124,13 +3282,13 @@ function kFilterRoutine(type,el) {
     return 0;
   });
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
-    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit';
-    const cardBg=isDone?'#f0f0f0':'#fff';
-    const cardBorder=isDone?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
+    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
+    const cardBg=isDone||isCancelled?'#f0f0f0':'#fff';
+    const cardBorder=isDone||isCancelled?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
     const bw=isActive?'1.5px':'0.5px';
-    const sl=isActive?'진행 중':isRecruit?'모집 중':'완료';
-    const bb=isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
-    const bc=isActive?'#fff':isRecruit?'#185FA5':'#aaa';
+    const sl=isCancelled?'폐강':isActive?'진행 중':isRecruit?'모집 중':'완료';
+    const bb=isCancelled?'#e0e0e0':isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
+    const bc=isCancelled?'#aaa':isActive?'#fff':isRecruit?'#185FA5':'#aaa';
     const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 오늘</span>`:'')
@@ -3189,8 +3347,13 @@ function openKRoutineDetail(routineId) {
   const pending = applicants.filter(a=>a.status==='pending');
   const approved = applicants.filter(a=>a.status==='approved');
   const rejected = applicants.filter(a=>a.status==='rejected');
+  const canCancel = (r.status==='recruit'||r.status==='active') && r.minPeople;
   document.getElementById('rdBody').innerHTML=`
-    <button onclick="openEditRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;background:#fff;color:#FF006C;border:1.5px solid #FF006C;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px;"><i class="ti ti-pencil" style="font-size:14px;"></i> 루틴 수정</button>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="openEditRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#FF006C;border:1.5px solid #FF006C;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-pencil" style="font-size:14px;"></i> 루틴 수정</button>
+      ${canCancel?`<button onclick="cancelRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#888;border:1.5px solid #ddd;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-ban" style="font-size:14px;"></i> 폐강 처리</button>`:''}
+    </div>
+    ${r.status==='cancelled'?`<div style="padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:12.5px;color:#888;margin-bottom:14px;">🙏 최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강된 루틴이에요</div>`:''}
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
       신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>
@@ -3255,6 +3418,15 @@ async function cancelApproval(routineId, userId) {
   openKRoutineDetail(routineId);
   kRenderRoutineTab();
 }
+
+async function cancelRoutine(routineId) {
+  if(!confirm('이 루틴을 폐강 처리할까요? 이미 신청한 청소년들에게 폐강 알림이 자동으로 발송돼요. 이 작업은 되돌릴 수 없어요.')) return;
+  const { error } = await sb.from('routines').update({status:'cancelled'}).eq('id',routineId);
+  if(error){ alert('폐강 처리 실패: '+error.message); return; }
+  await loadRoutines();
+  openKRoutineDetail(routineId);
+  kRenderRoutineTab();
+}
 function openKCertDetail(rid,name) {
   const r=state.routines.find(x=>x.id===rid);
   const p=r.participants.find(x=>x.name===name);
@@ -3303,7 +3475,7 @@ async function populateLeaderSelect(selectedId) {
   }
 }
 function resetCreateForm() {
-  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
@@ -3339,6 +3511,7 @@ async function openEditRoutine(routineId) {
   document.getElementById('rStart').value = r.startDate || '';
   document.getElementById('rEnd').value = r.endDate || '';
   document.getElementById('rPeople').value = r.maxPeople || 10;
+  document.getElementById('rMinPeople').value = r.minPeople || '';
   document.getElementById('rDesc').value = r.desc || '';
   document.getElementById('rKickoff').value = r.kickoffAt ? r.kickoffAt.slice(0,16) : '';
   document.getElementById('rClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
@@ -3395,10 +3568,11 @@ function _readCreateFormCommon(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
   const partner=document.getElementById('rPartner').value.trim();
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
+  const mp=document.getElementById('rMinPeople').value;
   const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
   const meetLink=document.getElementById('rMeetingLink').value.trim();
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
-  return {n,d,partner,s,e,p,kickoff,closing,meetLink,leader};
+  return {n,d,partner,s,e,p,mp,kickoff,closing,meetLink,leader};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -3406,6 +3580,7 @@ function _validateCreateForm(f){
   if((f.kickoff||f.closing)&&!f.meetLink) return '온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.';
   if(!f.s||!f.e||f.e<f.s) return '기간을 올바르게 설정해주세요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
+  if(f.mp && (parseInt(f.mp)<1 || parseInt(f.mp)>parseInt(f.p))) return '최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.';
   if(!f.d) return '루틴 소개를 입력해주세요.';
   return null;
 }
@@ -3429,7 +3604,7 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    start_date:f.s, end_date:f.e, max_people:parseInt(f.p),
+    start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -3459,7 +3634,7 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    start_date:f.s, end_date:f.e, max_people:parseInt(f.p),
+    start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;
@@ -3742,14 +3917,16 @@ function openCompleteSuccess(routineId) {
   currentLetterRoutineId=routineId;
   const r=state.routines.find(x=>x.id===routineId);
   if(r) {
+    const me=(r.participants||[]).find(p=>p.userId===currentUser?.id);
+    const myCerts=me?me.cert:0;
     document.getElementById('completeBadgeEmoji').textContent=r.emoji||'🏅';
     document.getElementById('completeRoutineName').textContent=`${r.emoji} ${r.title}`;
     // 기간 계산
     let days=21;
-    if(r.period){const parts=r.period.split('–');if(parts.length===2){const[s,e]=parts;const y=new Date().getFullYear();const sd=new Date(`${y}.${s.trim()}`),ed=new Date(`${y}.${e.trim()}`);if(!isNaN(sd)&&!isNaN(ed))days=Math.round((ed-sd)/86400000)+1;}}
+    if(r.startDate&&r.endDate){const s=new Date(r.startDate+'T00:00:00'),e=new Date(r.endDate+'T00:00:00');if(!isNaN(s)&&!isNaN(e)&&e>=s)days=Math.round((e-s)/86400000)+1;}
     document.getElementById('completeDays').textContent=days;
-    document.getElementById('completeCerts').textContent=r.certCount||0;
-    const rate=days>0?Math.round(((r.certCount||0)/days)*100):0;
+    document.getElementById('completeCerts').textContent=myCerts;
+    const rate=days>0?Math.round((myCerts/days)*100):0;
     document.getElementById('completeRate').textContent=Math.min(rate,100)+'%';
   }
   spawnConfetti();
@@ -3758,6 +3935,16 @@ function openCompleteSuccess(routineId) {
 function closeCompleteSuccess() {
   document.getElementById('completeSuccess').classList.remove('open');
   document.getElementById('confettiWrap').innerHTML='';
+}
+// 루틴이 done으로 전환된 걸 감지해서 완주 축하 화면을 한 번만 자동으로 띄움
+function _maybeCelebrateCompletion() {
+  if (!currentUser || state.currentRole !== 'youth') return;
+  const target = (state.routines||[]).find(r => r.status === 'done'
+    && (r.participants||[]).some(p => p.userId === currentUser.id)
+    && !localStorage.getItem('hankkut_celebrated_' + currentUser.id + '_' + r.id));
+  if (!target) return;
+  localStorage.setItem('hankkut_celebrated_' + currentUser.id + '_' + target.id, '1');
+  openCompleteSuccess(target.id);
 }
 function spawnConfetti() {
   const wrap=document.getElementById('confettiWrap');
@@ -3963,6 +4150,7 @@ async function refetchOnResume() {
   const activePage = document.querySelector((isYouth ? '#youthTabs' : '#kkutjjangTabs') + ' .tab-page.active');
   const tab = activePage && activePage.id.startsWith(prefix) ? activePage.id.slice(prefix.length) : null;
   if (tab) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
+  _maybeCelebrateCompletion();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);
