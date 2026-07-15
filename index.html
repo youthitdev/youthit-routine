@@ -545,6 +545,7 @@ select:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">인증 +10N · 댓글 +1N<br>후기 +30N</div>
             </div>
           </div>
+          <div id="myExpiryBanner" style="display:none;background:#FFF3CD;border-radius:12px;padding:10px 14px;font-size:12px;color:#856404;line-height:1.5;"></div>
           <button onclick="openShop()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;">🎁 상점 — 나다움으로 리워드 교환하기</button>
           <div class="stats-grid-3" style="grid-template-columns:repeat(2,minmax(0,1fr));">
             <div class="stat-card"><span style="font-size:18px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label">총 인증 수</span></div>
@@ -911,10 +912,13 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="font-size:22px;font-weight:700;color:white;" id="shopMyNadaeum">0N</div>
         <div style="font-size:10.5px;color:rgba(255,255,255,0.55);margin-top:4px;">⏳ 적립 후 3개월이 지난 포인트는 소멸돼요</div>
       </div>
+      <div id="shopExpiryBanner" style="display:none;background:#FFF3CD;border-radius:12px;padding:10px 14px;font-size:12px;color:#856404;line-height:1.5;"></div>
       <div style="font-size:13px;font-weight:600;color:#111;margin:14px 0 8px;">교환 가능한 리워드</div>
       <div id="shopRewardList" style="display:flex;flex-direction:column;gap:10px;"></div>
       <div style="font-size:13px;font-weight:600;color:#111;margin:20px 0 8px;">내 교환 내역</div>
       <div id="shopMyRedemptions" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="font-size:13px;font-weight:600;color:#111;margin:20px 0 8px;">포인트 내역</div>
+      <div id="shopPointLog" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
   </div>
 
@@ -1668,7 +1672,7 @@ function switchTab(tab) {
   else if(tab==='routine') renderRoutine();
   else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
-  else if(tab==='my') renderMy();
+  else if(tab==='my') { renderMy(); refreshExpiryBanner(); }
 }
 
 // ════════════════════════════════════════════════════════
@@ -2480,13 +2484,66 @@ async function openShop() {
   document.getElementById('shopMyNadaeum').textContent = (state.youth.nadaeum||0)+'N';
   document.getElementById('shopRewardList').innerHTML = `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;">불러오는 중...</div>`;
   document.getElementById('shopMyRedemptions').innerHTML = '';
+  document.getElementById('shopPointLog').innerHTML = '';
   openOverlay('shopOverlay');
-  const [rwRes, rdRes] = await Promise.all([
+  const [rwRes, rdRes, logRes] = await Promise.all([
     sb.from('rewards').select('*').eq('active', true).order('cost', { ascending: true }),
     sb.from('reward_redemptions').select('*, rewards(title)').eq('user_id', currentUser.id).order('requested_at', { ascending: false }),
+    sb.from('nadaeum_log').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }),
   ]);
   renderShopRewards(rwRes.data || []);
   renderShopRedemptions(rdRes.data || []);
+  renderShopPointLog(logRes.data || []);
+  renderExpiryBanners(logRes.data || []);
+}
+function renderShopPointLog(log) {
+  document.getElementById('shopPointLog').innerHTML = log.length ? log.slice(0, 50).map(l => {
+    const isExpiry = (l.reason||'').startsWith('포인트 소멸');
+    const isMinus = l.amount < 0;
+    const color = isExpiry ? '#aaa' : isMinus ? '#c0392b' : '#2E33BC';
+    const icon = isExpiry ? '⏳' : isMinus ? '🎁' : '➕';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:${isExpiry?'#fafafa':'#f5f5f7'};border-radius:10px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;color:${isExpiry?'#aaa':'#333'};">${icon} ${l.reason||'-'}</div>
+        <div style="font-size:10.5px;color:#bbb;margin-top:1px;">${(l.created_at||'').slice(0,10)}</div>
+      </div>
+      <span style="font-size:13px;font-weight:700;color:${color};flex-shrink:0;">${l.amount>0?'+':''}${l.amount}N</span>
+    </div>`;
+  }).join('') : `<div style="padding:16px;text-align:center;font-size:12.5px;color:#aaa;">아직 포인트 내역이 없어요</div>`;
+}
+// 30일 안에 소멸될 포인트 계산 (서버 소멸 로직과 같은 선입선출 방식의 근사치)
+function _calcExpiring30d(log) {
+  const balance = state.youth.nadaeum||0;
+  if (balance <= 0) return 0;
+  const cutoff = Date.now() - (90-30)*86400000; // 60일 이전 적립분 = 30일 내 소멸 대상
+  let earnsExpiring = 0, spent = 0;
+  log.forEach(l => {
+    if (l.amount > 0 && new Date(l.created_at).getTime() < cutoff) earnsExpiring += l.amount;
+    if (l.amount < 0) spent += -l.amount;
+  });
+  return Math.max(0, Math.min(balance, earnsExpiring - spent));
+}
+function renderExpiryBanners(log) {
+  const expiring = _calcExpiring30d(log);
+  const shopBanner = document.getElementById('shopExpiryBanner');
+  const myBanner = document.getElementById('myExpiryBanner');
+  if (expiring > 0) {
+    shopBanner.style.display = '';
+    shopBanner.innerHTML = `⏳ <b>${expiring}N</b>이 한 달 안에 소멸돼요 — 아래 리워드로 교환해보세요!`;
+    if (myBanner) {
+      myBanner.style.display = '';
+      myBanner.innerHTML = `⏳ <b>${expiring}N</b>이 한 달 안에 소멸 예정이에요 — <span style="text-decoration:underline;cursor:pointer;" onclick="openShop()">상점에서 쓰기</span>`;
+    }
+  } else {
+    shopBanner.style.display = 'none';
+    if (myBanner) myBanner.style.display = 'none';
+  }
+}
+// MY탭 진입 시 배너 갱신용 (상점 안 열어도 보이게)
+async function refreshExpiryBanner() {
+  if (!currentUser || state.currentRole !== 'youth') return;
+  const { data } = await sb.from('nadaeum_log').select('amount,created_at').eq('user_id', currentUser.id);
+  renderExpiryBanners(data || []);
 }
 function renderShopRewards(rewards) {
   const myN = state.youth.nadaeum||0;

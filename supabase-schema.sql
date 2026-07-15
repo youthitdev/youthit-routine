@@ -989,3 +989,43 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 SELECT cron.unschedule('hankkut-nadaeum-expiry')
  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-nadaeum-expiry');
 SELECT cron.schedule('hankkut-nadaeum-expiry', '10 0 * * *', 'SELECT expire_nadaeum()');
+
+-- =====================================================
+-- [마이그레이션 2026-07-14e] 완주 지급 순간 푸시 알림
+-- 완주 기준(2/3) 최초 달성으로 나다움이 일괄 지급되는 순간,
+-- 루틴명과 지급 총액을 푸시로 알림. 완주 후 추가 인증(+10)은 알림 없음(피로 방지).
+-- =====================================================
+CREATE OR REPLACE FUNCTION on_cert_nadaeum_payout()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_start date;
+  r_end date;
+  r_title text;
+  day_count int;
+  cert_goal int;
+  paid boolean;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  SELECT start_date, end_date, title INTO r_start, r_end, r_title FROM routines WHERE id = NEW.routine_id;
+  day_count := GREATEST(1, COALESCE((r_end - r_start), 20) + 1);
+  cert_goal := GREATEST(1, FLOOR(day_count * 2.0 / 3)::int);
+
+  SELECT nadaeum_paid INTO paid FROM routine_participants WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+
+  IF paid THEN
+    UPDATE profiles SET nadaeum = nadaeum + 10 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 10, '루틴 인증 (완주 후 추가 인증)');
+  ELSIF cnt >= cert_goal THEN
+    UPDATE profiles SET nadaeum = nadaeum + (cnt * 10) WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, cnt * 10, '루틴 완주 기준 달성 (인증 ' || cnt || '회 적립분 일괄 지급)');
+    UPDATE routine_participants SET nadaeum_paid = true WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 완주 기준 달성!',
+      '"' || coalesce(r_title, '루틴') || '"에서 나다움 ' || (cnt * 10) || 'N이 지급됐어요. 상점에서 리워드로 교환해보세요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

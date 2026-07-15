@@ -230,6 +230,10 @@
   </div>
 
   <div id="rewardView" style="display:none;">
+    <div class="kpi-row" style="margin-bottom:16px;">
+      <div class="kpi-card"><div class="kpi-label">교환 건수</div><div class="kpi-val" id="kpiRedemptions">0</div><div class="kpi-sub" id="kpiRedemptionsSub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">유통 포인트</div><div class="kpi-val" id="kpiCirculating">0N</div><div class="kpi-sub">청소년 보유 잔액 합계</div></div>
+    </div>
     <div class="chart-card" style="margin-bottom:16px;">
       <h3>🎁 리워드 등록</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
@@ -830,12 +834,17 @@ async function sendBroadcast() {
 }
 
 async function renderRewardView() {
-  const [rwRes, rdRes] = await Promise.all([
+  const [rwRes, rdRes, profRes] = await Promise.all([
     sb.from('rewards').select('*').order('created_at', { ascending: false }),
     sb.from('reward_redemptions').select('*').order('requested_at', { ascending: false }),
+    sb.from('profiles').select('nadaeum').eq('role', 'youth'),
   ]);
   rewardRows = rwRes.data || [];
   redemptionRows = rdRes.data || [];
+  const pendingCnt = redemptionRows.filter(r => r.status === 'pending').length;
+  document.getElementById('kpiRedemptions').textContent = redemptionRows.length;
+  document.getElementById('kpiRedemptionsSub').textContent = pendingCnt ? `대기 ${pendingCnt}건` : '대기 없음';
+  document.getElementById('kpiCirculating').textContent = (profRes.data || []).reduce((a, p) => a + (p.nadaeum || 0), 0).toLocaleString() + 'N';
   renderRewardList();
   renderRedemptionList();
   populateGrantUserSelect();
