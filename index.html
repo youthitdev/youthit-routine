@@ -1451,7 +1451,11 @@ function showAuthMsg(msg) {
 async function signInWithKakao() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'kakao',
-    options: { redirectTo: location.origin + location.pathname },
+    options: {
+      redirectTo: location.origin + location.pathname,
+      // account_email은 카카오 비즈앱 전용이라 요청하면 KOE205 발생 → 닉네임/사진만 요청
+      scopes: 'profile_nickname profile_image',
+    },
   });
   if (error) showAuthMsg('⚠️ ' + error.message);
 }
