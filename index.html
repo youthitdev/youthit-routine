@@ -1155,7 +1155,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       </div>
     </div>
     <button class="complete-btn-primary" onclick="openLetterFromComplete()">💌 끗짱에게 편지 쓰기</button>
-    <button class="complete-btn-secondary" onclick="closeCompleteSuccess()">나중에 쓸게요</button>
+    <button class="complete-btn-primary" style="background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);" onclick="closeCompleteSuccess();openReportCard(currentLetterRoutineId)">📤 완주 리포트 공유</button>
+    <button class="complete-btn-secondary" onclick="closeCompleteSuccess()">나중에 할게요</button>
   </div>
 
   <!-- 바텀시트: 완주 리포트 공유 -->
