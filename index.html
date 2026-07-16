@@ -312,6 +312,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <input type="email" id="loginEmail" class="auth-input" placeholder="이메일" onkeydown="if(event.key==='Enter')doLogin()">
       <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
+      <button onclick="signInWithKakao()" style="width:100%;padding:14px;border:none;border-radius:14px;background:#FEE500;color:#191919;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;">💬 카카오로 시작하기</button>
       <button onclick="sendResetEmail()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:12px;text-decoration:underline;cursor:pointer;margin-top:12px;font-family:inherit;">비밀번호를 잊으셨나요?</button>
     </div>
     <!-- 회원가입 폼 -->
@@ -354,6 +355,8 @@ select:focus { outline: none; border-color: #2E33BC; }
         </label>
       </div>
       <button class="splash-btn splash-btn-primary" onclick="doSignup()">가입하기</button>
+      <button onclick="signInWithKakao()" style="width:100%;padding:14px;border:none;border-radius:14px;background:#FEE500;color:#191919;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;">💬 카카오로 시작하기</button>
+      <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px;text-align:center;">카카오로 시작하면 기본정보는 다음 화면에서 입력해요</div>
     </div>
     <div class="auth-msg" id="authMsg"></div>
   </div>
@@ -406,6 +409,52 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div id="kkPendingBody" style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.6;margin-bottom:28px;"></div>
     <a href="mailto:soon@youthvoice.or.kr" style="font-size:13px;color:#fff;text-decoration:underline;margin-bottom:18px;">soon@youthvoice.or.kr 문의하기</a>
     <button class="splash-btn splash-btn-primary" style="width:auto;padding:11px 28px;" onclick="kkPendingLogout()">로그아웃</button>
+  </div>
+
+  <!-- 카카오 등 소셜 최초 로그인 후 추가 정보 입력 화면 -->
+  <div class="splash" id="completeProfileScreen" style="display:none;">
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;">거의 다 왔어요! 👋</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:20px;text-align:center;line-height:1.5;">한끗루틴 이용에 필요한 기본정보를<br>입력해주세요 (최초 1회)</div>
+    <div class="auth-form" style="display:flex;">
+      <div class="role-row">
+        <button class="role-btn active" id="cpRoleYouth" onclick="selectCpRole('youth')">🌱 청소년</button>
+        <button class="role-btn" id="cpRoleKk" onclick="selectCpRole('kkutjjang')">💪 끗짱</button>
+      </div>
+      <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
+      <input type="text" id="cpName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
+      <input type="text" id="cpRealName" class="auth-input" placeholder="이름 (실명)">
+      <input type="date" id="cpBirth" class="auth-input">
+      <input type="tel" id="cpPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
+      <div style="display:flex;gap:6px;">
+        <select id="cpSido" class="auth-input" style="flex:1;" onchange="populateSigugunSelect('cpSido','cpSigugun')"><option value="">시/도 선택</option></select>
+        <select id="cpSigugun" class="auth-input" style="flex:1;"><option value="">시/군/구 선택</option></select>
+      </div>
+      <div id="cpYouthExtra">
+        <select id="cpSchoolStatus" class="auth-input">
+          <option value="">재학 상태 선택</option>
+          <option value="out_of_school">학교 밖 청소년이에요</option>
+          <option value="enrolled">학교를 다녀요</option>
+          <option value="alternative">대안학교를 다녀요</option>
+        </select>
+      </div>
+      <div style="text-align:left;margin:4px 2px 0;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:8px;cursor:pointer;">
+          <input type="checkbox" id="cpAgreeAge" style="margin-top:2px;flex-shrink:0;">
+          <span>[필수] 만 14세 이상입니다</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:8px;cursor:pointer;">
+          <input type="checkbox" id="cpAgreePrivacy" style="margin-top:2px;flex-shrink:0;">
+          <span>[필수] 개인정보 수집 및 이용 동의 <a href="javascript:void(0)" onclick="event.preventDefault();event.stopPropagation();openSheet('policySheetBg')" style="color:#fff;text-decoration:underline;">자세히</a></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.6);margin-bottom:0;cursor:pointer;">
+          <input type="checkbox" id="cpAgreeMarketing" style="margin-top:2px;flex-shrink:0;">
+          <span>[선택] 마케팅 정보 수신 동의</span>
+        </label>
+      </div>
+      <button class="splash-btn splash-btn-primary" onclick="submitCompleteProfile()">시작하기</button>
+      <button onclick="kkPendingLogout()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:12px;text-decoration:underline;cursor:pointer;margin-top:10px;font-family:inherit;">다른 계정으로 로그인</button>
+    </div>
+    <div class="auth-msg" id="cpMsg"></div>
   </div>
 
   <!-- 비밀번호 재설정 화면 -->
@@ -1246,6 +1295,11 @@ async function loadProfileAndEnter() {
   }
 
   if (!profile) { showAuthMsg('⚠️ 프로필 로드 실패. 잠시 후 다시 시도해주세요.'); return; }
+  // 소셜(카카오) 최초 로그인은 기본정보가 비어있음 → 추가 정보 입력 화면으로
+  if (!profile.real_name || !profile.birth_date || !profile.phone || !profile.region_sido) {
+    showCompleteProfile(profile);
+    return;
+  }
   state.youth.name = profile.name;
   state.youth.certCount = profile.cert_count || 0;
   state.youth.commCount = profile.comm_count || 0;
@@ -1391,6 +1445,64 @@ function selectSignupRole(role) {
 
 function showAuthMsg(msg) {
   document.getElementById('authMsg').textContent = msg;
+}
+
+// ── 카카오 로그인 + 추가 정보 입력 ─────────────────────────
+async function signInWithKakao() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: { redirectTo: location.origin + location.pathname },
+  });
+  if (error) showAuthMsg('⚠️ ' + error.message);
+}
+let cpRole = 'youth';
+function selectCpRole(role) {
+  cpRole = role;
+  document.getElementById('cpRoleYouth').classList.toggle('active', role === 'youth');
+  document.getElementById('cpRoleKk').classList.toggle('active', role === 'kkutjjang');
+  document.getElementById('cpYouthExtra').style.display = role === 'youth' ? '' : 'none';
+  document.getElementById('cpKkHint').style.display = role === 'kkutjjang' ? '' : 'none';
+}
+function showCompleteProfile(profile) {
+  document.getElementById('splashScreen').classList.add('hide');
+  populateSidoSelect('cpSido');
+  // 카카오 프로필 닉네임이 있으면 미리 채움
+  const meta = currentUser?.user_metadata || {};
+  document.getElementById('cpName').value = (profile.name && profile.name !== '익명') ? profile.name : (meta.name || meta.full_name || meta.preferred_username || '');
+  selectCpRole(profile.role === 'kkutjjang' ? 'kkutjjang' : 'youth');
+  document.getElementById('completeProfileScreen').style.display = 'flex';
+}
+async function submitCompleteProfile() {
+  const msg = t => { document.getElementById('cpMsg').textContent = t; };
+  const name = document.getElementById('cpName').value.trim();
+  const realName = document.getElementById('cpRealName').value.trim();
+  const birthDate = document.getElementById('cpBirth').value;
+  const phone = document.getElementById('cpPhone').value.trim();
+  const sido = document.getElementById('cpSido').value;
+  const sigugun = document.getElementById('cpSigugun').value;
+  const schoolStatus = document.getElementById('cpSchoolStatus').value;
+  const agreeAge = document.getElementById('cpAgreeAge').checked;
+  const agreePrivacy = document.getElementById('cpAgreePrivacy').checked;
+  const agreeMarketing = document.getElementById('cpAgreeMarketing').checked;
+  if (!name || !realName || !birthDate || !phone || !sido || !sigugun) return msg('모든 항목을 입력해주세요');
+  if (!agreeAge || !agreePrivacy) return msg('필수 동의 항목에 체크해주세요');
+  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  if (age < 14) return msg('만 14세 이상만 가입할 수 있어요');
+  if (cpRole === 'youth' && !schoolStatus) return msg('재학 상태를 선택해주세요');
+  msg('저장 중...');
+  const payload = {
+    name, real_name: realName, birth_date: birthDate, phone,
+    region_sido: sido, region_sigugun: sigugun,
+    role: cpRole,
+    school_status: cpRole === 'youth' ? schoolStatus : null,
+    privacy_agreed_at: new Date().toISOString(),
+    marketing_agreed: agreeMarketing,
+  };
+  if (cpRole === 'kkutjjang') payload.kkutjjang_status = 'pending';
+  const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
+  if (error) return msg('⚠️ 저장 실패: ' + error.message);
+  document.getElementById('completeProfileScreen').style.display = 'none';
+  await loadProfileAndEnter();
 }
 
 async function doLogout() {

@@ -85,7 +85,7 @@
     - 배지: 청소년 카드/상세, 끗짱 카드/상세, admin.html 테이블 전부에 회색 "폐강" 표시 + 상세화면 "최소 인원(N명) 미달로 폐강됐어요" 문구
     - "폐강 처리" 버튼: index.html 끗짱 루틴 상세(`cancelRoutine()`, min_people 설정된 recruit/active 루틴에만 노출) + admin.html 루틴 탭(`cancelRoutineAdmin()`, 기존 보관/삭제 버튼과 같은 자리)
     - 브라우저 콘솔로 상태 주입해 3개 화면(청소년/끗짱/관리자) 배지·버튼 노출조건 전부 확인
-13. **가입 시 카카오 로그인 추가** (2026-07-14 요청) — 지금은 이메일/비밀번호 가입만 있음. Supabase Auth에서 카카오를 OAuth 제공자로 붙이려면 Kakao Developers 앱 등록(REST API 키) + Supabase 대시보드에 Client ID/Secret 설정 필요. 기존 가입 시 수집하는 기본정보(실명/생년월일/휴대폰/지역/역할 등)는 카카오 로그인만으로는 안 채워지므로, 최초 로그인 후 추가 정보 입력 화면으로 이어지는 온보딩 플로우 설계 필요
+13. **가입 시 카카오 로그인 추가** — 코드 ✅ 완료 (2026-07-15), **외부 설정 대기 중**. 구현: ①로그인/가입 탭에 "💬 카카오로 시작하기" 버튼(`signInWithKakao()`, `signInWithOAuth({provider:'kakao'})`) ②최초 소셜 로그인 감지: `loadProfileAndEnter()`에서 기본정보(실명/생년월일/휴대폰/지역) 비면 추가 정보 입력 화면(`completeProfileScreen`)으로 — 역할 선택+기본정보+동의 체크박스 3종+14세 검증, 카카오 닉네임 프리필, 완료 시 `privacy_agreed_at` 기록 후 정상 진입(끗짱 선택 시 `kkutjjang_status='pending'` — guard 트리거가 pending 설정은 허용함) ③`handle_new_user` 트리거: 소셜 가입은 동의 전이므로 `privacy_agreed_at` NULL로 생성(birth_date 메타 유무로 이메일/소셜 구분), 카카오 `full_name` 메타도 닉네임 폴백 (마이그레이션 `[2026-07-15]`, **실행 필요**). 브라우저 검증 완료(화면 전환·프리필·검증 3종). **남은 외부 설정(사용자가 직접)**: ⓐKakao Developers 앱 등록 → REST API 키·Client Secret 발급, Redirect URI `https://ynqvhsffoesjzefitafv.supabase.co/auth/v1/callback` 등록, 카카오 로그인 활성화 ⓑSupabase 대시보드 → Authentication → Providers → Kakao 활성화 + Client ID/Secret 입력 ⓒAuthentication → URL Configuration에 `https://youthitdev.github.io/youthit-routine/` 리다이렉트 허용 추가. 설정 후 실기기로 카카오 로그인→추가정보→진입 종단 테스트 필요
 
 ### 최근 완료 (2026-07-09~11 스프린트)
 

@@ -1055,3 +1055,36 @@ BEGIN
   END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-15] 카카오 로그인 대응 — 소셜 가입 시 동의 시점 보정
+-- 이메일 가입은 폼에서 동의 체크 후 가입하므로 가입 시각 = 동의 시각이지만,
+-- 카카오 OAuth 가입은 동의 전에 계정이 먼저 생기므로 privacy_agreed_at을
+-- NULL로 뒀다가 추가 정보 입력 화면(동의 체크 포함)에서 클라이언트가 채움.
+-- birth_date 메타 존재 여부로 이메일 가입(폼 경유)인지 구분.
+-- =====================================================
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status, privacy_agreed_at, marketing_agreed)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'full_name', '익명'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    NEW.raw_user_meta_data->>'school_status',
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      ELSE 'pending'
+    END,
+    CASE WHEN NULLIF(NEW.raw_user_meta_data->>'birth_date','') IS NOT NULL THEN now() ELSE NULL END,
+    COALESCE((NEW.raw_user_meta_data->>'marketing_agreed')::boolean, false)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
