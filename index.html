@@ -1717,7 +1717,13 @@ function renderHomeBanner() {
 }
 function openHomeBanner() {
   const b = (state.banners || [])[0];
-  if (b && b.link_url) window.open(b.link_url, '_blank');
+  if (!b || !b.link_url) return;
+  if (b.link_url.startsWith('routine:')) {
+    const rid = parseInt(b.link_url.slice(8));
+    if (state.routines.some(r => r.id === rid)) openRoutineDetail(rid);
+    return;
+  }
+  window.open(b.link_url, '_blank');
 }
 
 // ════════════════════════════════════════════════════════

@@ -298,7 +298,13 @@
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <input type="url" id="bnImage" placeholder="이미지 URL (선택)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
-        <input type="url" id="bnLink" placeholder="연결 링크 (선택, 새 탭으로 열림)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="text" id="bnLink" placeholder="연결 링크 (선택, 외부 URL — 새 탭으로 열림)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+        <span style="font-size:12px;color:#888;">또는 특정 루틴으로 연결:</span>
+        <select id="bnRoutineSelect" onchange="if(this.value){document.getElementById('bnLink').value='routine:'+this.value;this.value='';}" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <option value="">루틴 선택 (선택하면 연결 링크에 자동 입력)</option>
+        </select>
       </div>
       <button onclick="submitBanner()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
     </div>
@@ -957,13 +963,25 @@ async function renderBannerView() {
   const { data } = await sb.from('banners').select('*').order('sort_order', { ascending: true });
   bannerRows = data || [];
   renderBannerList();
+  const sel = document.getElementById('bnRoutineSelect');
+  sel.innerHTML = '<option value="">루틴 선택 (선택하면 연결 링크에 자동 입력)</option>'
+    + routineRows.filter(r => !r.archived).map(r => `<option value="${r.id}">${r.title} (${R_STATUS_LABEL[r.status]||r.status})</option>`).join('');
+}
+function _bannerLinkLabel(linkUrl) {
+  if (!linkUrl) return '-';
+  if (linkUrl.startsWith('routine:')) {
+    const rid = parseInt(linkUrl.slice(8));
+    const r = routineRows.find(x => x.id === rid);
+    return `🌱 ${r ? r.title : '(삭제된 루틴)'}`;
+  }
+  return `<a href="${linkUrl}" target="_blank" style="color:#2E33BC;">외부 링크</a>`;
 }
 function renderBannerList() {
   document.getElementById('bannerListBody').innerHTML = bannerRows.length ? bannerRows.map(b => `
     <tr>
       <td>${b.title}</td>
       <td>${b.sort_order}</td>
-      <td>${b.link_url ? `<a href="${b.link_url}" target="_blank" style="color:#2E33BC;">링크</a>` : '-'}</td>
+      <td>${_bannerLinkLabel(b.link_url)}</td>
       <td><span class="pill" style="background:${b.active?'#EAF3DE':'#f5f5f5'};color:${b.active?'#3B6D11':'#aaa'};">${b.active?'활성':'비활성'}</span></td>
       <td>
         <button onclick="toggleBannerActive(${b.id},${!b.active})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${b.active?'비활성화':'활성화'}</button>
