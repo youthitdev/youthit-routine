@@ -1202,3 +1202,49 @@ DROP TRIGGER IF EXISTS trg_post_comment_push ON post_comments;
 CREATE TRIGGER trg_post_comment_push
   AFTER INSERT ON post_comments
   FOR EACH ROW EXECUTE FUNCTION on_post_comment_push();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22b] 끗짱 "콕 찌르기" (미인증 청소년 응원)
+-- 담당 끗짱이 자기 루틴의 미인증 참여자에게 응원 푸시를 보냄.
+-- (routine_id, to_user, poke_date) unique로 하루 한 명당 한 번만 허용
+-- — 클라이언트는 unique_violation(23505)을 잡아서 안내 메시지만 보여줌.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS pokes (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  routine_id  bigint REFERENCES routines(id) ON DELETE CASCADE,
+  from_user   uuid   REFERENCES auth.users ON DELETE CASCADE,
+  to_user     uuid   REFERENCES auth.users ON DELETE CASCADE,
+  poke_date   date   NOT NULL DEFAULT current_date,
+  created_at  timestamptz DEFAULT now(),
+  UNIQUE (routine_id, to_user, poke_date)
+);
+ALTER TABLE pokes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "pokes_select" ON pokes FOR SELECT USING (
+  auth.uid() = from_user OR auth.uid() = to_user OR is_admin()
+);
+CREATE POLICY "pokes_insert" ON pokes FOR INSERT WITH CHECK (
+  auth.uid() = from_user AND
+  EXISTS (SELECT 1 FROM routines r WHERE r.id = routine_id AND (r.led_by = auth.uid() OR is_admin()))
+);
+
+CREATE OR REPLACE FUNCTION on_poke_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  poker_name text;
+  r_title text;
+BEGIN
+  SELECT name INTO poker_name FROM profiles WHERE id = NEW.from_user;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  PERFORM notify_push(
+    NEW.to_user,
+    '👋 콕! 응원이 왔어요',
+    coalesce(poker_name,'끗짱') || '님이 "' || coalesce(r_title,'루틴') || '"에서 응원을 보냈어요. 오늘 한 끗 남겨볼까요?'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_poke_push ON pokes;
+CREATE TRIGGER trg_poke_push
+  AFTER INSERT ON pokes
+  FOR EACH ROW EXECUTE FUNCTION on_poke_push();
