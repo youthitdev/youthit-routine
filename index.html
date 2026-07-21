@@ -494,12 +494,10 @@ select:focus { outline: none; border-color: #2E33BC; }
             <div style="position:absolute;right:36px;bottom:-36px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
             <div style="position:relative;">
               <div style="font-size:12px;opacity:0.8;margin-bottom:3px;" id="homeGreeting">오늘 하루도 한끗씩 ✦</div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <span style="font-size:19px;font-weight:700;" id="homeUsername"></span>
-                <span style="background:rgba(255,255,255,0.2);border-radius:12px;padding:3px 10px;font-size:11px;" id="homeLevelBadge"></span>
+                <div id="homeStreakArea"></div>
               </div>
-              <div id="homeStreakArea"></div>
-              <div id="homeLevelProgress" style="margin-top:12px;"></div>
               <div style="display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.18);">
                 <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">📸 <span id="homeCertCount">0</span>회</div>
                 <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">💬 <span id="homeCommCount">0</span>회</div>
@@ -507,6 +505,8 @@ select:focus { outline: none; border-color: #2E33BC; }
               </div>
             </div>
           </div>
+          <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
+          <div id="homeBannerArea" style="display:none;"></div>
           <!-- 오늘의 미션 -->
           <div id="meetBannerArea"></div>
           <div id="pushNudgeArea"></div>
@@ -1329,7 +1329,7 @@ async function loadProfileAndEnter() {
     showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
     return;
   }
-  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); } catch(e) { console.error('데이터 로드 실패', e); }
+  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
   _maybeCelebrateCompletion();
 }
@@ -1696,6 +1696,30 @@ async function loadCertFeed() {
   });
 }
 
+// 홈 화면 홍보 배너 (관리자 등록, 루틴 홍보/공지/외부 링크 등 자유롭게)
+async function loadBanners() {
+  const { data } = await sb.from('banners').select('*').eq('active', true).order('sort_order', { ascending: true });
+  state.banners = data || [];
+}
+function renderHomeBanner() {
+  const el = document.getElementById('homeBannerArea');
+  if (!el) return;
+  const b = (state.banners || [])[0];
+  if (!b) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+  el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
+    ${b.image_url ? `<img src="${b.image_url}" style="width:100%;height:100px;object-fit:cover;display:block;">` : ''}
+    <div style="padding:12px 14px;">
+      <div style="font-size:13px;font-weight:700;color:#111;">${b.title}</div>
+      ${b.body ? `<div style="font-size:12px;color:#888;margin-top:3px;line-height:1.4;">${b.body}</div>` : ''}
+    </div>
+  </div>`;
+}
+function openHomeBanner() {
+  const b = (state.banners || [])[0];
+  if (b && b.link_url) window.open(b.link_url, '_blank');
+}
+
 // ════════════════════════════════════════════════════════
 // 유틸
 // ════════════════════════════════════════════════════════
@@ -1816,33 +1840,19 @@ function _myActiveRoutines() {
   return state.routines.filter(r => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
 }
 function renderHome() {
-  const lv = getYLevel(state.youth.certCount);
   document.getElementById('homeGreeting').textContent = _greeting();
   document.getElementById('homeUsername').textContent = state.youth.name+'님';
-  document.getElementById('homeLevelBadge').textContent = `${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('homeCertCount').textContent = state.youth.certCount;
   document.getElementById('homeCommCount').textContent = state.youth.commCount;
   renderNadaeum();
 
-  // 스트릭 배지
+  // 스트릭 배지 (레벨·진행바는 MY탭에 있어서 홈은 한 줄로 축약)
   const sk = _streak(state.youth.certDates);
   document.getElementById('homeStreakArea').innerHTML = sk > 0
-    ? `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,214,0,0.22);border:0.5px solid rgba(255,214,0,0.5);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:#FFD600;">🔥 ${sk}일 연속 인증 중</span>`
-    : `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px;font-size:12px;color:rgba(255,255,255,0.85);">🌱 오늘 첫 한끗을 쌓아볼까요?</span>`;
+    ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;background:rgba(255,214,0,0.22);border:0.5px solid rgba(255,214,0,0.5);border-radius:20px;padding:5px 10px;font-size:11.5px;font-weight:600;color:#FFD600;white-space:nowrap;">🔥 ${sk}일째</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 10px;font-size:11.5px;color:rgba(255,255,255,0.85);white-space:nowrap;">🌱 오늘 시작!</span>`;
 
-  // 레벨 진행바
-  const NEXT = {1:{at:20,name:'새싹',emoji:'🌿'},2:{at:50,name:'나무',emoji:'🌳'},3:{at:100,name:'숲',emoji:'🌲'}};
-  const nx = NEXT[lv.level];
-  const base = lv.level===1?0:lv.level===2?20:lv.level===3?50:100;
-  document.getElementById('homeLevelProgress').innerHTML = nx
-    ? `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.75);margin-bottom:5px;">
-         <span>${nx.emoji} ${nx.name}까지 인증 ${nx.at - state.youth.certCount}회</span>
-         <span>${state.youth.certCount}/${nx.at}</span>
-       </div>
-       <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.18);overflow:hidden;">
-         <div style="height:100%;width:${Math.min(100,Math.round((state.youth.certCount-base)/(nx.at-base)*100))}%;border-radius:3px;background:linear-gradient(90deg,#83CA00,#FFD600);transition:width 0.4s;"></div>
-       </div>`
-    : `<div style="font-size:11px;color:rgba(255,255,255,0.8);">🌲 최고 레벨이에요! 숲이 되어주셔서 고마워요</div>`;
+  renderHomeBanner();
 
   const active = _myActiveRoutines();
 
@@ -4398,7 +4408,7 @@ async function refetchOnResume() {
   if (now - _lastRefetchAt < 8000) return; // 너무 잦은 재조회 방지
   _lastRefetchAt = now;
   try {
-    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed()]);
+    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners()]);
   } catch (e) { console.error('재조회 실패', e); return; }
   const isYouth = state.currentRole === 'youth';
   const prefix = isYouth ? 'page-' : 'kpage-';

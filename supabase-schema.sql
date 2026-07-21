@@ -1088,3 +1088,25 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-17] 홈 화면 배너 (루틴 홍보/공지/외부 링크)
+-- 관리자가 등록·활성화/비활성화·삭제. 홈 화면엔 active=true인 것 중
+-- sort_order가 가장 작은(우선순위 높은) 배너 1개만 노출.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS banners (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title       text NOT NULL,
+  body        text,
+  image_url   text,
+  link_url    text,
+  active      boolean NOT NULL DEFAULT true,
+  sort_order  integer NOT NULL DEFAULT 0,
+  created_by  uuid REFERENCES auth.users(id),
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE banners ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "banners_select" ON banners FOR SELECT USING (active = true OR is_admin());
+CREATE POLICY "banners_admin_insert" ON banners FOR INSERT WITH CHECK (is_admin());
+CREATE POLICY "banners_admin_update" ON banners FOR UPDATE USING (is_admin());
+CREATE POLICY "banners_admin_delete" ON banners FOR DELETE USING (is_admin());

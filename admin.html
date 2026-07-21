@@ -96,6 +96,7 @@
     <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 통계</button>
     <button class="tab-btn" id="tabNotifyBtn" onclick="switchTab('notify')">🔔 알림 보내기</button>
     <button class="tab-btn" id="tabRewardBtn" onclick="switchTab('reward')">🎁 리워드</button>
+    <button class="tab-btn" id="tabBannerBtn" onclick="switchTab('banner')">📢 배너</button>
   </div>
 
   <div class="filter-bar" id="youthFilters">
@@ -283,6 +284,35 @@
       <div id="grantResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
     </div>
   </div>
+
+  <div id="bannerView" style="display:none;">
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>📢 배너 등록</h3>
+      <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px;">청소년 홈 화면 상단에 노출돼요. 여러 개 등록하면 노출순서가 가장 작은 것 1개만 보여요.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="bnTitle" placeholder="제목 (예: 여름방학 루틴 모집 중!)" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="number" id="bnOrder" value="0" placeholder="노출순서" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="bnBody" placeholder="내용 (선택)" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="url" id="bnImage" placeholder="이미지 URL (선택)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="url" id="bnLink" placeholder="연결 링크 (선택, 새 탭으로 열림)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <button onclick="submitBanner()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+    </div>
+
+    <div class="chart-card">
+      <h3>배너 목록</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>제목</th><th>노출순서</th><th>링크</th><th>상태</th><th></th></tr></thead>
+          <tbody id="bannerListBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -315,6 +345,7 @@ let currentUser = null;
 let currentTab = 'youth';
 let youthRows = [], kkRows = [], routineRows = [];
 let rewardRows = [], redemptionRows = [];
+let bannerRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
 let rawParticipants = [], rawCerts = [];
@@ -428,18 +459,21 @@ function switchTab(tab) {
   document.getElementById('tabStatsBtn').classList.toggle('active', tab === 'stats');
   document.getElementById('tabNotifyBtn').classList.toggle('active', tab === 'notify');
   document.getElementById('tabRewardBtn').classList.toggle('active', tab === 'reward');
+  document.getElementById('tabBannerBtn').classList.toggle('active', tab === 'banner');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
-  document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify' || tab === 'reward') ? 'none' : 'block';
+  document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify' || tab === 'reward' || tab === 'banner') ? 'none' : 'block';
   document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
   document.getElementById('notifyView').style.display = tab === 'notify' ? 'block' : 'none';
   document.getElementById('rewardView').style.display = tab === 'reward' ? 'block' : 'none';
+  document.getElementById('bannerView').style.display = tab === 'banner' ? 'block' : 'none';
   document.getElementById('bulkBar').style.display = 'none';
   sortKey = null;
   if (tab === 'stats') renderStatsView();
   else if (tab === 'notify') renderNotifyView();
   else if (tab === 'reward') renderRewardView();
+  else if (tab === 'banner') renderBannerView();
   else renderTable();
 }
 
@@ -917,6 +951,49 @@ async function deleteReward(id, title) {
   const { error } = await sb.from('rewards').delete().eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
   await renderRewardView();
+}
+
+async function renderBannerView() {
+  const { data } = await sb.from('banners').select('*').order('sort_order', { ascending: true });
+  bannerRows = data || [];
+  renderBannerList();
+}
+function renderBannerList() {
+  document.getElementById('bannerListBody').innerHTML = bannerRows.length ? bannerRows.map(b => `
+    <tr>
+      <td>${b.title}</td>
+      <td>${b.sort_order}</td>
+      <td>${b.link_url ? `<a href="${b.link_url}" target="_blank" style="color:#2E33BC;">링크</a>` : '-'}</td>
+      <td><span class="pill" style="background:${b.active?'#EAF3DE':'#f5f5f5'};color:${b.active?'#3B6D11':'#aaa'};">${b.active?'활성':'비활성'}</span></td>
+      <td>
+        <button onclick="toggleBannerActive(${b.id},${!b.active})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${b.active?'비활성화':'활성화'}</button>
+        <button onclick="deleteBanner(${b.id},'${b.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
+      </td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="5">등록된 배너가 없어요</td></tr>`;
+}
+async function submitBanner() {
+  const title = document.getElementById('bnTitle').value.trim();
+  const body = document.getElementById('bnBody').value.trim();
+  const image_url = document.getElementById('bnImage').value.trim();
+  const link_url = document.getElementById('bnLink').value.trim();
+  const sort_order = parseInt(document.getElementById('bnOrder').value) || 0;
+  if (!title) { alert('제목을 입력해주세요.'); return; }
+  const { error } = await sb.from('banners').insert({ title, body: body || null, image_url: image_url || null, link_url: link_url || null, sort_order });
+  if (error) { alert('등록 실패: ' + error.message); return; }
+  ['bnTitle', 'bnBody', 'bnImage', 'bnLink'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bnOrder').value = '0';
+  await renderBannerView();
+}
+async function toggleBannerActive(id, active) {
+  const { error } = await sb.from('banners').update({ active }).eq('id', id);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  await renderBannerView();
+}
+async function deleteBanner(id, title) {
+  if (!confirm(`"${title}" 배너를 삭제할까요?`)) return;
+  const { error } = await sb.from('banners').delete().eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  await renderBannerView();
 }
 
 async function fulfillRedemption(id) {
