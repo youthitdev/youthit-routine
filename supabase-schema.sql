@@ -1130,3 +1130,35 @@ DROP POLICY IF EXISTS "banner_images_delete_admin" ON storage.objects;
 CREATE POLICY "banner_images_delete_admin" ON storage.objects FOR DELETE USING (
   bucket_id = 'banner-images' AND is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-21] 서류 승인·끗짱 가입 승인 알림
+-- 루틴 참여 승인은 이미 알림이 가고 있음(on_participant_status_change).
+-- 학교밖청소년 서류 승인, 끗짱 가입 승인은 알림이 없어서 추가.
+-- guard 트리거(BEFORE UPDATE)와는 분리된 별도 AFTER UPDATE 트리거.
+-- =====================================================
+CREATE OR REPLACE FUNCTION on_verify_status_notify()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.verify_status IS DISTINCT FROM OLD.verify_status AND NEW.verify_status = 'approved' THEN
+    PERFORM notify_push(NEW.id, '학교밖청소년 인증 완료! ✅', '서류 심사가 승인됐어요. 학교밖청소년 전용 루틴에도 참여할 수 있어요.');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_verify_status_notify ON profiles;
+CREATE TRIGGER trg_verify_status_notify AFTER UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION on_verify_status_notify();
+
+CREATE OR REPLACE FUNCTION on_kkutjjang_status_notify()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.kkutjjang_status IS DISTINCT FROM OLD.kkutjjang_status AND NEW.kkutjjang_status = 'approved' THEN
+    PERFORM notify_push(NEW.id, '끗짱 가입이 승인됐어요! 🎉', '이제 루틴을 배정받아 활동할 수 있어요.');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_kkutjjang_status_notify ON profiles;
+CREATE TRIGGER trg_kkutjjang_status_notify AFTER UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION on_kkutjjang_status_notify();
