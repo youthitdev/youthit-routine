@@ -107,7 +107,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .active-card { background: #2E33BC; border-radius: 16px; padding: 12px; cursor: pointer; }
 
 /* 인증 폼 */
-.photo-upload { border: 1.5px dashed #ccc; border-radius: 16px; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; background: #f9f9f9; position: relative; overflow: hidden; }
+.photo-upload { border: 1.5px dashed #ccc; border-radius: 16px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; background: #f9f9f9; position: relative; overflow: hidden; }
 .photo-upload.has-photo { border-style: solid; border-color: #2E33BC; }
 .photo-prev-img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .field-label { font-size: 13px; font-weight: 500; color: #111; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
@@ -1697,28 +1697,44 @@ async function loadCertFeed() {
 
 // 홈 화면 홍보 배너 (관리자 등록, 루틴 홍보/공지/외부 링크 등 자유롭게)
 async function loadBanners() {
-  const { data } = await sb.from('banners').select('*').eq('active', true).order('sort_order', { ascending: true });
+  const { data } = await sb.from('banners').select('*').eq('active', true).order('sort_order', { ascending: true }).limit(10);
   state.banners = data || [];
 }
+let _bannerRotateIdx = 0;
+let _bannerRotateTimer = null;
 function renderHomeBanner() {
   const el = document.getElementById('homeBannerArea');
   if (!el) return;
-  const b = (state.banners || [])[0];
-  if (!b) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  if (_bannerRotateTimer) { clearInterval(_bannerRotateTimer); _bannerRotateTimer = null; }
+  const banners = state.banners || [];
+  if (!banners.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  _bannerRotateIdx = 0;
+  _renderBannerSlide(el);
+  if (banners.length > 1) {
+    _bannerRotateTimer = setInterval(() => {
+      _bannerRotateIdx = (_bannerRotateIdx + 1) % (state.banners || []).length;
+      _renderBannerSlide(el);
+    }, 4000);
+  }
+}
+function _renderBannerSlide(el) {
+  const b = (state.banners || [])[_bannerRotateIdx];
+  if (!b) return;
   el.style.display = 'block';
   const imageBlock = b.image_url
-    ? `<img src="${b.image_url}" style="width:100%;height:100px;object-fit:cover;display:block;">`
-    : `<div style="width:100%;height:100px;background:linear-gradient(120deg,#E6F1FB 0%,#EAF3DE 50%,#FBEAF0 100%);display:flex;align-items:center;justify-content:center;font-size:26px;">📢</div>`;
+    ? `<img src="${b.image_url}" style="width:100%;height:150px;object-fit:cover;display:block;">`
+    : `<div style="width:100%;height:150px;background:linear-gradient(120deg,#E6F1FB 0%,#EAF3DE 50%,#FBEAF0 100%);display:flex;align-items:center;justify-content:center;font-size:26px;">📢</div>`;
   el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
     ${imageBlock}
     <div style="padding:12px 14px;">
       <div style="font-size:13px;font-weight:700;color:#111;">${b.title}</div>
       ${b.body ? `<div style="font-size:12px;color:#888;margin-top:3px;line-height:1.4;">${b.body}</div>` : ''}
     </div>
+    ${(state.banners||[]).length>1?`<div style="display:flex;gap:4px;justify-content:center;padding-bottom:10px;">${(state.banners||[]).map((_,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===_bannerRotateIdx?'#2E33BC':'#ddd'};"></span>`).join('')}</div>`:''}
   </div>`;
 }
 function openHomeBanner() {
-  const b = (state.banners || [])[0];
+  const b = (state.banners || [])[_bannerRotateIdx];
   if (!b || !b.link_url) return;
   if (b.link_url.startsWith('routine:')) {
     const rid = parseInt(b.link_url.slice(8));
