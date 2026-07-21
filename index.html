@@ -1727,24 +1727,35 @@ function _bannerImageUrl(b) {
   }
   return null;
 }
+const BANNER_PASTELS = [
+  { bg: '#E6F1FB', text: '#185FA5' }, // 블루
+  { bg: '#EAF3DE', text: '#3B6D11' }, // 그린
+  { bg: '#FBEAF0', text: '#993556' }, // 레드/핑크
+];
 function _renderBannerSlide(el) {
   const b = (state.banners || [])[_bannerRotateIdx];
   if (!b) return;
   el.style.display = 'block';
   const imgUrl = _bannerImageUrl(b);
+  const pastel = BANNER_PASTELS[Math.abs(b.id||0) % BANNER_PASTELS.length];
   const bgBlock = imgUrl
     ? `<img src="${imgUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;">`
-    : `<div style="position:absolute;inset:0;background:linear-gradient(120deg,#E6F1FB 0%,#EAF3DE 50%,#FBEAF0 100%);"></div>`;
+    : `<div style="position:absolute;inset:0;background:${pastel.bg};"></div>`;
+  const scrim = imgUrl ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 100%);"></div>` : '';
+  const textColor = imgUrl ? '#fff' : pastel.text;
+  const textShadow = imgUrl ? 'text-shadow:0 1px 3px rgba(0,0,0,0.3);' : '';
+  const dotOn = imgUrl ? '#fff' : pastel.text;
+  const dotOff = imgUrl ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.18)';
   const dots = (state.banners||[]).length>1
-    ? `<div style="position:absolute;left:12px;bottom:12px;display:flex;gap:4px;">${(state.banners||[]).map((_,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===_bannerRotateIdx?'#fff':'rgba(255,255,255,0.45)'};"></span>`).join('')}</div>`
+    ? `<div style="position:absolute;left:12px;bottom:12px;display:flex;gap:4px;">${(state.banners||[]).map((_,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===_bannerRotateIdx?dotOn:dotOff};"></span>`).join('')}</div>`
     : '';
   el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="position:relative;height:150px;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
     ${bgBlock}
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 100%);"></div>
+    ${scrim}
     ${dots}
     <div style="position:absolute;right:12px;bottom:10px;max-width:72%;text-align:right;">
-      <div style="font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.3);">${b.title}</div>
-      ${b.body ? `<div style="font-size:11.5px;color:rgba(255,255,255,0.9);margin-top:2px;line-height:1.35;text-shadow:0 1px 3px rgba(0,0,0,0.3);">${b.body}</div>` : ''}
+      <div style="font-size:13px;font-weight:700;color:${textColor};${textShadow}">${b.title}</div>
+      ${b.body ? `<div style="font-size:11.5px;color:${textColor};opacity:${imgUrl?0.9:0.85};margin-top:2px;line-height:1.35;${textShadow}">${b.body}</div>` : ''}
     </div>
   </div>`;
 }
