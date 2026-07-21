@@ -1162,3 +1162,43 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_kkutjjang_status_notify ON profiles;
 CREATE TRIGGER trg_kkutjjang_status_notify AFTER UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION on_kkutjjang_status_notify();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22] 커뮤니티 게시글 댓글
+-- cert_comments와 동일한 패턴 (댓글 좋아요는 없음, 삭제는 본인/관리자만).
+-- 게시글 작성자에게 댓글 알림도 cert_comment_push와 동일하게 추가.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS post_comments (
+  id          bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  post_id     bigint REFERENCES posts(id) ON DELETE CASCADE,
+  user_id     uuid   REFERENCES auth.users ON DELETE CASCADE,
+  content     text   NOT NULL,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE post_comments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "pc_select" ON post_comments FOR SELECT USING (true);
+CREATE POLICY "pc_insert" ON post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "pc_delete" ON post_comments FOR DELETE USING (auth.uid() = user_id OR is_admin());
+
+CREATE OR REPLACE FUNCTION on_post_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  post_owner uuid;
+  commenter_name text;
+BEGIN
+  SELECT author_id INTO post_owner FROM posts WHERE id = NEW.post_id;
+  IF post_owner IS NULL OR post_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(
+    post_owner,
+    '💬 내 글에 댓글이 달렸어요',
+    coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_post_comment_push ON post_comments;
+CREATE TRIGGER trg_post_comment_push
+  AFTER INSERT ON post_comments
+  FOR EACH ROW EXECUTE FUNCTION on_post_comment_push();

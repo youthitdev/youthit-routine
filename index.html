@@ -1647,12 +1647,13 @@ async function loadRoutines() {
 }
 
 async function loadPosts() {
-  const [postRes, likeRes, profRes] = await Promise.all([
+  const [postRes, likeRes, profRes, commentRes] = await Promise.all([
     sb.from('posts').select('*').order('created_at', { ascending: false }),
     sb.from('post_likes').select('post_id,user_id'),
     sb.from('profiles').select('id,name'),
+    sb.from('post_comments').select('id,post_id,user_id,content,created_at').order('created_at', { ascending: true }),
   ]);
-  const posts = postRes.data || [], likes = likeRes.data || [];
+  const posts = postRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
@@ -1660,7 +1661,18 @@ async function loadPosts() {
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
+    comments: comments.filter(cm => cm.post_id === p.id).map(cm => ({
+      id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+    })),
   }));
+}
+// 공지(notice)를 최신순 상단에 고정, 그 아래로 나머지 글도 최신순
+function _pinNotices(list) {
+  return [...list].sort((a, b) => {
+    const an = a.type === 'notice', bn = b.type === 'notice';
+    if (an !== bn) return an ? -1 : 1;
+    return 0; // Array.sort는 안정 정렬이라 원래(최신순) 순서가 그룹 내에서 유지됨
+  });
 }
 
 async function loadCertFeed() {
@@ -2286,6 +2298,7 @@ function openCertFeedDetail(id) {
 }
 
 let currentCertDetailId = null;
+let currentPostDetailId = null;
 
 function renderCertDetail(id) {
   currentCertDetailId = id;
@@ -2341,10 +2354,12 @@ function renderCertDetail(id) {
 }
 
 async function submitCommentFromBar() {
-  if(!currentCertDetailId || !currentUser) return;
+  if(!currentUser) return;
   const input = document.getElementById('rdCommentInput');
   const text = input.value.trim();
   if(!text) return;
+  if(currentPostDetailId){ await _submitPostComment(text, input); return; }
+  if(!currentCertDetailId) return;
   const c = (state.certFeed||[]).find(x=>x.id===currentCertDetailId);
   if(!c) return;
   const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
@@ -2395,6 +2410,106 @@ async function deleteCertComment(certId, commentId) {
   });
   const feedEl=document.getElementById('feedComment_'+certId);
   if(feedEl) feedEl.textContent=cnt;
+}
+
+// ════════════════════════════════════════════════════════
+// 커뮤니티 게시글 상세 · 댓글
+// ════════════════════════════════════════════════════════
+function openPostDetail(id) {
+  currentPostDetailId = id;
+  currentCertDetailId = null;
+  const p = state.posts.find(x=>x.id===id);
+  if(!p) return;
+  const comments = p.comments||[];
+  document.getElementById('rdSub').textContent = p.date;
+  document.getElementById('rdTitle').textContent = p.type==='notice' ? '📢 공지' : '✍️ 후기';
+
+  const bar = document.getElementById('rdCommentBar');
+  const avatar = document.getElementById('rdCommentAvatar');
+  const input = document.getElementById('rdCommentInput');
+  if(bar) bar.style.display='';
+  if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
+  if(input) input.value='';
+
+  const canDelete = _canModerate(p.authorId);
+  const likeFn = state.currentRole==='youth' ? 'togglePostLike' : 'toggleKPostLike';
+  document.getElementById('rdBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      ${p.type==='notice'
+        ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
+        :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
+      <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
+      <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
+      ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+    </div>
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${p.title}</div>
+    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;">${p.content}</div>
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:12px;">
+      <div onclick="${likeFn}(${p.id})" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:22px;color:${p.liked?'#FF006C':'#ccc'};"></i>
+        <span style="font-size:14px;color:#666;">${p.likes}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-message-circle" style="font-size:22px;color:#aaa;"></i>
+        <span style="font-size:14px;color:#666;">${comments.length}</span>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:600;color:#111;">댓글 <span id="postCommentCountLabel_${p.id}">${comments.length}</span>개</div>
+    <div id="postCommentList_${p.id}" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+      ${comments.map(cm=>`
+        <div style="display:flex;gap:8px;" id="postCommentRow_${cm.id}">
+          <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+          <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
+              ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deletePostComment(${p.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+            </div>
+            <div style="font-size:13px;color:#333;line-height:1.5;">${cm.text}</div>
+            <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
+          </div>
+        </div>`).join('')}
+      ${comments.length===0?'<div style="text-align:center;padding:20px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요! 💬</div>':''}
+    </div>`;
+  openOverlay('routineDetailOverlay');
+}
+async function _submitPostComment(text, input) {
+  const p = state.posts.find(x=>x.id===currentPostDetailId);
+  if(!p) return;
+  const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+  const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text }).select().single();
+  if(error){ alert('댓글 등록 실패: '+error.message); return; }
+  if(!p.comments) p.comments=[];
+  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime() });
+  if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
+  save();
+  input.value='';
+  const list = document.getElementById('postCommentList_'+currentPostDetailId);
+  const empty = list.querySelector('div[style*="text-align:center"]');
+  if(empty) empty.remove();
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;';
+  row.id = 'postCommentRow_'+data.id;
+  row.innerHTML = `
+    <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${authorName[0]}</div>
+    <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${authorName}</div>
+      <div style="font-size:13px;color:#333;line-height:1.5;">${text}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:4px;">방금</div>
+    </div>`;
+  list.appendChild(row);
+  const label = document.getElementById('postCommentCountLabel_'+currentPostDetailId);
+  if(label) label.textContent = p.comments.length;
+}
+async function deletePostComment(postId, commentId) {
+  if(!confirm('이 댓글을 삭제할까요?')) return;
+  const { error } = await sb.from('post_comments').delete().eq('id', commentId);
+  if(error){ alert('삭제 실패: '+error.message); return; }
+  const p = state.posts.find(x=>x.id===postId);
+  if(p) p.comments = (p.comments||[]).filter(cm=>cm.id!==commentId);
+  const row = document.getElementById('postCommentRow_'+commentId);
+  if(row) row.remove();
+  const label = document.getElementById('postCommentCountLabel_'+postId);
+  if(label) label.textContent = p ? p.comments.length : 0;
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
@@ -2889,9 +3004,12 @@ function _postCard(p, likeFn) {
     </div>
     <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
     <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
-    <div style="margin-top:12px;">
+    <div style="margin-top:12px;display:flex;gap:8px;">
       <span onclick="${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
         <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
+      </span>
+      <span onclick="openPostDetail(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:#f5f5f7;cursor:pointer;font-size:12px;font-weight:600;color:#888;user-select:none;">
+        <i class="ti ti-message-circle" style="font-size:14px;color:#aaa;"></i>${(p.comments&&p.comments.length>0)?p.comments.length:'댓글'}
       </span>
     </div>
   </div>`;
@@ -2906,7 +3024,7 @@ async function deletePost(id) {
 }
 function renderComm(f) {
   commFilter=f;
-  const list=f==='all'?state.posts:state.posts.filter(p=>p.type===f);
+  const list=_pinNotices(f==='all'?state.posts:state.posts.filter(p=>p.type===f));
   document.getElementById('postList').innerHTML = list.length>0
     ? list.map(p=>_postCard(p,'togglePostLike')).join('')
     : `<div style="padding:52px 16px;text-align:center;">
@@ -3941,9 +4059,9 @@ function kResetReviewFilter() {
 let kReviewFilter='all';
 function kRenderReviewTab(filter) {
   kReviewFilter=filter||'all';
-  const list = filter==='notice' ? state.posts.filter(p=>p.type==='notice')
+  const list = _pinNotices(filter==='notice' ? state.posts.filter(p=>p.type==='notice')
     : filter==='review' ? state.posts.filter(p=>p.type==='review')
-    : state.posts;
+    : state.posts);
   const el=document.getElementById('kReviewFeed');
   if(!el) return;
   el.innerHTML = list.length > 0
@@ -4412,6 +4530,7 @@ function closeOverlay(id) {
     const bar=document.getElementById('rdCommentBar');
     if(bar) bar.style.display='none';
     currentCertDetailId=null;
+    currentPostDetailId=null;
   }
   // 3뎁스 오버레이 닫힐 때 탭 복원 (다른 3뎁스 오버레이가 없을 때만)
   if(DEPTH3_OVERLAYS.includes(id)) {
