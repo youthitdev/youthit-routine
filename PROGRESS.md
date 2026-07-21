@@ -122,7 +122,7 @@
 
 ## 최근 완료 (2026-07-22)
 
-- **커뮤니티 게시글 댓글 추가** — 지금까지 게시글(공지/후기)엔 좋아요만 있고 댓글이 없었음. `post_comments` 테이블 신규(cert_comments와 동일 패턴 — 본인/관리자만 삭제) + 댓글 시 게시글 작성자에게 푸시(`on_post_comment_push`, cert_comment_push와 동일 패턴). 카드에 "💬 댓글 N" 버튼 추가 → 누르면 기존 `routineDetailOverlay`(rdBody/rdCommentBar)를 재사용하는 `openPostDetail()`로 상세+댓글 목록+입력바 노출. 인증 댓글용이던 `currentCertDetailId`와 겹치지 않게 `currentPostDetailId`를 별도로 두고 `submitCommentFromBar()`에서 분기(기존 인증 댓글 로직은 안 건드림). 브라우저에서 댓글 등록·삭제·카운트 갱신 확인. 마이그레이션 `[2026-07-22]`, **실행 필요**
+- **커뮤니티 게시글 댓글 추가** — 지금까지 게시글(공지/후기)엔 좋아요만 있고 댓글이 없었음. `post_comments` 테이블 신규(cert_comments와 동일 패턴 — 본인/관리자만 삭제) + 댓글 시 게시글 작성자에게 푸시(`on_post_comment_push`, cert_comment_push와 동일 패턴). 카드에 "💬 댓글 N" 버튼 추가 → 누르면 기존 `routineDetailOverlay`(rdBody/rdCommentBar)를 재사용하는 `openPostDetail()`로 상세+댓글 목록+입력바 노출. 인증 댓글용이던 `currentCertDetailId`와 겹치지 않게 `currentPostDetailId`를 별도로 두고 `submitCommentFromBar()`에서 분기(기존 인증 댓글 로직은 안 건드림). 브라우저에서 댓글 등록·삭제·카운트 갱신 확인. 마이그레이션 `[2026-07-22]` 실행 완료
 - **공지글 상단고정** — 커뮤니티 "전체" 목록에서 공지(notice)가 날짜순으로 후기들에 밀려 섞이던 걸, `_pinNotices()`로 공지를 항상 최상단(안정 정렬이라 그룹 내 최신순은 유지)으로 고정. 청소년 커뮤니티 탭·끗짱 리뷰 탭 양쪽에 적용. DB 변경 없음, 브라우저 검증 완료
 
 ## 최근 완료 (2026-07-21)
