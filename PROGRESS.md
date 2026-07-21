@@ -123,7 +123,7 @@
 ## 최근 완료 (2026-07-21)
 
 - **참여 인원 표시를 "N명 참여" → "👤 N/최대" 로 변경** — 청소년 루틴 상세 태그에서 `${r.people}명 참여`를 `👤 ${r.people}/${r.maxPeople}`로 교체. 브라우저 검증 완료
-- **서류 승인·끗짱 가입 승인 알림 추가** — 루틴 참여 승인/거절은 이미 알림이 가고 있었는데(`on_participant_status_change`), 학교밖청소년 서류 승인과 끗짱 가입 승인엔 알림이 없던 걸 발견. `profiles` 테이블에 별도 AFTER UPDATE 트리거 2개 추가(`on_verify_status_notify`, `on_kkutjjang_status_notify`) — 기존 권한 가드 트리거(BEFORE UPDATE, `guard_verify_status`/`guard_kkutjjang_status`)와는 분리, 승인(approved)으로 바뀌는 순간만 `notify_push()`. 거절 알림은 요청 범위 밖이라 추가 안 함(기존처럼 인앱에서 사유만 확인). 마이그레이션 `[2026-07-21]`, **실행 필요**
+- **서류 승인·끗짱 가입 승인 알림 추가** — 루틴 참여 승인/거절은 이미 알림이 가고 있었는데(`on_participant_status_change`), 학교밖청소년 서류 승인과 끗짱 가입 승인엔 알림이 없던 걸 발견. `profiles` 테이블에 별도 AFTER UPDATE 트리거 2개 추가(`on_verify_status_notify`, `on_kkutjjang_status_notify`) — 기존 권한 가드 트리거(BEFORE UPDATE, `guard_verify_status`/`guard_kkutjjang_status`)와는 분리, 승인(approved)으로 바뀌는 순간만 `notify_push()`. 거절 알림은 요청 범위 밖이라 추가 안 함(기존처럼 인앱에서 사유만 확인). 마이그레이션 `[2026-07-21]` 실행 완료
   - **루틴 공유 링크(실제 URL) 추가** (2026-07-17) — `routine:` 배너 딥링크는 앱 안에서만 동작해서, 카톡·인스타 등 외부에 뿌릴 수 있는 진짜 URL이 없다는 문제 발견. 청소년·끗짱 루틴 상세(모집중/진행중 루틴만)에 **"🔗 공유"** 버튼 추가 → `?routine={id}` 쿼리 링크 생성, `navigator.share` 지원 시 공유 시트, 없으면 클립보드 복사(실패 시 프롬프트 폴백). 앱이 이 쿼리로 열리면 로그인 완료 후 자동으로 해당 루틴 상세를 띄우고 URL은 깨끗하게 정리(`pendingRoutineId`). 브라우저에서 딥링크 파싱→자동 오픈→URL 정리는 검증 완료, 클립보드/공유시트 자체는 헤드리스 환경 제약으로 실기기 확인 필요
 
 ## 기술 부채 (급하지 않음)
