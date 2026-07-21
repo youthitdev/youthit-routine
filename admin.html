@@ -296,8 +296,15 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <input type="text" id="bnBody" placeholder="내용 (선택)" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+        <input type="url" id="bnImage" placeholder="이미지 URL (직접 입력 또는 아래에서 업로드)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="file" id="bnImageFile" accept="image/*" style="display:none;" onchange="handleBannerImageUpload(event)">
+        <button type="button" onclick="document.getElementById('bnImageFile').click()" style="padding:9px 14px;background:#fff;color:#2E33BC;border:1px solid #2E33BC;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🖼️ 이미지 업로드</button>
+      </div>
+      <div id="bnImagePreviewWrap" style="display:none;margin-bottom:8px;">
+        <img id="bnImagePreview" style="max-height:80px;border-radius:8px;display:block;">
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-        <input type="url" id="bnImage" placeholder="이미지 URL (선택)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <input type="text" id="bnLink" placeholder="연결 링크 (선택, 외부 URL — 새 탭으로 열림)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
@@ -306,7 +313,8 @@
           <option value="">루틴 선택 (선택하면 연결 링크에 자동 입력)</option>
         </select>
       </div>
-      <button onclick="submitBanner()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+      <button id="bnSubmitBtn" onclick="submitBanner()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+      <button id="bnCancelEditBtn" onclick="cancelEditBanner()" style="display:none;padding:9px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">수정 취소</button>
     </div>
 
     <div class="chart-card">
@@ -984,10 +992,51 @@ function renderBannerList() {
       <td>${_bannerLinkLabel(b.link_url)}</td>
       <td><span class="pill" style="background:${b.active?'#EAF3DE':'#f5f5f5'};color:${b.active?'#3B6D11':'#aaa'};">${b.active?'활성':'비활성'}</span></td>
       <td>
+        <button onclick="startEditBanner(${b.id})" style="padding:5px 10px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">수정</button>
         <button onclick="toggleBannerActive(${b.id},${!b.active})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${b.active?'비활성화':'활성화'}</button>
         <button onclick="deleteBanner(${b.id},'${b.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
       </td>
     </tr>`).join('') : `<tr class="empty-row"><td colspan="5">등록된 배너가 없어요</td></tr>`;
+}
+async function handleBannerImageUpload(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const path = `${Date.now()}_${file.name}`;
+  const { error: upErr } = await sb.storage.from('banner-images').upload(path, file);
+  if (upErr) { alert('이미지 업로드 실패: ' + upErr.message); return; }
+  const url = sb.storage.from('banner-images').getPublicUrl(path).data.publicUrl;
+  document.getElementById('bnImage').value = url;
+  _showBannerImagePreview(url);
+}
+function _showBannerImagePreview(url) {
+  const wrap = document.getElementById('bnImagePreviewWrap');
+  if (!url) { wrap.style.display = 'none'; return; }
+  document.getElementById('bnImagePreview').src = url;
+  wrap.style.display = '';
+}
+let editingBannerId = null;
+function startEditBanner(id) {
+  const b = bannerRows.find(x => x.id === id);
+  if (!b) return;
+  editingBannerId = id;
+  document.getElementById('bnTitle').value = b.title;
+  document.getElementById('bnBody').value = b.body || '';
+  document.getElementById('bnImage').value = b.image_url || '';
+  document.getElementById('bnLink').value = b.link_url || '';
+  document.getElementById('bnOrder').value = b.sort_order;
+  _showBannerImagePreview(b.image_url);
+  document.getElementById('bnSubmitBtn').textContent = '수정 완료';
+  document.getElementById('bnCancelEditBtn').style.display = '';
+  document.getElementById('bnTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function cancelEditBanner() {
+  editingBannerId = null;
+  ['bnTitle', 'bnBody', 'bnImage', 'bnLink'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bnOrder').value = '0';
+  _showBannerImagePreview(null);
+  document.getElementById('bnSubmitBtn').textContent = '등록하기';
+  document.getElementById('bnCancelEditBtn').style.display = 'none';
 }
 async function submitBanner() {
   const title = document.getElementById('bnTitle').value.trim();
@@ -996,10 +1045,12 @@ async function submitBanner() {
   const link_url = document.getElementById('bnLink').value.trim();
   const sort_order = parseInt(document.getElementById('bnOrder').value) || 0;
   if (!title) { alert('제목을 입력해주세요.'); return; }
-  const { error } = await sb.from('banners').insert({ title, body: body || null, image_url: image_url || null, link_url: link_url || null, sort_order });
-  if (error) { alert('등록 실패: ' + error.message); return; }
-  ['bnTitle', 'bnBody', 'bnImage', 'bnLink'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('bnOrder').value = '0';
+  const payload = { title, body: body || null, image_url: image_url || null, link_url: link_url || null, sort_order };
+  const { error } = editingBannerId
+    ? await sb.from('banners').update(payload).eq('id', editingBannerId)
+    : await sb.from('banners').insert(payload);
+  if (error) { alert((editingBannerId ? '수정' : '등록') + ' 실패: ' + error.message); return; }
+  cancelEditBanner();
   await renderBannerView();
 }
 async function toggleBannerActive(id, active) {
@@ -1011,6 +1062,7 @@ async function deleteBanner(id, title) {
   if (!confirm(`"${title}" 배너를 삭제할까요?`)) return;
   const { error } = await sb.from('banners').delete().eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
+  if (editingBannerId === id) cancelEditBanner();
   await renderBannerView();
 }
 

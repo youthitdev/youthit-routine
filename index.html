@@ -489,20 +489,12 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="tab-page active" id="page-home">
         <div class="scroll-body">
           <!-- 히어로 카드 -->
-          <div style="background:linear-gradient(135deg,#2E33BC 0%,#4B50D4 100%);border-radius:20px;padding:18px 16px 16px;color:white;position:relative;overflow:hidden;">
-            <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
-            <div style="position:absolute;right:36px;bottom:-36px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
-            <div style="position:relative;">
-              <div style="font-size:12px;opacity:0.8;margin-bottom:3px;" id="homeGreeting">오늘 하루도 한끗씩 ✦</div>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span style="font-size:19px;font-weight:700;" id="homeUsername"></span>
-                <div id="homeStreakArea"></div>
-              </div>
-              <div style="display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.18);">
-                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">📸 <span id="homeCertCount">0</span>회</div>
-                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">💬 <span id="homeCommCount">0</span>회</div>
-                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,0.85);">✨ <span class="nadaeum-val">0N</span></div>
-              </div>
+          <div style="background:linear-gradient(135deg,#2E33BC 0%,#4B50D4 100%);border-radius:16px;padding:12px 16px;color:white;position:relative;overflow:hidden;">
+            <div style="position:absolute;right:-16px;top:-20px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+            <div style="position:relative;font-size:11px;opacity:0.8;margin-bottom:2px;" id="homeGreeting">오늘 하루도 한끗씩 ✦</div>
+            <div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span style="font-size:16px;font-weight:700;" id="homeUsername"></span>
+              <div id="homeStreakArea"></div>
             </div>
           </div>
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
@@ -1848,8 +1840,6 @@ function _myActiveRoutines() {
 function renderHome() {
   document.getElementById('homeGreeting').textContent = _greeting();
   document.getElementById('homeUsername').textContent = state.youth.name+'님';
-  document.getElementById('homeCertCount').textContent = state.youth.certCount;
-  document.getElementById('homeCommCount').textContent = state.youth.commCount;
   renderNadaeum();
 
   // 스트릭 배지 (레벨·진행바는 MY탭에 있어서 홈은 한 줄로 축약)

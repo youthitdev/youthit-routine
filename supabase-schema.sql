@@ -1110,3 +1110,23 @@ CREATE POLICY "banners_select" ON banners FOR SELECT USING (active = true OR is_
 CREATE POLICY "banners_admin_insert" ON banners FOR INSERT WITH CHECK (is_admin());
 CREATE POLICY "banners_admin_update" ON banners FOR UPDATE USING (is_admin());
 CREATE POLICY "banners_admin_delete" ON banners FOR DELETE USING (is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-17b] 배너 이미지 업로드 버킷
+-- =====================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('banner-images', 'banner-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "banner_images_insert_admin" ON storage.objects;
+CREATE POLICY "banner_images_insert_admin" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'banner-images' AND is_admin()
+);
+DROP POLICY IF EXISTS "banner_images_select_all" ON storage.objects;
+CREATE POLICY "banner_images_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'banner-images'
+);
+DROP POLICY IF EXISTS "banner_images_delete_admin" ON storage.objects;
+CREATE POLICY "banner_images_delete_admin" ON storage.objects FOR DELETE USING (
+  bucket_id = 'banner-images' AND is_admin()
+);
