@@ -1236,6 +1236,8 @@ function populateSigugunSelect(sidoId, sigugunId){
 }
 
 var isRecoveryFlow = /type=recovery/.test(location.hash);
+// 공유된 루틴 링크(?routine=ID)로 들어온 경우 로그인 후 해당 루틴 상세를 바로 열기 위해 기억해둠
+var pendingRoutineId = (function(){ const m = location.search.match(/routine=(\d+)/); return m ? parseInt(m[1]) : null; })();
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
@@ -1324,6 +1326,11 @@ async function loadProfileAndEnter() {
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
   _maybeCelebrateCompletion();
+  if (pendingRoutineId && state.currentRole === 'youth') {
+    const pid = pendingRoutineId; pendingRoutineId = null;
+    history.replaceState(null, '', location.pathname);
+    if (state.routines.some(r => r.id === pid)) openRoutineDetail(pid);
+  }
 }
 function showKkutjjangPending(status, reason) {
   document.getElementById('splashScreen').classList.add('hide');
@@ -2353,6 +2360,7 @@ function openRoutineDetail(id) {
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.people}명 참여</div>
+    ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:12px;color:#2E33BC;font-weight:600;background:#E6F1FB;padding:4px 9px;border-radius:12px;cursor:pointer;">🔗 공유</div>`:''}
   </div>
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>`;
@@ -3573,6 +3581,7 @@ function openKRoutineDetail(routineId) {
   document.getElementById('rdBody').innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:14px;">
       <button onclick="openEditRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#FF006C;border:1.5px solid #FF006C;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-pencil" style="font-size:14px;"></i> 루틴 수정</button>
+      ${(r.status==='recruit'||r.status==='active')?`<button onclick="shareRoutineLink(${routineId},'${(r.title||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">🔗 공유</button>`:''}
       ${canCancel?`<button onclick="cancelRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#888;border:1.5px solid #ddd;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-ban" style="font-size:14px;"></i> 폐강 처리</button>`:''}
       ${r.status==='done'?`<button onclick="openKReportCard(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 완주 리포트</button>`:''}
     </div>
@@ -4255,6 +4264,20 @@ function openReportCard(routineId) {
   openSheet('reportCardBg');
 }
 function closeReportCard() { closeSheet('reportCardBg'); }
+// 루틴 상세로 바로 이동하는 링크 공유 (홈 배너와는 별개로, 카톡·인스타 등 외부에 뿌릴 수 있는 실제 URL)
+async function shareRoutineLink(routineId, title) {
+  const url = `${location.origin}${location.pathname}?routine=${routineId}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: `한끗루틴 - ${title}`, text: `${title} 루틴에 함께해요!`, url }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('링크가 복사됐어요! 카톡이나 SNS에 붙여넣어 공유해보세요.');
+  } catch (e) {
+    prompt('아래 링크를 복사해서 공유해보세요', url);
+  }
+}
 function _downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
