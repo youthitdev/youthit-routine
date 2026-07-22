@@ -611,6 +611,10 @@ select:focus { outline: none; border-color: #2E33BC; }
               </div>
             </div>
           </div>
+          <div class="section-card">
+            <div class="section-hd"><div class="section-hd-title">🏅 배지</div></div>
+            <div id="badgeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;"></div>
+          </div>
           <div class="ai-card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
               <div style="font-size:15px;font-weight:600;color:white;">AI 루틴 리포트</div>
@@ -1530,7 +1534,7 @@ async function doLogout() {
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,badges:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
     {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
@@ -1900,7 +1904,7 @@ function switchTab(tab) {
   else if(tab==='routine') renderRoutine();
   else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
-  else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); }
+  else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
 }
 // MY탭에 올 때마다 인증 상태를 서버에서 다시 확인 — 로그인 이후 관리자가 승인/반려했으면 재로그인 없이도 최신화
 async function refreshVerifyStatus() {
@@ -3164,6 +3168,34 @@ function renderCal() {
 function calPrevMonth(){if(calMonth===0){calMonth=11;calYear--;}else calMonth--;renderCal();}
 function calNextMonth(){const n=new Date();if(calYear>n.getFullYear()||(calYear===n.getFullYear()&&calMonth>=n.getMonth()))return;if(calMonth===11){calMonth=0;calYear++;}else calMonth++;renderCal();}
 
+// 배지는 서버(user_badges 테이블, DB 트리거가 실제 인증/완주 기준으로 지급)가 판단한
+// 목록만 그대로 진열함 — 조건 계산을 클라이언트가 다시 하지 않음(위조 방지, nadaeum과 동일한 이유).
+const BADGE_CATALOG = [
+  {key:'first_cert', emoji:'📸', title:'첫 인증', desc:'첫 인증을 남기면'},
+  {key:'first_complete', emoji:'🌱', title:'첫 완주', desc:'루틴 1개를 완주하면'},
+  {key:'complete_3', emoji:'🏆', title:'완주 3회', desc:'루틴 3개를 완주하면'},
+  {key:'streak_7', emoji:'🔥', title:'연속 7일', desc:'7일 연속 인증하면'},
+  {key:'streak_30', emoji:'🔥', title:'연속 30일', desc:'30일 연속 인증하면'},
+  {key:'cert_50', emoji:'💯', title:'인증 50회', desc:'누적 인증 50회를 채우면'},
+];
+async function loadBadges() {
+  if(!currentUser) return;
+  const { data } = await sb.from('user_badges').select('badge_key').eq('user_id', currentUser.id);
+  state.youth.badges = (data||[]).map(b=>b.badge_key);
+}
+function renderBadges() {
+  const el = document.getElementById('badgeGrid');
+  if(!el) return;
+  const earned = state.youth.badges || [];
+  el.innerHTML = BADGE_CATALOG.map(b=>{
+    const got = earned.includes(b.key);
+    return `<div style="text-align:center;padding:10px 6px;border-radius:12px;background:${got?'#FFF8E1':'#f5f5f7'};">
+      <div style="font-size:26px;opacity:${got?'1':'0.25'};filter:${got?'none':'grayscale(1)'};">${b.emoji}</div>
+      <div style="font-size:11px;font-weight:600;color:${got?'#111':'#aaa'};margin-top:4px;">${b.title}</div>
+      <div style="font-size:9px;color:#aaa;margin-top:2px;">${got?'획득 완료':b.desc}</div>
+    </div>`;
+  }).join('');
+}
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
@@ -3188,6 +3220,7 @@ function renderMy() {
     }).join('');
   }
   renderCal();
+  renderBadges();
   renderSwitchBtn();
   renderVerifyCard();
   _updateAiReportCard();
@@ -3742,7 +3775,9 @@ function kRenderRoutineTab() {
 }
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-  const base=_kMyRoutines();
+  // 루틴탭은 둘러보기 용도라 전체 루틴을 보여줌(다른 끗짱 담당분 포함) — 홈/인증탭/통계는
+  // 관리 화면이라 그대로 _kMyRoutines()(내 담당 루틴만)로 스코핑 유지
+  const base=state.routines;
   const filtered=type==='all'?base:base.filter(r=>r.status===type);
   // 진행중 루틴 항상 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
@@ -3773,6 +3808,7 @@ function kFilterRoutine(type,el) {
         ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
         <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
         <span class="rc-people">👤 ${r.people}명</span>
+        ${state.loginType!=='both' && r.ledBy===currentUser?.id?`<span style="position:absolute;bottom:8px;left:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(46,51,188,0.9);color:#fff;">내 담당</span>`:''}
         ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">

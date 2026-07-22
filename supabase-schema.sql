@@ -1484,3 +1484,105 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_award_review_nadaeum ON posts;
 CREATE TRIGGER trg_award_review_nadaeum AFTER INSERT ON posts
   FOR EACH ROW EXECUTE FUNCTION award_review_nadaeum();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22e] 배지/업적 컬렉션 (MVP 6종)
+-- 첫 인증·첫 완주·루틴 3개 완주·연속 7일·연속 30일·인증 50회.
+-- 나다움과 마찬가지로 클라이언트가 스스로 지급 조건을 판단하면 위조 가능하므로,
+-- 실제 certifications/routine_participants 변화를 트리거가 감지해 서버에서만 지급.
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id     uuid REFERENCES auth.users ON DELETE CASCADE,
+  badge_key   text NOT NULL,
+  earned_at   timestamptz DEFAULT now(),
+  UNIQUE(user_id, badge_key)
+);
+ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_badges_select_own" ON user_badges FOR SELECT USING (auth.uid() = user_id);
+-- INSERT 정책 없음: 트리거(SECURITY DEFINER)만 기록 가능
+
+-- 배지 지급 + 최초 지급 시에만 축하 푸시 (ON CONFLICT DO NOTHING이라 중복 지급 안 됨)
+CREATE OR REPLACE FUNCTION award_badge(p_user uuid, p_key text, p_title text) RETURNS void AS $$
+BEGIN
+  INSERT INTO user_badges(user_id, badge_key) VALUES (p_user, p_key)
+  ON CONFLICT (user_id, badge_key) DO NOTHING;
+  IF FOUND THEN
+    PERFORM notify_push(p_user, '🏅 새 배지 획득!', p_title || ' 배지를 획득했어요! MY탭에서 확인해보세요.');
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 오늘을 포함해 연속으로 인증한 일수 (gaps-and-islands: 날짜 그룹핑)
+CREATE OR REPLACE FUNCTION _current_cert_streak(p_user uuid) RETURNS int AS $$
+DECLARE result int;
+BEGIN
+  WITH days AS (
+    SELECT DISTINCT DATE(created_at) AS d FROM certifications WHERE user_id = p_user
+  ), ranked AS (
+    SELECT d, d - (ROW_NUMBER() OVER (ORDER BY d))::int AS grp FROM days
+  )
+  SELECT count(*) INTO result FROM ranked
+  WHERE grp = (SELECT grp FROM ranked WHERE d = CURRENT_DATE LIMIT 1);
+  RETURN COALESCE(result, 0);
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- 인증 저장 시: 첫 인증 / 누적 50회 / 연속 7일·30일 배지 체크
+CREATE OR REPLACE FUNCTION award_cert_badges() RETURNS TRIGGER AS $$
+DECLARE total_certs int; streak int;
+BEGIN
+  SELECT count(*) INTO total_certs FROM certifications WHERE user_id = NEW.user_id;
+  IF total_certs = 1 THEN PERFORM award_badge(NEW.user_id, 'first_cert', '📸 첫 인증'); END IF;
+  IF total_certs = 50 THEN PERFORM award_badge(NEW.user_id, 'cert_50', '💯 인증 50회'); END IF;
+  streak := _current_cert_streak(NEW.user_id);
+  IF streak = 7 THEN PERFORM award_badge(NEW.user_id, 'streak_7', '🔥 연속 인증 7일'); END IF;
+  IF streak = 30 THEN PERFORM award_badge(NEW.user_id, 'streak_30', '🔥 연속 인증 30일'); END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_award_cert_badges ON certifications;
+CREATE TRIGGER trg_award_cert_badges AFTER INSERT ON certifications
+  FOR EACH ROW EXECUTE FUNCTION award_cert_badges();
+
+-- 완주(나다움 일괄지급 대상이 되는 순간 = 2/3 기준 최초 달성) 시: 첫 완주 / 3개 완주 배지 체크
+-- on_cert_nadaeum_payout()이 이 순간 routine_participants.nadaeum_paid를 false→true로 바꾸므로 그 전환을 감지
+CREATE OR REPLACE FUNCTION award_completion_badges() RETURNS TRIGGER AS $$
+DECLARE done_count int;
+BEGIN
+  SELECT count(*) INTO done_count FROM routine_participants WHERE user_id = NEW.user_id AND nadaeum_paid = true;
+  IF done_count = 1 THEN PERFORM award_badge(NEW.user_id, 'first_complete', '🌱 첫 완주'); END IF;
+  IF done_count = 3 THEN PERFORM award_badge(NEW.user_id, 'complete_3', '🏆 루틴 3개 완주'); END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_award_completion_badges ON routine_participants;
+CREATE TRIGGER trg_award_completion_badges AFTER UPDATE ON routine_participants
+  FOR EACH ROW WHEN (NEW.nadaeum_paid IS DISTINCT FROM OLD.nadaeum_paid AND NEW.nadaeum_paid = true)
+  EXECUTE FUNCTION award_completion_badges();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22f] 루틴 참여 신청 자격을 서버에서도 검증
+-- 지금까지는 "끗짱은 신청 UI 자체가 없음"·"학교밖 전용은 verify_status 승인 전엔
+-- 신청 버튼이 막힘" 둘 다 클라이언트 쪽 방어뿐이었음(rp_insert RLS는
+-- auth.uid()=user_id만 체크). REST API로 직접 routine_participants insert를
+-- 호출하면 끗짱 계정도, 미승인 재학 청소년도 신청이 그대로 들어갈 수 있었던 구멍.
+-- =====================================================
+CREATE OR REPLACE FUNCTION guard_participant_apply() RETURNS TRIGGER AS $$
+DECLARE u_role text; u_verify text; r_elig text;
+BEGIN
+  SELECT role, verify_status INTO u_role, u_verify FROM profiles WHERE id = NEW.user_id;
+  IF u_role = 'kkutjjang' THEN
+    RAISE EXCEPTION '끗짱은 루틴에 참여 신청할 수 없어요';
+  END IF;
+  SELECT eligibility INTO r_elig FROM routines WHERE id = NEW.routine_id;
+  IF r_elig = 'out_of_school' AND COALESCE(u_verify,'none') <> 'approved' THEN
+    RAISE EXCEPTION '학교밖청소년 확인서 승인 후 신청할 수 있어요';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_guard_participant_apply ON routine_participants;
+CREATE TRIGGER trg_guard_participant_apply BEFORE INSERT ON routine_participants
+  FOR EACH ROW EXECUTE FUNCTION guard_participant_apply();
