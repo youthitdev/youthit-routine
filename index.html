@@ -475,7 +475,10 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div class="header-sub">Youth-it</div>
         <div class="header-title">한끗루틴<span class="role-badge" id="headerRoleBadge"></span></div>
       </div>
-      <i class="ti ti-bell" onclick="openNotifSetting()" style="font-size:20px;color:white;cursor:pointer;"></i>
+      <div style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
+        <i class="ti ti-bell" style="font-size:20px;color:white;"></i>
+        <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FF006C;border:1.5px solid #2E33BC;"></span>
+      </div>
     </div>
   </div>
 
@@ -1078,6 +1081,17 @@ select:focus { outline: none; border-color: #2E33BC; }
   </div>
 
   <!-- 바텀시트: 알림 설정 -->
+  <div class="sheet-bg" id="notifHistoryBg" onclick="closeSheet('notifHistoryBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:600;color:#111;">알림</div>
+        <span onclick="closeSheet('notifHistoryBg');openNotifSetting()" style="font-size:12px;color:#2E33BC;font-weight:600;cursor:pointer;">⚙️ 알림 설정</span>
+      </div>
+      <div id="notifHistoryList" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;"></div>
+    </div>
+  </div>
+
   <div class="sheet-bg" id="notifSettingBg" onclick="closeSheet('notifSettingBg')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
@@ -1326,6 +1340,7 @@ async function loadProfileAndEnter() {
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
   _maybeCelebrateCompletion();
+  refreshNotifUnreadDot();
   if (pendingRoutineId && state.currentRole === 'youth') {
     const pid = pendingRoutineId; pendingRoutineId = null;
     history.replaceState(null, '', location.pathname);
@@ -1876,7 +1891,16 @@ function switchTab(tab) {
   else if(tab==='routine') renderRoutine();
   else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
-  else if(tab==='my') { renderMy(); refreshExpiryBanner(); }
+  else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); }
+}
+// MY탭에 올 때마다 인증 상태를 서버에서 다시 확인 — 로그인 이후 관리자가 승인/반려했으면 재로그인 없이도 최신화
+async function refreshVerifyStatus() {
+  if(!currentUser) return;
+  const { data } = await sb.from('profiles').select('verify_status,verify_reject_reason').eq('id',currentUser.id).single();
+  if(data) {
+    state.youth.verifyStatus = data.verify_status || 'none';
+    state.youth.verifyRejectReason = data.verify_reject_reason || '';
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -2607,8 +2631,7 @@ async function submitApplyRoutine(){
   document.getElementById('rdBody').innerHTML='';
   renderRoutine();
   setTimeout(async ()=>{
-    const otMsg = r&&r.kickoffAt ? `\n\n🚀 첫날 OT: ${_fmtDT(r.kickoffAt)}\n줌으로 함께 만나 첫 인증을 해볼 거예요!` : '';
-    alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.'+otMsg);
+    alert('참여 신청이 완료됐어요!\n끗짱의 승인 후 루틴에 참여할 수 있어요.');
     // 승인 소식을 받을 동기가 가장 강한 순간 — 알림 미설정자에겐 설정 시트를 바로 열어줌
     try {
       if (_isIOSNeedsInstall()) { openNotifSetting(); return; }
@@ -3258,6 +3281,28 @@ function openNotifSetting() {
   refreshPushToggle();
   loadReminderHour();
   openSheet('notifSettingBg');
+}
+// 알림 내역함 — 서버 알림은 전부 notify_push()를 거치고, 그 함수가 notifications 테이블에도 기록해둠
+async function openNotifHistory() {
+  if(!currentUser){ openSheet('notifHistoryBg'); document.getElementById('notifHistoryList').innerHTML='<div style="text-align:center;padding:24px;font-size:13px;color:#aaa;">로그인이 필요해요</div>'; return; }
+  const list = document.getElementById('notifHistoryList');
+  list.innerHTML = '<div style="text-align:center;padding:24px;font-size:13px;color:#aaa;">불러오는 중...</div>';
+  openSheet('notifHistoryBg');
+  const { data, error } = await sb.from('notifications').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}).limit(30);
+  const rows = error ? [] : (data||[]);
+  list.innerHTML = rows.length ? rows.map(n=>`
+    <div style="padding:12px 14px;background:${n.read?'#fff':'#f0f1fb'};border:0.5px solid #eee;border-radius:12px;">
+      <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:2px;">${n.title||''}</div>
+      <div style="font-size:12.5px;color:#555;line-height:1.5;">${n.body||''}</div>
+      <div style="font-size:10.5px;color:#bbb;margin-top:4px;">${timeAgo(new Date(n.created_at).getTime())}</div>
+    </div>`).join('') : '<div style="text-align:center;padding:32px 16px;"><div style="font-size:28px;margin-bottom:8px;">🔔</div><div style="font-size:13px;color:#aaa;">아직 알림이 없어요</div></div>';
+  document.getElementById('notifUnreadDot').style.display='none';
+  if(rows.some(n=>!n.read)) sb.from('notifications').update({read:true}).eq('user_id',currentUser.id).eq('read',false).then(()=>{});
+}
+async function refreshNotifUnreadDot() {
+  if(!currentUser) return;
+  const { count } = await sb.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',currentUser.id).eq('read',false);
+  document.getElementById('notifUnreadDot').style.display = count>0 ? '' : 'none';
 }
 async function loadReminderHour() {
   const wrap = document.getElementById('reminderWrap');
@@ -4610,6 +4655,7 @@ async function refetchOnResume() {
   const tab = activePage && activePage.id.startsWith(prefix) ? activePage.id.slice(prefix.length) : null;
   if (tab) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
   _maybeCelebrateCompletion();
+  refreshNotifUnreadDot();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);

@@ -1248,3 +1248,62 @@ DROP TRIGGER IF EXISTS trg_poke_push ON pokes;
 CREATE TRIGGER trg_poke_push
   AFTER INSERT ON pokes
   FOR EACH ROW EXECUTE FUNCTION on_poke_push();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22c] 인앱 알림 내역함
+-- 홈 화면 알림벨이 "알림 설정"만 열던 문제 — 실제 알림 목록이 없어서였음.
+-- notify_push()를 거치는 모든 알림(승인/거절/좋아요/댓글/폐강/완주지급/
+-- 콕찌르기/탈퇴 등)이 자동으로 여기 쌓이도록 notify_push() 자체에서 기록.
+-- 기존 호출부(트리거 10여 곳)는 하나도 안 건드림.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id     uuid   REFERENCES auth.users ON DELETE CASCADE,
+  title       text,
+  body        text,
+  read        boolean NOT NULL DEFAULT false,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "notif_select_own" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notif_update_own" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE OR REPLACE FUNCTION notify_push(target_user uuid, push_title text, push_body text)
+RETURNS void AS $$
+DECLARE
+  sr_key text;
+BEGIN
+  INSERT INTO notifications(user_id, title, body) VALUES (target_user, push_title, push_body);
+  SELECT decrypted_secret INTO sr_key FROM vault.decrypted_secrets WHERE name = 'sr_key_for_push';
+  IF sr_key IS NULL THEN RETURN; END IF;  -- 키 미설정 시 푸시만 조용히 스킵 (인앱 내역은 이미 기록됨)
+  PERFORM net.http_post(
+    url := 'https://ynqvhsffoesjzefitafv.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || sr_key),
+    body := jsonb_build_object('user_id', target_user, 'title', push_title, 'body', push_body, 'url', '/youthit-routine/')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 루틴 참여 승인 시 알림이 안 온다는 QA 리포트 확인 — 코드 리뷰 결과 트리거 자체엔
+-- 결함을 못 찾았음(로직 정확). 혹시 운영 DB에 트리거가 누락/드리프트됐을 가능성에
+-- 대비해 동일 정의로 안전하게 재실행(멱등, DROP 후 재생성이라 부작용 없음).
+CREATE OR REPLACE FUNCTION on_participant_status_change()
+RETURNS TRIGGER AS $$
+DECLARE r_title text;
+BEGIN
+  IF NEW.status IS NOT DISTINCT FROM OLD.status OR NEW.status NOT IN ('approved','rejected') THEN
+    RETURN NEW;
+  END IF;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  IF NEW.status = 'approved' THEN
+    PERFORM notify_push(NEW.user_id, '루틴 참여가 승인됐어요! 🎉', '"' || coalesce(r_title,'루틴') || '" 이제 함께 시작해요!');
+  ELSE
+    PERFORM notify_push(NEW.user_id, '루틴 참여 안내', '"' || coalesce(r_title,'루틴') || '" 참여가 이번엔 어려워요. 다른 루틴도 둘러봐요.');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_participant_status_push ON routine_participants;
+CREATE TRIGGER trg_participant_status_push
+  AFTER UPDATE ON routine_participants
+  FOR EACH ROW EXECUTE FUNCTION on_participant_status_change();
