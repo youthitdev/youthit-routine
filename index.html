@@ -611,10 +611,6 @@ select:focus { outline: none; border-color: #2E33BC; }
               </div>
             </div>
           </div>
-          <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">🏅 배지</div></div>
-            <div id="badgeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;"></div>
-          </div>
           <div class="ai-card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
               <div style="font-size:15px;font-weight:600;color:white;">AI 루틴 리포트</div>
@@ -628,6 +624,7 @@ select:focus { outline: none; border-color: #2E33BC; }
             <div id="completedList"></div>
           </div>
           <div class="menu-card">
+            <div class="menu-item" onclick="openBadgeSheet()"><div class="menu-left"><div class="menu-icon" style="background:#FFF8E1;"><i class="ti ti-award" style="font-size:15px;color:#B8860B;"></i></div>배지</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openSheet('accountSheetBg')"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
@@ -1120,6 +1117,15 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:12px;">탈퇴하면 인증 기록·나다움 포인트·참여 내역과 제출한 서류가 모두 삭제되고 되돌릴 수 없어요.</div>
         <button id="deleteAccountBtn" onclick="deleteAccount()" style="width:100%;padding:12px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">회원 탈퇴하기</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 바텀시트: 배지 -->
+  <div class="sheet-bg" id="badgeSheetBg" onclick="closeSheet('badgeSheetBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:12px;">🏅 배지</div>
+      <div id="badgeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;"></div>
     </div>
   </div>
 
@@ -3195,6 +3201,10 @@ function renderBadges() {
       <div style="font-size:9px;color:#aaa;margin-top:2px;">${got?'획득 완료':b.desc}</div>
     </div>`;
   }).join('');
+}
+function openBadgeSheet() {
+  openSheet('badgeSheetBg');
+  loadBadges().then(renderBadges);
 }
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
