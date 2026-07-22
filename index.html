@@ -475,9 +475,12 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div class="header-sub">Youth-it</div>
         <div class="header-title">한끗루틴<span class="role-badge" id="headerRoleBadge"></span></div>
       </div>
-      <div style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
-        <i class="ti ti-bell" style="font-size:20px;color:white;"></i>
-        <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FF006C;border:1.5px solid #2E33BC;"></span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="headerStreakBadge"></span>
+        <div style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
+          <i class="ti ti-bell" style="font-size:20px;color:white;"></i>
+          <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FF006C;border:1.5px solid #2E33BC;"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -491,15 +494,6 @@ select:focus { outline: none; border-color: #2E33BC; }
       <!-- 홈 -->
       <div class="tab-page active" id="page-home">
         <div class="scroll-body">
-          <!-- 히어로 카드 -->
-          <div style="background:linear-gradient(135deg,#2E33BC 0%,#4B50D4 100%);border-radius:16px;padding:12px 16px;color:white;position:relative;overflow:hidden;">
-            <div style="position:absolute;right:-16px;top:-20px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
-            <div style="position:relative;font-size:11px;opacity:0.8;margin-bottom:2px;" id="homeGreeting">오늘 하루도 한끗씩 ✦</div>
-            <div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span style="font-size:16px;font-weight:700;" id="homeUsername"></span>
-              <div id="homeStreakArea"></div>
-            </div>
-          </div>
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
           <div id="homeBannerArea" style="display:none;"></div>
           <!-- 오늘의 미션 -->
@@ -1341,6 +1335,7 @@ async function loadProfileAndEnter() {
   enterAs(profile.role);
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
+  updateHeaderStreakBadge();
   if (pendingRoutineId && state.currentRole === 'youth') {
     const pid = pendingRoutineId; pendingRoutineId = null;
     history.replaceState(null, '', location.pathname);
@@ -1915,6 +1910,16 @@ function _streak(dates) {
   while(set.has(key(d))) { n++; d.setDate(d.getDate()-1); }
   return n;
 }
+// 헤더의 스트릭 배지 — 청소년일 때만, 연속 인증 중일 때만 노출
+function updateHeaderStreakBadge() {
+  const el = document.getElementById('headerStreakBadge');
+  if(!el) return;
+  if(state.currentRole !== 'youth') { el.innerHTML=''; return; }
+  const sk = _streak(state.youth.certDates);
+  el.innerHTML = sk > 0
+    ? `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,0.22);border-radius:12px;padding:4px 9px;font-size:11.5px;font-weight:700;color:#fff;white-space:nowrap;">🔥 ${sk}일째</span>`
+    : '';
+}
 function _greeting() {
   const h = new Date().getHours();
   if(h < 6)  return '고요한 새벽이에요 🌙';
@@ -1926,16 +1931,8 @@ function _myActiveRoutines() {
   return state.routines.filter(r => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
 }
 function renderHome() {
-  document.getElementById('homeGreeting').textContent = _greeting();
-  document.getElementById('homeUsername').textContent = state.youth.name+'님';
   renderNadaeum();
-
-  // 스트릭 배지 (레벨·진행바는 MY탭에 있어서 홈은 한 줄로 축약)
-  const sk = _streak(state.youth.certDates);
-  document.getElementById('homeStreakArea').innerHTML = sk > 0
-    ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;background:rgba(255,214,0,0.22);border:0.5px solid rgba(255,214,0,0.5);border-radius:20px;padding:5px 10px;font-size:11.5px;font-weight:600;color:#FFD600;white-space:nowrap;">🔥 ${sk}일째</span>`
-    : `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 10px;font-size:11.5px;color:rgba(255,255,255,0.85);white-space:nowrap;">🌱 오늘 시작!</span>`;
-
+  updateHeaderStreakBadge();
   renderHomeBanner();
 
   const active = _myActiveRoutines();
@@ -4656,6 +4653,7 @@ async function refetchOnResume() {
   if (tab) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
+  updateHeaderStreakBadge();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);
