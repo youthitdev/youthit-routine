@@ -471,15 +471,12 @@ select:focus { outline: none; border-color: #2E33BC; }
   <!-- 헤더 -->
   <div class="header" id="mainHeader" style="display:none;">
     <div class="header-row">
-      <div>
-        <div class="header-sub">Youth-it</div>
-        <div class="header-title">한끗루틴<span class="role-badge" id="headerRoleBadge"></span></div>
-      </div>
+      <div class="header-title">한끗루틴<span class="role-badge" id="headerRoleBadge"></span></div>
       <div style="display:flex;align-items:center;gap:10px;">
         <span id="headerStreakBadge"></span>
         <div style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
           <i class="ti ti-bell" style="font-size:20px;color:white;"></i>
-          <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FF006C;border:1.5px solid #2E33BC;"></span>
+          <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FFD600;border:1.5px solid #FFD600;"></span>
         </div>
       </div>
     </div>
@@ -1975,13 +1972,7 @@ function renderHome() {
       <button onclick="switchTab('routine')" style="padding:10px 22px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">루틴 둘러보기</button>
     </div>`;
   } else if(notDone.length === 0) {
-    missionEl.innerHTML = `<div style="background:linear-gradient(135deg,#83CA00,#9FE01F);border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:28px;">🎉</div>
-      <div>
-        <div style="font-size:14px;font-weight:700;color:white;">오늘 한끗 완료!</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">참여 중인 루틴 ${active.length}개 모두 인증했어요</div>
-      </div>
-    </div>`;
+    missionEl.innerHTML = '';
   } else {
     missionEl.innerHTML = `<div class="section-card">
       <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
