@@ -1120,6 +1120,34 @@ select:focus { outline: none; border-color: #2E33BC; }
     </div>
   </div>
 
+  <!-- 바텀시트: 아이폰 홈 화면에 추가 가이드 -->
+  <div class="sheet-bg" id="iosInstallSheetBg" onclick="closeSheet('iosInstallSheetBg')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:4px;">📲 홈 화면에 추가하기</div>
+      <div style="font-size:12px;color:#888;margin-bottom:18px;line-height:1.5;">앱처럼 쓰고, 승인·응원 알림도 놓치지 않아요</div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">1</div>
+          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">Safari 하단의 <b>공유 버튼</b>을 눌러요
+            <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:10px;padding:7px 12px;font-size:16px;">⬆️<span style="font-size:11px;color:#888;">공유</span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">2</div>
+          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">메뉴를 아래로 내려서 <b>"홈 화면에 추가"</b>를 선택해요
+            <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:10px;padding:7px 12px;font-size:13px;">➕ 홈 화면에 추가</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">3</div>
+          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">오른쪽 위 <b>"추가"</b>를 누르면 끝!<br>홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요</div>
+        </div>
+      </div>
+      <button class="primary-btn" style="margin-top:22px;" onclick="closeSheet('iosInstallSheetBg')">확인</button>
+    </div>
+  </div>
+
   <!-- 바텀시트: 배지 -->
   <div class="sheet-bg" id="badgeSheetBg" onclick="closeSheet('badgeSheetBg')">
     <div class="sheet" onclick="event.stopPropagation()">
@@ -3206,6 +3234,7 @@ function openBadgeSheet() {
   openSheet('badgeSheetBg');
   loadBadges().then(renderBadges);
 }
+function openIOSInstallSheet() { openSheet('iosInstallSheetBg'); }
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
@@ -3445,8 +3474,8 @@ async function refreshPushToggle() {
   if (!_pushSupported()) {
     wrap.style.display = '';
     btn.style.display = 'none';
-    hint.textContent = _isIOSNeedsInstall()
-      ? '아이폰은 Safari 공유 버튼 → "홈 화면에 추가" 후 앱에서 알림을 켤 수 있어요.'
+    hint.innerHTML = _isIOSNeedsInstall()
+      ? '아이폰은 <a href="javascript:void(0)" onclick="openIOSInstallSheet()" style="color:#2E33BC;font-weight:600;text-decoration:underline;">홈 화면에 추가</a>하면 앱에서 알림을 켤 수 있어요.'
       : '이 브라우저는 푸시 알림을 지원하지 않아요.';
     return;
   }
@@ -3540,7 +3569,7 @@ async function renderPushNudge() {
       el.innerHTML = `<div style="background:#f0f1fb;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:10px;">
         <div style="font-size:20px;">📲</div>
         <div style="flex:1;min-width:0;font-size:12px;color:#333;line-height:1.5;"><b>홈 화면에 추가</b>하면 앱처럼 쓰고<br>승인·응원 알림도 받을 수 있어요</div>
-        <button onclick="alert('Safari 하단의 공유 버튼(□↑)을 누르고\\n[홈 화면에 추가]를 선택해주세요!')" style="flex-shrink:0;padding:8px 12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">방법 보기</button>
+        <button onclick="openIOSInstallSheet()" style="flex-shrink:0;padding:8px 12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">방법 보기</button>
         ${closeBtn}
       </div>`;
     }
