@@ -1307,3 +1307,180 @@ DROP TRIGGER IF EXISTS trg_participant_status_push ON routine_participants;
 CREATE TRIGGER trg_participant_status_push
   AFTER UPDATE ON routine_participants
   FOR EACH ROW EXECUTE FUNCTION on_participant_status_change();
+
+-- =====================================================
+-- [마이그레이션 2026-07-22d] nadaeum/role 직접 변조 보안 구멍 수정
+-- 코드 리뷰로 발견: profiles_update RLS 정책이 auth.uid()=id만 체크해서
+-- 로그인 사용자가 REST API로 자기 nadaeum(포인트)이나 role을 직접 아무 값으로나
+-- 바꿀 수 있었음(verify_status/kkutjjang_status는 이미 가드 트리거로 보호됨).
+-- 특히 댓글/후기 나다움은 클라이언트가 profiles.nadaeum을 직접 update()하는
+-- 구조였어서, 실제 댓글/후기 없이도 포인트를 무한정 올릴 수 있는 취약점이었음.
+--
+-- 수정 방향: 인증(cert) 지급과 동일하게 댓글/후기 나다움도 서버 트리거가
+-- 실제 insert(cert_comments/post_comments/posts) 건수를 기준으로 지급하도록
+-- 옮기고, profiles.nadaeum/role은 "신뢰된 서버 경로"에서만 바뀌도록 가드.
+-- =====================================================
+
+-- 1) 트랜잭션 로컬 플래그로 "신뢰된 나다움 변경"임을 표시하는 헬퍼
+--    (기존 지급/차감 함수들이 이 함수를 호출한 뒤에만 profiles.nadaeum을 바꾸도록)
+CREATE OR REPLACE FUNCTION _mark_nadaeum_trusted() RETURNS void AS $$
+  SELECT set_config('app.nadaeum_trusted', 'true', true);
+$$ LANGUAGE sql;
+
+-- 2) 본인이 nadaeum/role을 직접 바꾸지 못하게 가드
+--    - nadaeum: 관리자이거나, 신뢰된 서버 함수(트리거)를 거친 변경만 허용
+--    - role: 관리자이거나, 최초 가입 완료 이전(실명/생년월일/휴대폰이 아직 비어있는
+--            소셜 로그인 추가정보 입력 단계, doCompleteProfile())에서 한 번만 허용
+CREATE OR REPLACE FUNCTION guard_nadaeum_role() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.nadaeum IS DISTINCT FROM OLD.nadaeum THEN
+    IF NOT is_admin() AND current_setting('app.nadaeum_trusted', true) IS DISTINCT FROM 'true' THEN
+      RAISE EXCEPTION '나다움 포인트는 실제 활동을 통해서만 적립/차감돼요';
+    END IF;
+  END IF;
+  IF NEW.role IS DISTINCT FROM OLD.role THEN
+    IF NOT is_admin() AND NOT (OLD.real_name IS NULL AND OLD.birth_date IS NULL AND OLD.phone IS NULL) THEN
+      RAISE EXCEPTION '역할은 최초 가입 완료 시점 이후에는 변경할 수 없어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_guard_nadaeum_role ON profiles;
+CREATE TRIGGER trg_guard_nadaeum_role BEFORE UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION guard_nadaeum_role();
+
+-- 3) 기존 지급/차감 함수들이 신뢰 플래그를 세우도록 재정의 (로직 자체는 동일)
+CREATE OR REPLACE FUNCTION on_cert_nadaeum_payout()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_start date;
+  r_end date;
+  r_title text;
+  day_count int;
+  cert_goal int;
+  paid boolean;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  SELECT start_date, end_date, title INTO r_start, r_end, r_title FROM routines WHERE id = NEW.routine_id;
+  day_count := GREATEST(1, COALESCE((r_end - r_start), 20) + 1);
+  cert_goal := GREATEST(1, FLOOR(day_count * 2.0 / 3)::int);
+
+  SELECT nadaeum_paid INTO paid FROM routine_participants WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+
+  IF paid THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 10 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 10, '루틴 인증 (완주 후 추가 인증)');
+  ELSIF cnt >= cert_goal THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + (cnt * 10) WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, cnt * 10, '루틴 완주 기준 달성 (인증 ' || cnt || '회 적립분 일괄 지급)');
+    UPDATE routine_participants SET nadaeum_paid = true WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 완주 기준 달성!',
+      '"' || coalesce(r_title, '루틴') || '"에서 나다움 ' || (cnt * 10) || 'N이 지급됐어요. 상점에서 리워드로 교환해보세요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION guard_redemption()
+RETURNS TRIGGER AS $$
+DECLARE
+  bal int;
+  r_cost int;
+  r_stock int;
+  r_active boolean;
+  r_title text;
+BEGIN
+  SELECT nadaeum INTO bal FROM profiles WHERE id = NEW.user_id;
+  SELECT cost, stock, active, title INTO r_cost, r_stock, r_active, r_title FROM rewards WHERE id = NEW.reward_id;
+  IF r_cost IS NULL THEN
+    RAISE EXCEPTION '존재하지 않는 리워드예요';
+  END IF;
+  IF NOT r_active THEN
+    RAISE EXCEPTION '지금은 교환할 수 없는 리워드예요';
+  END IF;
+  IF r_stock <= 0 THEN
+    RAISE EXCEPTION '재고가 없어요';
+  END IF;
+  IF COALESCE(bal,0) < r_cost THEN
+    RAISE EXCEPTION '나다움 포인트가 부족해요';
+  END IF;
+  PERFORM _mark_nadaeum_trusted();
+  UPDATE profiles SET nadaeum = nadaeum - r_cost WHERE id = NEW.user_id;
+  UPDATE rewards SET stock = stock - 1 WHERE id = NEW.reward_id;
+  INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, -r_cost, '리워드 교환: ' || r_title);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION expire_nadaeum()
+RETURNS void AS $$
+DECLARE
+  u RECORD;
+  e_old int;
+  spent int;
+  exp int;
+BEGIN
+  FOR u IN SELECT id, nadaeum FROM profiles WHERE nadaeum > 0 LOOP
+    SELECT COALESCE(SUM(amount),0) INTO e_old FROM nadaeum_log
+     WHERE user_id = u.id AND amount > 0 AND created_at < now() - interval '3 months';
+    SELECT COALESCE(-SUM(amount),0) INTO spent FROM nadaeum_log
+     WHERE user_id = u.id AND amount < 0;
+    exp := LEAST(u.nadaeum, GREATEST(0, e_old - spent));
+    IF exp > 0 THEN
+      PERFORM _mark_nadaeum_trusted();
+      UPDATE profiles SET nadaeum = nadaeum - exp WHERE id = u.id;
+      INSERT INTO nadaeum_log(user_id, amount, reason)
+      VALUES (u.id, -exp, '포인트 소멸 (적립 후 3개월 경과)');
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 4) 댓글 나다움(+1, 하루 최대 5)을 실제 댓글 insert 기준으로 서버가 지급
+--    (cert_comments·post_comments 공용 — 오늘 지급된 로그 건수로 상한 체크)
+CREATE OR REPLACE FUNCTION award_comment_nadaeum() RETURNS TRIGGER AS $$
+DECLARE today_count int;
+BEGIN
+  SELECT count(*) INTO today_count FROM nadaeum_log
+   WHERE user_id = NEW.user_id AND reason = '댓글 작성' AND created_at >= date_trunc('day', now());
+  IF today_count < 5 THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 1 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 1, '댓글 작성');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_cert_comment_nadaeum ON cert_comments;
+CREATE TRIGGER trg_cert_comment_nadaeum AFTER INSERT ON cert_comments
+  FOR EACH ROW EXECUTE FUNCTION award_comment_nadaeum();
+DROP TRIGGER IF EXISTS trg_post_comment_nadaeum ON post_comments;
+CREATE TRIGGER trg_post_comment_nadaeum AFTER INSERT ON post_comments
+  FOR EACH ROW EXECUTE FUNCTION award_comment_nadaeum();
+
+-- 5) 후기 나다움(+30, 루틴당 1회)을 실제 게시글(posts, type='review') insert 기준으로 지급
+--    ("이미 이 루틴을 리뷰한 적 있는지"를 클라이언트 로컬스토리지가 아니라 DB로 판단)
+CREATE OR REPLACE FUNCTION award_review_nadaeum() RETURNS TRIGGER AS $$
+DECLARE prior_count int;
+BEGIN
+  IF NEW.type <> 'review' OR NEW.routine_id IS NULL THEN RETURN NEW; END IF;
+  SELECT count(*) INTO prior_count FROM posts
+   WHERE type = 'review' AND routine_id = NEW.routine_id AND author_id = NEW.author_id AND id <> NEW.id;
+  IF prior_count = 0 THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 30 WHERE id = NEW.author_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.author_id, 30, '후기 작성');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_award_review_nadaeum ON posts;
+CREATE TRIGGER trg_award_review_nadaeum AFTER INSERT ON posts
+  FOR EACH ROW EXECUTE FUNCTION award_review_nadaeum();

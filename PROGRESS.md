@@ -174,6 +174,17 @@
 - **서류 승인·끗짱 가입 승인 알림 추가** — 루틴 참여 승인/거절은 이미 알림이 가고 있었는데(`on_participant_status_change`), 학교밖청소년 서류 승인과 끗짱 가입 승인엔 알림이 없던 걸 발견. `profiles` 테이블에 별도 AFTER UPDATE 트리거 2개 추가(`on_verify_status_notify`, `on_kkutjjang_status_notify`) — 기존 권한 가드 트리거(BEFORE UPDATE, `guard_verify_status`/`guard_kkutjjang_status`)와는 분리, 승인(approved)으로 바뀌는 순간만 `notify_push()`. 거절 알림은 요청 범위 밖이라 추가 안 함(기존처럼 인앱에서 사유만 확인). 마이그레이션 `[2026-07-21]` 실행 완료
   - **루틴 공유 링크(실제 URL) 추가** (2026-07-17) — `routine:` 배너 딥링크는 앱 안에서만 동작해서, 카톡·인스타 등 외부에 뿌릴 수 있는 진짜 URL이 없다는 문제 발견. 청소년·끗짱 루틴 상세(모집중/진행중 루틴만)에 **"🔗 공유"** 버튼 추가 → `?routine={id}` 쿼리 링크 생성, `navigator.share` 지원 시 공유 시트, 없으면 클립보드 복사(실패 시 프롬프트 폴백). 앱이 이 쿼리로 열리면 로그인 완료 후 자동으로 해당 루틴 상세를 띄우고 URL은 깨끗하게 정리(`pendingRoutineId`). 브라우저에서 딥링크 파싱→자동 오픈→URL 정리는 검증 완료, 클립보드/공유시트 자체는 헤드리스 환경 제약으로 실기기 확인 필요
 
+## 최근 완료 (2026-07-22, 코드 리뷰로 발견한 보안 구멍 2건 수정)
+
+코드 리뷰(Explore 에이전트)로 개선점을 훑다가 발견한 실제 보안 구멍 2건 처리:
+
+1. **nadaeum(포인트)/role을 REST API로 직접 변조 가능했던 구멍** — `profiles_update` RLS 정책이 `auth.uid()=id`만 체크해서, 로그인 사용자가 Supabase 클라이언트로 직접 `profiles.update({nadaeum: 999999})`를 호출하면 그대로 통과됐음. 특히 댓글/후기 나다움은 애초에 클라이언트가 `earnNadaeum()`에서 `profiles.nadaeum`을 직접 update()하는 구조였어서, 실제 댓글/후기 작성 없이도 포인트를 무한정 올릴 수 있었음.
+   - **DB 수정**: 인증(cert) 지급과 동일한 패턴으로 댓글(+1, 하루 5회 상한)·후기(+30, 루틴당 1회) 나다움도 서버 트리거(`award_comment_nadaeum` on cert_comments/post_comments, `award_review_nadaeum` on posts)가 실제 insert 건수 기준으로 지급하도록 변경. `guard_nadaeum_role` 트리거 신설 — nadaeum은 관리자이거나 트랜잭션 로컬 플래그(`_mark_nadaeum_trusted()`, 기존 지급/차감 함수들이 호출)를 거친 경우만 변경 허용, role은 관리자이거나 최초 가입 완료 이전(카카오 소셜 로그인 추가정보 입력 단계, 실명/생년월일/휴대폰이 아직 비어있는 시점)에만 1회 허용. 마이그레이션 `[2026-07-22d]`, **실행 필요**
+   - **클라이언트 수정**: `earnNadaeum()`을 인증(submitCert)과 동일한 패턴으로 변경 — 직접 profiles.nadaeum을 쓰지 않고, 댓글/후기 insert 후 서버 값을 다시 조회해서 반영. 하루 댓글 5회 상한·후기 1회 제한을 추적하던 클라이언트 전용 상태(`nadaeumToday`, `nadaeumReviews`)는 서버가 실제 행 기준으로 판단하므로 제거
+2. **localStorage에 실명/생년월일/휴대폰 평문 저장** — 로그인할 때마다 `hankkut_v4` 캐시에 PII가 그대로 직렬화됐음(공유 기기 위험). `persistState()` 헬퍼를 도입해 localStorage에 쓸 때만 realName/birthDate/phone을 제외하도록 수정(메모리상의 `state`는 그대로 유지, 앱 재실행 시 `loadProfileAndEnter()`가 어차피 서버에서 다시 채워주므로 기능엔 영향 없음). DB 변경 없음
+
+`node --check`로 문법 검증 완료. 브라우저 실사용 테스트는 아직 안 함(마이그레이션 실행 후 실제 댓글/후기/인증 나다움 지급, 카카오 신규가입 role 설정 플로우 확인 권장).
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토

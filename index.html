@@ -1329,7 +1329,7 @@ async function loadProfileAndEnter() {
   state.kkutjjang.regionSigugun = profile.region_sigugun || '';
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
-  localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  persistState();
   if (profile.role === 'kkutjjang' && !isAdmin && profile.kkutjjang_status !== 'approved') {
     showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
     return;
@@ -1530,7 +1530,7 @@ async function doLogout() {
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,nadaeumToday:{date:'',certs:0,comments:0},nadaeumReviews:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
     {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
@@ -1561,8 +1561,19 @@ function loadState() {
   try { const s = localStorage.getItem('hankkut_v4'); return s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULT)); }
   catch { return JSON.parse(JSON.stringify(DEFAULT)); }
 }
+// 공유 기기(피시방·학교 컴퓨터 등) 노출 위험이 있어 실명/생년월일/휴대폰은
+// localStorage에 저장하지 않음 — 로그인 세션 동안엔 메모리(state)에만 유지하고,
+// 앱을 다시 열 때는 loadProfileAndEnter()가 매번 서버에서 다시 채워줌.
+const PII_FIELDS = ['realName', 'birthDate', 'phone'];
+function persistState() {
+  const toStore = JSON.parse(JSON.stringify(state));
+  ['youth', 'kkutjjang'].forEach(role => {
+    if (toStore[role]) PII_FIELDS.forEach(f => delete toStore[role][f]);
+  });
+  localStorage.setItem('hankkut_v4', JSON.stringify(toStore));
+}
 function save() {
-  localStorage.setItem('hankkut_v4', JSON.stringify(state));
+  persistState();
   // nadaeum은 여기서 건드리지 않음: 인증은 완주 시점에 서버 트리거가 지급하고,
   // 댓글/후기는 earnNadaeum()이 그때그때 직접 반영함. 여기서 덮어쓰면 트리거 지급분을 지워버림.
   if (currentUser && state.currentRole === 'youth') {
@@ -2796,39 +2807,24 @@ function showNadaeumToast(msg) {
   nadaeumToastTimer=setTimeout(()=>el.classList.remove('show'),2200);
 }
 function todayKey() { return new Date().toDateString(); }
-function resetTodayIfNeeded() {
-  if(!state.youth.nadaeumToday) state.youth.nadaeumToday={date:'',certs:0,comments:0};
-  if(state.youth.nadaeumToday.date !== todayKey()) {
-    state.youth.nadaeumToday={date:todayKey(),certs:0,comments:0};
-  }
-}
-// 댓글/후기는 1회성 행동이라 그때그때 즉시 지급(기존과 동일).
-// 인증(cert)만 예외: 여기서 지급하지 않고 서버 트리거가 완주 기준 달성 시 지급 —
-// submitCert()에서 인증 저장 직후 profiles.nadaeum을 다시 조회해서 반영함.
-function earnNadaeum(type, routineId) {
+// 댓글/후기 나다움은 서버 트리거(award_comment_nadaeum/award_review_nadaeum)가
+// 실제 insert된 댓글/후기 행 기준으로 지급함(하루 댓글 5회 상한, 후기는 루틴당 1회 —
+// 전부 DB에서 판단). 클라이언트는 profiles.nadaeum을 직접 바꿀 수 없으므로(가드 트리거),
+// 인증(submitCert)과 동일하게 저장 직후 서버 값을 다시 조회해서 반영만 함.
+async function earnNadaeum(type) {
+  if(!currentUser) return;
   if(!state.youth.nadaeum) state.youth.nadaeum=0;
-  if(!state.youth.nadaeumReviews) state.youth.nadaeumReviews=[];
-  resetTodayIfNeeded();
-  const t=state.youth.nadaeumToday;
-  let earned=0, msg='';
-  if(type==='comment') {
-    if(t.comments<5) { earned=1; t.comments++; msg='💬 댓글 +1 나다움'; }
-  } else if(type==='review') {
-    if(routineId && !state.youth.nadaeumReviews.includes(routineId)) {
-      earned=30; state.youth.nadaeumReviews.push(routineId); msg='✍️ 후기 +30 나다움';
-    }
+  const prev = state.youth.nadaeum;
+  const { data } = await sb.from('profiles').select('nadaeum').eq('id', currentUser.id).single();
+  const now = data?.nadaeum ?? prev;
+  const gained = now - prev;
+  state.youth.nadaeum = now;
+  save();
+  if(gained>0) {
+    const msg = type==='comment' ? `💬 댓글 +${gained} 나다움` : `✍️ 후기 +${gained} 나다움`;
+    showNadaeumToast(msg+` → 총 ${now}N`);
   }
-  if(earned>0) {
-    state.youth.nadaeum+=earned;
-    if(currentUser) {
-      sb.from('profiles').update({ nadaeum: state.youth.nadaeum }).eq('id', currentUser.id).then(() => {});
-      // 소멸기간(3개월) 계산은 nadaeum_log 기준이라 적립 내역을 반드시 남겨야 함
-      sb.from('nadaeum_log').insert({ user_id: currentUser.id, amount: earned, reason: type==='comment'?'댓글 작성':'후기 작성' }).then(() => {});
-    }
-    save();
-    showNadaeumToast(msg+` → 총 ${state.youth.nadaeum}N`);
-    renderNadaeum();
-  }
+  renderNadaeum();
 }
 function renderNadaeum() {
   const n=state.youth.nadaeum||0;
@@ -3118,7 +3114,7 @@ async function submitPost() {
     routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
   });
   if(error){ alert('게시 실패: '+error.message); return; }
-  earnNadaeum('review', currentReviewRoutineId);
+  earnNadaeum('review');
   currentReviewRoutineId=null;
   save();
   await loadPosts();
