@@ -99,6 +99,7 @@
 - 구축된 것: `push_subscriptions` 테이블+RLS, `send-push` Edge Function(관리자 JWT 또는 service 키만 발송, 만료 구독 자동 정리, `user_id`/`user_ids`/`target:'all'`/`target:'routine'+routine_id` 지원, CORS 헤더 포함), VAPID 시크릿, 마이페이지 "알림 설정" 토글+리마인드 시간(`profiles.reminder_hour`), service-worker.js push/notificationclick 핸들러(캐시 v4), DB 트리거(승인/거절·좋아요·댓글·마일스톤), pg_cron 잡 `hankkut-cert-reminder`(매시 정각, `send_cert_reminders()`)
 - 발송: `POST {SB_URL}/functions/v1/send-push` + `Authorization: Bearer <service키 또는 관리자 JWT>` + `{"user_id"|"user_ids"|"target":"all"|{"target":"routine","routine_id":N}, "title", "body", "url"}`. DB에서 직접: `SELECT notify_push(user_id, title, body);`
 - 디버깅: 발송 로그 `SELECT * FROM net._http_response ORDER BY id DESC LIMIT 5;`. 브라우저에서 함수 호출 시 CORS 헤더 필수
+- **"알림 설정은 켜져 있는데 실제 푸시가 안 온다"는 문의 시 1차 해결책** (2026-07-22 실기기로 확인) — 인앱 알림 내역함(`notifications` 테이블)에는 기록되는데 폰에 배너/알림센터로는 안 오는 경우, iOS PWA의 구독 정보가 깨져있을 가능성이 큼. **홈 화면 아이콘을 삭제하고 다시 추가(재설치)** 하면 새 구독이 맺어지면서 해결됨. 앱 안에서 "알림 끄기→켜기"만으로는 해결 안 될 수 있음(겉보기엔 켜진 것처럼 보여도 구독이 안 살아남). 스태프 테스트나 실사용자 문의에서 우선 안내할 것
 - 로컬 도구: Deno(`~/.deno/bin`)·Supabase CLI(`~/.local/bin`, login+link 완료) — PATH 미등록, 쓸 때 `export PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"`. VAPID 키 원본 `~/.hankkut-vapid-keys`(**비밀키 절대 저장소에 넣지 말 것**)
 - 주의: SQL Editor 실행 시 **프로젝트가 ynqvhsffoesjzefitafv인지 확인**(approval 프로젝트에 실행한 사고 있었음). iOS는 "홈 화면에 추가"해야 푸시 동작(16.4+), 집중 모드 중엔 알림 센터에만 쌓임. 새 테이블 후 API 캐시 갱신에 `NOTIFY pgrst, 'reload schema';` 필요할 수 있음
 
