@@ -616,8 +616,8 @@ select:focus { outline: none; border-color: #2E33BC; }
               <div style="font-size:15px;font-weight:600;color:white;">AI 루틴 리포트</div>
               <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;">AI</span>
             </div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;">내 기록 분석 + 루틴에 어울리는 책도 추천해드려요.</div>
-            <button style="width:100%;padding:10px;background:white;color:#2E33BC;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;" onclick="openReport()">리포트 받기</button>
+            <div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:12px;" id="aiReportDesc">내 기록 분석 + 루틴에 어울리는 책도 추천해드려요.</div>
+            <button id="aiReportBtn" style="width:100%;padding:10px;background:white;color:#2E33BC;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;" onclick="openReport()">리포트 받기</button>
           </div>
           <div class="section-card" id="completedSection" style="display:none;">
             <div class="section-hd"><div class="section-hd-title">완주한 루틴</div></div>
@@ -1158,6 +1158,7 @@ select:focus { outline: none; border-color: #2E33BC; }
     </div>
     <button class="complete-btn-primary" onclick="openLetterFromComplete()">💌 끗짱에게 편지 쓰기</button>
     <button class="complete-btn-primary" style="background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);" onclick="closeCompleteSuccess();openReportCard(currentLetterRoutineId)">📤 완주 리포트 공유</button>
+    <div onclick="closeCompleteSuccess();openReport()" style="font-size:12.5px;color:rgba(255,255,255,0.75);text-decoration:underline;cursor:pointer;margin-top:10px;">📊 내 루틴 AI 리포트도 보러가기</div>
     <button class="complete-btn-secondary" onclick="closeCompleteSuccess()">나중에 할게요</button>
   </div>
 
@@ -3193,6 +3194,29 @@ function renderMy() {
   renderCal();
   renderSwitchBtn();
   renderVerifyCard();
+  _updateAiReportCard();
+}
+// AI 리포트는 데이터가 어느 정도 쌓여야 의미가 있어서, 루틴 3개 참여 또는 인증 30회부터 노출
+function _aiReportProgress() {
+  const myRoutineCount = (state.routines||[]).filter(r=>currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)).length;
+  const certCount = state.youth.certCount||0;
+  return { myRoutineCount, certCount, eligible: myRoutineCount>=3 || certCount>=30 };
+}
+function _updateAiReportCard() {
+  const desc = document.getElementById('aiReportDesc');
+  const btn = document.getElementById('aiReportBtn');
+  if(!desc||!btn) return;
+  const { myRoutineCount, certCount, eligible } = _aiReportProgress();
+  if(eligible) {
+    desc.textContent = '내 기록 분석 + 루틴에 어울리는 책도 추천해드려요.';
+    btn.textContent = '리포트 받기';
+    btn.style.opacity=''; btn.style.cursor='pointer';
+  } else {
+    const routineLeft = Math.max(0, 3-myRoutineCount), certLeft = Math.max(0, 30-certCount);
+    desc.textContent = `루틴 참여 ${routineLeft}개 또는 인증 ${certLeft}회를 더 채우면 AI 리포트를 받아볼 수 있어요.`;
+    btn.textContent = '🔒 조금만 더 쌓아볼까요';
+    btn.style.opacity='0.6'; btn.style.cursor='default';
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -3538,19 +3562,30 @@ async function enablePushFromNudge(btn) {
 
 // AI 리포트
 async function openReport() {
+  openSheet('reportSheetBg');
   document.getElementById('reportSubtitle').textContent=`${state.youth.name}님의 기록을 분석하고 있어요`;
+  document.getElementById('reportBooks').innerHTML='';
+  const { myRoutineCount, certCount, eligible } = _aiReportProgress();
+  if(!eligible) {
+    const routineLeft = Math.max(0, 3-myRoutineCount), certLeft = Math.max(0, 30-certCount);
+    document.getElementById('reportSubtitle').textContent='';
+    document.getElementById('reportAnalysis').innerHTML = `<div style="text-align:center;padding:12px 0;">🔒 <br><br>루틴 참여 ${routineLeft}개 또는 인증 ${certLeft}회를 더 채우면<br>AI 리포트를 받아볼 수 있어요.</div>`;
+    return;
+  }
   document.getElementById('reportAnalysis').innerHTML='<div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
   document.getElementById('reportBooks').innerHTML='<div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
-  openSheet('reportSheetBg');
   try {
     const lv=getYLevel(state.youth.certCount);
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      model:'claude-sonnet-4-6',max_tokens:1000,
-      system:'탈학교 청소년의 생활 루틴 형성을 돕는 따뜻한 AI 코치예요. 아래 JSON 형식으로만 응답하세요.\n{"analysis":"루틴 분석 (2~3문장)","books":[{"title":"책 제목","author":"저자","reason":"이유 한 문장"},{"title":"책 제목","author":"저자","reason":"이유"}]}',
-      messages:[{role:'user',content:`사용자: ${state.youth.name} (레벨${lv.level} ${lv.name})\n총 인증: ${state.youth.certCount}회 / 소통: ${state.youth.commCount}회\n참여 중: ${_myActiveRoutines().map(r=>r.title).join(', ')}\n완주: ${state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)).map(r=>r.title).join(', ')}\n루틴 분석과 어울리는 책 2권을 추천해줘.`}]
-    })});
-    const data=await res.json();
-    const parsed=JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
+    const prompt = `사용자: ${state.youth.name} (레벨${lv.level} ${lv.name})\n총 인증: ${state.youth.certCount}회 / 소통: ${state.youth.commCount}회\n참여 중: ${_myActiveRoutines().map(r=>r.title).join(', ')}\n완주: ${state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)).map(r=>r.title).join(', ')}\n루틴 분석과 어울리는 책 2권을 추천해줘.`;
+    const { data: sessionData } = await sb.auth.getSession();
+    const res = await fetch(`${SB_URL}/functions/v1/ai-report`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sessionData?.session?.access_token||'')},
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'요청 실패');
+    const parsed=JSON.parse(data.text.replace(/```json|```/g,'').trim());
     document.getElementById('reportAnalysis').textContent=parsed.analysis;
     document.getElementById('reportBooks').innerHTML=parsed.books.map((b,i)=>`<div style="background:#f5f5f7;border-radius:12px;padding:12px;display:flex;gap:12px;${i>0?'margin-top:8px':''}"><div style="width:40px;height:52px;border-radius:4px;background:${i===0?'#2E33BC':'#83CA00'};display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-book" style="font-size:18px;color:white;"></i></div><div><div style="font-size:13px;font-weight:500;color:#111;">${b.title}</div><div style="font-size:11px;color:#888;margin-top:2px;">${b.author}</div><div style="font-size:12px;color:#666;margin-top:5px;line-height:1.5;">${b.reason}</div></div></div>`).join('');
   } catch { document.getElementById('reportAnalysis').textContent='잠시 후 다시 시도해주세요.'; }
