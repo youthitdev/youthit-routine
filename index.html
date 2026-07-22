@@ -50,6 +50,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .auth-input:focus { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.15); }
 .auth-input:-webkit-autofill,
 .auth-input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px rgba(46,51,188,0.8) inset !important; -webkit-text-fill-color: white !important; }
+/* 날짜 input은 브라우저마다 placeholder 표시가 달라서(PC는 형식이 보이고 모바일은 공란)
+   값이 없을 때만 보이는 라벨을 겹쳐서 일관되게 "생년월일"이 보이도록 함 */
+.date-field-wrap { position: relative; margin-bottom: 10px; }
+.date-field-wrap .auth-input { margin-bottom: 0; }
+.date-field-wrap .date-label-overlay { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 15px; color: rgba(255,255,255,0.4); pointer-events: none; }
+/* 값이 없고 포커스도 안 된 상태에서는 브라우저 자체 날짜 형식(--.--.--)을 투명 처리해서
+   위 라벨과 겹치지 않게 함. 포커스 중(입력 중)이거나 값이 있으면 원래대로 보이고 라벨은 숨김 */
+.date-field-wrap input[type="date"]:not(.has-value):not(:focus)::-webkit-datetime-edit-fields-wrapper,
+.date-field-wrap input[type="date"]:not(.has-value):not(:focus)::-webkit-datetime-edit-text,
+.date-field-wrap input[type="date"]:not(.has-value):not(:focus)::-webkit-datetime-edit-month-field,
+.date-field-wrap input[type="date"]:not(.has-value):not(:focus)::-webkit-datetime-edit-day-field,
+.date-field-wrap input[type="date"]:not(.has-value):not(:focus)::-webkit-datetime-edit-year-field { color: transparent; }
+.date-field-wrap input[type="date"]:focus ~ .date-label-overlay { display: none; }
 .role-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .role-btn { flex: 1; padding: 11px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.22); background: transparent; color: rgba(255,255,255,0.55); font-size: 14px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .role-btn.active { background: rgba(255,255,255,0.22); color: white; border-color: rgba(255,255,255,0.55); }
@@ -200,7 +213,6 @@ select:focus { outline: none; border-color: #2E33BC; }
 @keyframes ysArm { from { transform: rotate(30deg); } to { transform: rotate(390deg); } }
 @keyframes ysDotPop { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.6); } 70% { transform: translateX(-50%) scale(0.85); } 100% { transform: translateX(-50%) scale(1); } }
 .ys-name { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
-.ys-sub { font-size: 13px; color: rgba(255,255,255,0.7); text-align: center; line-height: 1.7; }
 
 /* 온보딩 */
 .onboarding { position: absolute; inset: 0; background: #fff; z-index: 600; display: flex; flex-direction: column; overflow: hidden; }
@@ -265,7 +277,6 @@ select:focus { outline: none; border-color: #2E33BC; }
       </div>
     </div>
     <div class="ys-name">Youth-it</div>
-    <div class="ys-sub">한 끗 한 끗을 쌓아<br>나다움을 찾는 시간</div>
   </div>
 
   <!-- 온보딩 -->
@@ -329,7 +340,10 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="signupRealName" class="auth-input" placeholder="이름 (실명)">
-      <input type="date" id="signupBirth" class="auth-input">
+      <div class="date-field-wrap">
+        <input type="date" id="signupBirth" class="auth-input" oninput="_toggleDateLabel(this)">
+        <span class="date-label-overlay" id="signupBirthLabel">생년월일</span>
+      </div>
       <input type="email" id="signupEmail" class="auth-input" placeholder="이메일">
       <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)">
       <input type="tel" id="signupPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
@@ -428,7 +442,10 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="cpName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="cpRealName" class="auth-input" placeholder="이름 (실명)">
-      <input type="date" id="cpBirth" class="auth-input">
+      <div class="date-field-wrap">
+        <input type="date" id="cpBirth" class="auth-input" oninput="_toggleDateLabel(this)">
+        <span class="date-label-overlay" id="cpBirthLabel">생년월일</span>
+      </div>
       <input type="tel" id="cpPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
       <div style="display:flex;gap:6px;">
         <select id="cpSido" class="auth-input" style="flex:1;" onchange="populateSigugunSelect('cpSido','cpSigugun')"><option value="">시/도 선택</option></select>
@@ -1486,6 +1503,12 @@ function showAuthTab(tab) {
   document.getElementById('authMsg').textContent = '';
 }
 
+// 날짜 input의 브라우저별 표시 차이(모바일은 값 없을 때 공란)를 보정 — 값이 있으면 겹친 라벨을 숨김
+function _toggleDateLabel(el) {
+  el.classList.toggle('has-value', !!el.value);
+  const label = document.getElementById(el.id + 'Label');
+  if (label) label.style.display = el.value ? 'none' : '';
+}
 function selectSignupRole(role) {
   signupRole = role;
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
@@ -4673,6 +4696,28 @@ function submitLetter() {
 // 3뎁스 오버레이 목록 (탭 숨김)
 const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay'];
 
+// ── 뒤로가기(모바일 스와이프 포함)가 앱 종료 대신 오버레이/시트만 닫도록 ──
+// 오버레이/시트를 열 때마다 히스토리를 한 칸 쌓아두고, 실제 사용자가 뒤로가기/
+// 스와이프하면(popstate) 가장 최근에 연 것만 닫는다. X버튼 등으로 먼저 닫은
+// 경우엔 history.back()을 부르지 않아 그 칸이 그대로 남는데, 이러면 나중에
+// 뒤로가기를 한 번 더 눌러야 할 수 있지만(아무 변화 없는 "빈 뒤로가기" 1회),
+// 지금처럼 뒤로가기 즉시 앱이 통째로 꺼지는 것보다는 훨씬 나은 절충.
+let _openModalOrder = [];
+function _trackModalOpen(kind, id) {
+  _openModalOrder.push({kind, id});
+  history.pushState({hkModal:true}, '');
+}
+function _trackModalClose(kind, id) {
+  for(let i=_openModalOrder.length-1;i>=0;i--){
+    if(_openModalOrder[i].kind===kind && _openModalOrder[i].id===id){ _openModalOrder.splice(i,1); break; }
+  }
+}
+window.addEventListener('popstate', () => {
+  if(_openModalOrder.length===0) return;
+  const top = _openModalOrder.pop();
+  if(top.kind==='overlay') closeOverlay(top.id); else closeSheet(top.id);
+});
+
 function openOverlay(id) {
   document.getElementById(id).classList.add('open');
   // 역할 색상 헤더에 적용
@@ -4682,9 +4727,11 @@ function openOverlay(id) {
   if(DEPTH3_OVERLAYS.includes(id)) {
     document.getElementById('mainNav').style.display = 'none';
   }
+  _trackModalOpen('overlay', id);
 }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
+  _trackModalClose('overlay', id);
   if(id==='routineFeedOverlay') {
     document.getElementById('certFloatingBtn').style.display='none';
   }
@@ -4701,8 +4748,8 @@ function closeOverlay(id) {
     if(!anyOpen) document.getElementById('mainNav').style.display = '';
   }
 }
-function openSheet(id) { document.getElementById(id).classList.add('open'); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function openSheet(id) { document.getElementById(id).classList.add('open'); _trackModalOpen('sheet', id); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); _trackModalClose('sheet', id); }
 
 // ════════════════════════════════════════════════════════
 // 온보딩
