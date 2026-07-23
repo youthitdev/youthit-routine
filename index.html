@@ -238,11 +238,13 @@ select:focus { outline: none; border-color: #2E33BC; }
 .confetti-wrap { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .confetti-piece { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confettiFall linear infinite; }
 @keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
-.badge-wrap { position: relative; margin-bottom: 24px; }
+.badge-wrap { position: relative; margin-bottom: 44px; }
 .badge-glow { position: absolute; inset: -16px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); animation: badgePulse 2s ease-in-out infinite; }
 @keyframes badgePulse { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.15);opacity:1} }
 .badge-circle { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #FFD700, #FFA500); display: flex; align-items: center; justify-content: center; font-size: 52px; box-shadow: 0 8px 32px rgba(255,180,0,0.5), 0 0 0 6px rgba(255,215,0,0.3); position: relative; z-index: 1; }
-.badge-ribbon { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); background: #FFD700; color: #7A4F00; font-size: 10px; font-weight: 700; padding: 3px 12px; border-radius: 10px; white-space: nowrap; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+/* 원래 원(뱃지) 아래쪽에 겹쳐서 라벨을 얹는 디자인이었는데, 이모지에 따라 글자가
+   묻혀서 안 보이는 경우가 있어 원 밖으로 완전히 내림(겹침 없이 아래 여백에 배치) */
+.badge-ribbon { position: absolute; top: 100%; margin-top: 10px; left: 50%; transform: translateX(-50%); background: #FFD700; color: #7A4F00; font-size: 10px; font-weight: 700; padding: 3px 12px; border-radius: 10px; white-space: nowrap; letter-spacing: 0.5px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
 .complete-title { font-size: 26px; font-weight: 800; color: white; text-align: center; letter-spacing: -0.5px; margin-bottom: 6px; }
 .complete-routine-name { font-size: 16px; color: rgba(255,255,255,0.85); text-align: center; margin-bottom: 24px; }
 .complete-stats { display: flex; gap: 12px; margin-bottom: 28px; }
