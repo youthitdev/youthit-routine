@@ -1586,3 +1586,27 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_guard_participant_apply ON routine_participants;
 CREATE TRIGGER trg_guard_participant_apply BEFORE INSERT ON routine_participants
   FOR EACH ROW EXECUTE FUNCTION guard_participant_apply();
+
+-- =====================================================
+-- [마이그레이션 2026-07-23] 게시글(posts) 수정 기능 추가
+-- QA 이슈트래커: 커뮤니티 게시글에 수정 기능이 없었음. UPDATE RLS 정책 자체가
+-- 아예 없었어서(SELECT/INSERT/DELETE만 존재) 추가하고, 작성자/관리자 여부와
+-- 무관하게 type·author_id·routine_id는 못 바꾸도록(제목/내용만 수정 가능) 가드.
+-- =====================================================
+CREATE POLICY "posts_update" ON posts FOR UPDATE USING (auth.uid() = author_id OR is_admin());
+
+CREATE OR REPLACE FUNCTION guard_post_update() RETURNS TRIGGER AS $$
+BEGIN
+  IF NOT is_admin() AND (
+    NEW.author_id IS DISTINCT FROM OLD.author_id
+    OR NEW.type IS DISTINCT FROM OLD.type
+    OR NEW.routine_id IS DISTINCT FROM OLD.routine_id
+  ) THEN
+    RAISE EXCEPTION '게시글의 작성자·종류·연결된 루틴은 수정할 수 없어요';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_guard_post_update ON posts;
+CREATE TRIGGER trg_guard_post_update BEFORE UPDATE ON posts
+  FOR EACH ROW EXECUTE FUNCTION guard_post_update();

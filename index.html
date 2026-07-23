@@ -21,9 +21,11 @@
 :root { --role-color: #2E33BC; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; display: flex; justify-content: center; min-height: 100vh; align-items: flex-start; }
 .app { background: #fff; width: 100%; max-width: 390px; min-height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-/* 실제 폰 화면(≤390px)에서는 데스크톱용 "폰 프레임" 폭 제한을 없애서, 뷰포트와 앱 폭 사이
-   서브픽셀 오차로 양쪽에 배경색 실선이 보이던 문제(뷰포트 자체가 이미 폰 크기)를 방지 */
-@media (max-width: 390px) {
+/* 실제 폰 화면에서는 데스크톱용 "폰 프레임" 폭 제한(390px)을 없애서 양쪽에 여백/실선이
+   보이지 않게 함. 390px는 구형 iPhone 기준이라 iPhone 14/15/16(393px)·Pro Max(430px)·
+   흔한 안드로이드(360~412px) 등 요즘 폰 뷰포트를 못 덮어서 실기기에서 여백이 보이던 문제 —
+   실제 폰이 거의 다 들어오도록 480px로 넉넉하게 올림 */
+@media (max-width: 480px) {
   .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
 }
 @media (min-width: 500px) {
@@ -52,8 +54,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .auth-input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px rgba(46,51,188,0.8) inset !important; -webkit-text-fill-color: white !important; }
 /* 날짜 input은 브라우저마다 placeholder 표시가 달라서(PC는 형식이 보이고 모바일은 공란)
    값이 없을 때만 보이는 라벨을 겹쳐서 일관되게 "생년월일"이 보이도록 함 */
-.date-field-wrap { position: relative; margin-bottom: 10px; }
-.date-field-wrap .auth-input { margin-bottom: 0; }
+.date-field-wrap { position: relative; margin-bottom: 10px; width: 100%; min-width: 0; }
+.date-field-wrap .auth-input { margin-bottom: 0; width: 100%; min-width: 0; }
 .date-field-wrap .date-label-overlay { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 15px; color: rgba(255,255,255,0.4); pointer-events: none; }
 /* 값이 없고 포커스도 안 된 상태에서는 브라우저 자체 날짜 형식(--.--.--)을 투명 처리해서
    위 라벨과 겹치지 않게 함. 포커스 중(입력 중)이거나 값이 있으면 원래대로 보이고 라벨은 숨김 */
@@ -740,7 +742,7 @@ select:focus { outline: none; border-color: #2E33BC; }
           <div class="chip" onclick="kFilterReview('review',this)">후기</div>
         </div>
         <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="kReviewFeed"></div>
-        <button onclick="openSheet('kWriteSheetBg')" style="position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));right:calc(50% - 195px + 16px);width:48px;height:48px;border-radius:50%;background:#2E33BC;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(46,51,188,0.3);z-index:101;">
+        <button onclick="openKWriteSheet()" style="position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));right:calc(50% - 195px + 16px);width:48px;height:48px;border-radius:50%;background:#2E33BC;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(46,51,188,0.3);z-index:101;">
           <i class="ti ti-plus" style="font-size:22px;color:white;"></i>
         </button>
       </div>
@@ -1962,6 +1964,7 @@ function switchTab(tab) {
   else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
   else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
+  _navPushTab(tab, false);
 }
 // MY탭에 올 때마다 인증 상태를 서버에서 다시 확인 — 로그인 이후 관리자가 승인/반려했으면 재로그인 없이도 최신화
 async function refreshVerifyStatus() {
@@ -2396,6 +2399,7 @@ function openCertFeedDetail(id) {
 
 let currentCertDetailId = null;
 let currentPostDetailId = null;
+let editingPostId = null; // null이면 새 글 작성, 값이 있으면 해당 게시글 수정 모드
 
 function renderCertDetail(id) {
   currentCertDetailId = id;
@@ -2537,6 +2541,7 @@ function openPostDetail(id) {
         :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
+      ${canDelete?`<i class="ti ti-pencil" onclick="editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
       ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${p.title}</div>
@@ -3074,22 +3079,23 @@ function _canModerate(authorId) {
 function _postCard(p, likeFn) {
   const isNotice=p.type==='notice';
   const canDelete=_canModerate(p.authorId);
-  return `<div style="background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;">
+  return `<div onclick="openPostDetail(${p.id})" style="cursor:pointer;background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
       ${isNotice
         ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
         :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
-      ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+      ${canDelete?`<i class="ti ti-pencil" onclick="event.stopPropagation();editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+      ${canDelete?`<i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
     <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
     <div style="margin-top:12px;display:flex;gap:8px;">
-      <span onclick="${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
+      <span onclick="event.stopPropagation();${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
         <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
       </span>
-      <span onclick="openPostDetail(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:#f5f5f7;cursor:pointer;font-size:12px;font-weight:600;color:#888;user-select:none;">
+      <span onclick="event.stopPropagation();openPostDetail(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:#f5f5f7;cursor:pointer;font-size:12px;font-weight:600;color:#888;user-select:none;">
         <i class="ti ti-message-circle" style="font-size:14px;color:#aaa;"></i>${(p.comments&&p.comments.length>0)?p.comments.length:'댓글'}
       </span>
     </div>
@@ -3097,11 +3103,36 @@ function _postCard(p, likeFn) {
 }
 async function deletePost(id) {
   if(!confirm('이 게시글을 삭제할까요?')) return;
-  const { error } = await sb.from('posts').delete().eq('id', id);
+  // RLS 조건에 안 맞으면(author_id 불일치 등) Supabase는 에러 없이 0건 삭제로
+  // 조용히 끝내버려서 "삭제 버튼을 눌러도 아무 일도 안 일어나는" 것처럼 보였음 —
+  // .select()로 실제 삭제된 행을 돌려받아 0건이면 명시적으로 알려주도록 함
+  const { data, error } = await sb.from('posts').delete().eq('id', id).select('id');
   if(error){ alert('삭제 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('삭제 권한이 없거나 이미 삭제된 글이에요.'); return; }
+  if(currentPostDetailId===id) closeOverlay('routineDetailOverlay');
   await loadPosts();
   if(state.currentRole==='youth') renderComm(commFilter);
   else kRenderReviewTab(kReviewFilter);
+}
+// 게시글 수정 — 후기(review)는 청소년 글쓰기 시트, 공지(notice)는 끗짱 글쓰기 시트를
+// 기존 내용으로 채워서 재사용. submitPost()/kSubmitPost()가 editingPostId 유무로
+// insert/update를 분기함(루틴 연결·글 종류는 그대로 두고 제목/내용만 수정)
+function editPost(id) {
+  const p = state.posts.find(x=>x.id===id);
+  if(!p) return;
+  editingPostId = id;
+  if(p.type==='review') {
+    document.getElementById('reviewWriteRoutineName').textContent = '';
+    document.getElementById('postTitle').value = p.title;
+    document.getElementById('postContent').value = p.content;
+    document.querySelector('#reviewWriteSheetBg .primary-btn').textContent = '수정 완료';
+    openSheet('reviewWriteSheetBg');
+  } else {
+    document.getElementById('kPostTitle').value = p.title;
+    document.getElementById('kPostContent').value = p.content;
+    document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
+    openSheet('kWriteSheetBg');
+  }
 }
 function renderComm(f) {
   commFilter=f;
@@ -3137,10 +3168,12 @@ function openCommWriteWithRoutine(routineId, type) {
   if(routineId) {
     const r = state.routines.find(x=>x.id===routineId);
     if(type==='review') {
+      editingPostId = null;
       currentReviewRoutineId = routineId;
       document.getElementById('reviewWriteRoutineName').textContent = r.emoji+' '+r.title;
       document.getElementById('postTitle').value='';
       document.getElementById('postContent').value='';
+      document.querySelector('#reviewWriteSheetBg .primary-btn').textContent = '후기 게시하기';
       openSheet('reviewWriteSheetBg');
     } else if(type==='letter') {
       openLetterOverlay(routineId, r.title);
@@ -3170,12 +3203,18 @@ async function submitPost() {
   const c=document.getElementById('postContent').value.trim();
   if(!t||!c){alert('제목과 내용을 입력해주세요.');return;}
   if(!currentUser){alert('로그인이 필요해요.');return;}
-  const { error } = await sb.from('posts').insert({
-    type:'review', title:t, content:c, author_id:currentUser.id,
-    routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
-  });
-  if(error){ alert('게시 실패: '+error.message); return; }
-  earnNadaeum('review');
+  if(editingPostId) {
+    const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
+    if(error){ alert('수정 실패: '+error.message); return; }
+    editingPostId = null;
+  } else {
+    const { error } = await sb.from('posts').insert({
+      type:'review', title:t, content:c, author_id:currentUser.id,
+      routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
+    });
+    if(error){ alert('게시 실패: '+error.message); return; }
+    earnNadaeum('review');
+  }
   currentReviewRoutineId=null;
   save();
   await loadPosts();
@@ -3695,6 +3734,7 @@ function kSwitchTab(tab) {
   else if(tab==='cert') kRenderCertTab();
   else if(tab==='review') { kResetReviewFilter(); kRenderReviewTab('all'); }
   else if(tab==='my') kRenderMy();
+  _navPushTab(tab, true);
 }
 
 // ════════════════════════════════════════════════════════
@@ -4278,15 +4318,28 @@ async function toggleKPostLike(id) {
 // ════════════════════════════════════════════════════════
 // 끗짱 커뮤니티 글쓰기
 // ════════════════════════════════════════════════════════
+function openKWriteSheet() {
+  editingPostId = null;
+  document.getElementById('kPostTitle').value='';
+  document.getElementById('kPostContent').value='';
+  document.querySelector('#kWriteSheetBg .primary-btn').textContent = '게시하기';
+  openSheet('kWriteSheetBg');
+}
 async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
-  const { error } = await sb.from('posts').insert({
-    type:'notice', title:t, content:c, author_id:currentUser.id,
-  });
-  if(error){ alert('게시 실패: '+error.message); return; }
+  if(editingPostId) {
+    const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
+    if(error){ alert('수정 실패: '+error.message); return; }
+    editingPostId = null;
+  } else {
+    const { error } = await sb.from('posts').insert({
+      type:'notice', title:t, content:c, author_id:currentUser.id,
+    });
+    if(error){ alert('게시 실패: '+error.message); return; }
+  }
   await loadPosts();
   closeSheet('kWriteSheetBg');
   document.getElementById('kPostTitle').value='';
@@ -4696,26 +4749,46 @@ function submitLetter() {
 // 3뎁스 오버레이 목록 (탭 숨김)
 const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay'];
 
-// ── 뒤로가기(모바일 스와이프 포함)가 앱 종료 대신 오버레이/시트만 닫도록 ──
-// 오버레이/시트를 열 때마다 히스토리를 한 칸 쌓아두고, 실제 사용자가 뒤로가기/
-// 스와이프하면(popstate) 가장 최근에 연 것만 닫는다. X버튼 등으로 먼저 닫은
-// 경우엔 history.back()을 부르지 않아 그 칸이 그대로 남는데, 이러면 나중에
-// 뒤로가기를 한 번 더 눌러야 할 수 있지만(아무 변화 없는 "빈 뒤로가기" 1회),
-// 지금처럼 뒤로가기 즉시 앱이 통째로 꺼지는 것보다는 훨씬 나은 절충.
-let _openModalOrder = [];
-function _trackModalOpen(kind, id) {
-  _openModalOrder.push({kind, id});
-  history.pushState({hkModal:true}, '');
+// ── 뒤로가기(모바일 스와이프 포함) 내비게이션 스택 ──
+// 오버레이/시트를 열거나 탭을 바꿀 때마다 히스토리를 한 칸 쌓아두고, 실제
+// 사용자가 뒤로가기/스와이프하면(popstate) 열려있는 걸 닫거나 이전 탭으로
+// 돌아간다(앱이 통째로 종료되는 대신). X버튼 등으로 모달을 먼저 닫은 경우엔
+// history.back()을 부르지 않아 그 칸이 그대로 남는데, 이러면 나중에 뒤로가기를
+// 한 번 더 눌러야 할 수 있지만(아무 변화 없는 "빈 뒤로가기" 1회), 지금처럼
+// 뒤로가기 즉시 앱이 꺼지는 것보다는 훨씬 나은 절충.
+let _navStack = []; // {type:'modal', kind, id} | {type:'tab', tab, isK}
+let _poppingNav = false; // popstate가 유발한 내부 탭 전환인지 구분(재귀 push 방지)
+
+function _navPushModal(kind, id) {
+  _navStack.push({type:'modal', kind, id});
+  history.pushState({}, '');
 }
-function _trackModalClose(kind, id) {
-  for(let i=_openModalOrder.length-1;i>=0;i--){
-    if(_openModalOrder[i].kind===kind && _openModalOrder[i].id===id){ _openModalOrder.splice(i,1); break; }
+function _navRemoveModal(kind, id) {
+  for(let i=_navStack.length-1;i>=0;i--){
+    const e=_navStack[i];
+    if(e.type==='modal' && e.kind===kind && e.id===id){ _navStack.splice(i,1); break; }
   }
 }
+function _navPushTab(tab, isK) {
+  if(_poppingNav) return;
+  const lastTab = [..._navStack].reverse().find(e=>e.type==='tab');
+  if(lastTab && lastTab.tab===tab && lastTab.isK===isK) return; // 같은 탭 재클릭은 무시
+  _navStack.push({type:'tab', tab, isK});
+  history.pushState({}, '');
+}
 window.addEventListener('popstate', () => {
-  if(_openModalOrder.length===0) return;
-  const top = _openModalOrder.pop();
-  if(top.kind==='overlay') closeOverlay(top.id); else closeSheet(top.id);
+  const entry = _navStack.pop();
+  if(!entry) return; // 더 쌓인 게 없으면 기본 동작(진짜 종료 등)에 맡김
+  if(entry.type === 'modal') {
+    if(entry.kind==='overlay') closeOverlay(entry.id); else closeSheet(entry.id);
+    return;
+  }
+  const prevTab = [..._navStack].reverse().find(e=>e.type==='tab');
+  const targetTab = prevTab ? prevTab.tab : 'home';
+  const targetIsK = prevTab ? prevTab.isK : entry.isK;
+  _poppingNav = true;
+  if(targetIsK) kSwitchTab(targetTab); else switchTab(targetTab);
+  _poppingNav = false;
 });
 
 function openOverlay(id) {
@@ -4727,11 +4800,11 @@ function openOverlay(id) {
   if(DEPTH3_OVERLAYS.includes(id)) {
     document.getElementById('mainNav').style.display = 'none';
   }
-  _trackModalOpen('overlay', id);
+  _navPushModal('overlay', id);
 }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
-  _trackModalClose('overlay', id);
+  _navRemoveModal('overlay', id);
   if(id==='routineFeedOverlay') {
     document.getElementById('certFloatingBtn').style.display='none';
   }
@@ -4748,8 +4821,8 @@ function closeOverlay(id) {
     if(!anyOpen) document.getElementById('mainNav').style.display = '';
   }
 }
-function openSheet(id) { document.getElementById(id).classList.add('open'); _trackModalOpen('sheet', id); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); _trackModalClose('sheet', id); }
+function openSheet(id) { document.getElementById(id).classList.add('open'); _navPushModal('sheet', id); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); _navRemoveModal('sheet', id); }
 
 // ════════════════════════════════════════════════════════
 // 온보딩
