@@ -190,6 +190,12 @@ select:focus { outline: none; border-color: #2E33BC; }
 .sheet-bg.open .sheet { transform: translateY(0); }
 .sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto 16px; }
 
+/* 인증글 사진 확대 보기 */
+.photo-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 600; opacity: 0; pointer-events: none; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; }
+.photo-lightbox.open { opacity: 1; pointer-events: all; }
+.photo-lightbox img { max-width: 92vw; max-height: 86vh; object-fit: contain; border-radius: 8px; }
+.photo-lightbox .lightbox-close { position: absolute; top: 20px; right: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
 /* 완료 화면 */
 .success-scr { position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateX(100vw); width: 100%; max-width: 390px; height: 100%; background: #fff; z-index: 400; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: transform 0.25s; }
 .success-scr.open { transform: translateX(-50%) translateX(0); }
@@ -535,8 +541,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="tab-page" id="page-routine">
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="routineFilterBar" style="padding-top:0;flex:1;">
-            <div class="chip active" onclick="filterRoutine('all',this)">전체</div>
-            <div class="chip" onclick="filterRoutine('active',this)">참여 중</div>
+            <div class="chip active" onclick="filterRoutine('active',this)">참여 중</div>
             <div class="chip" onclick="filterRoutine('recruit',this)">모집 중</div>
             <div class="chip" onclick="filterRoutine('done',this)">완료</div>
           </div>
@@ -711,8 +716,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="tab-page" id="kpage-routine">
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="kRoutineFilterBar" style="padding-top:0;flex:1;">
-            <div class="chip active" onclick="kFilterRoutine('all',this)">전체</div>
-            <div class="chip" onclick="kFilterRoutine('active',this)">진행 중</div>
+            <div class="chip active" onclick="kFilterRoutine('active',this)">진행 중</div>
+            <div class="chip" onclick="kFilterRoutine('all',this)">전체</div>
             <div class="chip" onclick="kFilterRoutine('recruit',this)">모집 중</div>
             <div class="chip" onclick="kFilterRoutine('done',this)">완료</div>
           </div>
@@ -1169,6 +1174,12 @@ select:focus { outline: none; border-color: #2E33BC; }
     </div>
   </div>
 
+  <!-- 인증글 사진 확대 보기 -->
+  <div class="photo-lightbox" id="photoLightboxBg" onclick="closeSheet('photoLightboxBg')">
+    <button class="lightbox-close" onclick="event.stopPropagation();closeSheet('photoLightboxBg')"><i class="ti ti-x" style="font-size:18px;color:#fff;"></i></button>
+    <img id="photoLightboxImg" src="" onclick="event.stopPropagation()">
+  </div>
+
   <!-- 바텀시트: 배지 -->
   <div class="sheet-bg" id="badgeSheetBg" onclick="closeSheet('badgeSheetBg')">
     <div class="sheet" onclick="event.stopPropagation()">
@@ -1550,7 +1561,10 @@ function showCompleteProfile(profile) {
   populateSidoSelect('cpSido');
   // 카카오 프로필 닉네임이 있으면 미리 채움
   const meta = currentUser?.user_metadata || {};
-  document.getElementById('cpName').value = (profile.name && profile.name !== '익명') ? profile.name : (meta.name || meta.full_name || meta.preferred_username || '');
+  const kakaoName = meta.name || meta.full_name || meta.preferred_username || '';
+  document.getElementById('cpName').value = (profile.name && profile.name !== '익명') ? profile.name : kakaoName;
+  // 카카오 설정 이름이 실명인 경우가 많아 실명 칸도 같이 채워둠(수정 가능)
+  document.getElementById('cpRealName').value = kakaoName;
   selectCpRole(profile.role === 'kkutjjang' ? 'kkutjjang' : 'youth');
   document.getElementById('completeProfileScreen').style.display = 'flex';
 }
@@ -1595,7 +1609,7 @@ async function doLogout() {
 const DEFAULT = {
   loginType: null,
   currentRole: null,
-  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,completeCount:1,avatar:null,pendingRoutines:[],nadaeum:120,badges:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
+  youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,avatar:null,pendingRoutines:[],nadaeum:120,badges:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
     {id:1,applicants:[],status:'active',title:'아침 루틴 21일',emoji:'🌱',period:'6.10–6.30',tag:'생활',people:8,maxPeople:10,progress:67,desc:'매일 아침 기상 후 물 한 잔, 스트레칭 5분, 오늘 할 일 3가지 적기.',todayCert:true,certCount:52,avgRate:78,participants:[{name:'지민',day:'14일째',cert:13,todayDone:true},{name:'현우',day:'14일째',cert:11,todayDone:true},{name:'서연',day:'14일째',cert:10,todayDone:false},{name:'나연',day:'14일째',cert:9,todayDone:false}]},
@@ -1819,12 +1833,15 @@ function renderHomeBanner() {
   }
 }
 // 배너에 이미지가 없고 루틴에 연결돼 있으면 그 루틴의 대표 이미지를 그대로 씀
+// (깨진 이미지 URL은 _failedBannerImages에 기록해두고 제외 — 로드 실패 시 흰 배경에
+// 흰 글씨가 겹쳐 "내용이 안 보이는" 것처럼 보이던 문제 방지, 파스텔 배경으로 폴백)
+const _failedBannerImages = new Set();
 function _bannerImageUrl(b) {
-  if (b.image_url) return b.image_url;
+  if (b.image_url && !_failedBannerImages.has(b.image_url)) return b.image_url;
   if (b.link_url && b.link_url.startsWith('routine:')) {
     const rid = parseInt(b.link_url.slice(8));
     const r = (state.routines || []).find(x => x.id === rid);
-    if (r && r.coverImageUrl) return r.coverImageUrl;
+    if (r && r.coverImageUrl && !_failedBannerImages.has(r.coverImageUrl)) return r.coverImageUrl;
   }
   return null;
 }
@@ -1840,7 +1857,7 @@ function _renderBannerSlide(el) {
   const imgUrl = _bannerImageUrl(b);
   const pastel = BANNER_PASTELS[Math.abs(b.id||0) % BANNER_PASTELS.length];
   const bgBlock = imgUrl
-    ? `<img src="${imgUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;">`
+    ? `<img src="${imgUrl}" onerror="_failedBannerImages.add(this.src);_renderBannerSlide(document.getElementById('homeBannerArea'));" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;">`
     : `<div style="position:absolute;inset:0;background:${pastel.bg};"></div>`;
   const scrim = imgUrl ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 100%);"></div>` : '';
   const textColor = imgUrl ? '#fff' : pastel.text;
@@ -2117,15 +2134,15 @@ function toggleLike(id) {
 // ════════════════════════════════════════════════════════
 // 청소년 루틴
 // ════════════════════════════════════════════════════════
-let searchOpen=false, currentFilterType='all';
+let searchOpen=false, currentFilterType='active';
 
 function renderRoutine() {
-  searchOpen=false; currentFilterType='all';
+  searchOpen=false; currentFilterType='active';
   document.querySelectorAll('#routineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#routineFilterBar .chip').classList.add('active');
   const wrap = document.getElementById('searchBarWrap');
   if(wrap) wrap.style.display='none';
-  renderRoutineGrid('all','');
+  renderRoutineGrid('active','');
 }
 
 function filterRoutine(type, el) {
@@ -2417,7 +2434,7 @@ function renderCertDetail(id) {
   if(input) input.value='';
 
   const photoHtml = (c.photos && c.photos.length)
-    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;">`).join('')}</div>`
+    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
     : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
         <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
       </div>`;
@@ -2758,7 +2775,7 @@ function renderCertTab() {
 }
 function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title); }
 function openCertForm(id,title) {
-  currentCertId=id; certHasPhoto=false; certPhotos=[];
+  currentCertId=id; certHasPhoto=false; certPhotos=[]; certPhotoWatermarked=[];
   document.getElementById('certFormTitle').textContent=title;
   renderCertPhotoGrid();
   document.getElementById('certMemo').value='';
@@ -2769,6 +2786,7 @@ function openCertForm(id,title) {
   openOverlay('certFormOverlay');
 }
 let certPhotos = [];
+let certPhotoWatermarked = []; // certPhotos와 같은 인덱스로 "지금 찍기"(워터마크 적용) 여부 추적
 
 function handleCertPhotos(e) {
   const files = Array.from(e.target.files);
@@ -2778,6 +2796,7 @@ function handleCertPhotos(e) {
     const r = new FileReader();
     r.onload = ev => {
       certPhotos.push(ev.target.result);
+      certPhotoWatermarked.push(false);
       certHasPhoto = certPhotos.length > 0;
       renderCertPhotoGrid();
       checkCertBtn();
@@ -2790,9 +2809,12 @@ function handleCertPhotos(e) {
 function renderCertPhotoGrid() {
   const grid = document.getElementById('certPhotoGrid');
   const req = document.getElementById('certPhotoRequired');
+  // 작은 미리보기 타일에서는 사진에 새긴 워터마크 글자가 너무 작아 안 보여서
+  // "워터마크가 적용 안 된 것 같다"는 문의가 있었음 — 타일 위에 별도 뱃지로 명확히 표시
   let html = certPhotos.map((src, i) => `
     <div style="aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;">
       <img src="${src}" style="width:100%;height:100%;object-fit:cover;">
+      ${certPhotoWatermarked[i] ? `<span style="position:absolute;left:4px;bottom:4px;font-size:9px;font-weight:600;color:#fff;background:rgba(0,0,0,0.55);padding:2px 6px;border-radius:8px;">📸 실시간</span>` : ''}
       <button onclick="removeCertPhoto(${i})" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">
         <i class="ti ti-x" style="font-size:11px;color:white;"></i>
       </button>
@@ -2839,6 +2861,7 @@ function handleCertCameraPhoto(e) {
       ctx.textBaseline = 'top';
       ctx.fillText(label, x + pad, y + pad);
       certPhotos.push(canvas.toDataURL('image/jpeg', 0.85));
+      certPhotoWatermarked.push(true);
       certHasPhoto = true;
       renderCertPhotoGrid();
       checkCertBtn();
@@ -2850,6 +2873,7 @@ function handleCertCameraPhoto(e) {
 
 function removeCertPhoto(idx) {
   certPhotos.splice(idx, 1);
+  certPhotoWatermarked.splice(idx, 1);
   certHasPhoto = certPhotos.length > 0;
   renderCertPhotoGrid();
   checkCertBtn();
@@ -3299,6 +3323,10 @@ function openBadgeSheet() {
   loadBadges().then(renderBadges);
 }
 function openIOSInstallSheet() { openSheet('iosInstallSheetBg'); }
+function openPhotoLightbox(url) {
+  document.getElementById('photoLightboxImg').src = url;
+  openSheet('photoLightboxBg');
+}
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
@@ -3312,8 +3340,8 @@ function renderMy() {
   document.getElementById('myCertCount').textContent=state.youth.certCount;
   document.getElementById('myStreak').textContent=_streak(state.youth.certDates)+'일';
   document.getElementById('myCommCount').textContent=state.youth.commCount;
-  document.getElementById('myCompleteCount').textContent=state.youth.completeCount;
   const done=state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
+  document.getElementById('myCompleteCount').textContent=done.length;
   if(done.length>0){
     document.getElementById('completedSection').style.display='';
     document.getElementById('completedList').innerHTML=done.map(r=>{
@@ -3875,13 +3903,13 @@ function kRenderRoutineTab() {
   document.getElementById('kCreateBtn').style.display = state.loginType==='both' ? '' : 'none';
   document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#kRoutineFilterBar .chip').classList.add('active');
-  kFilterRoutine('all',null);
+  kFilterRoutine('active',null);
 }
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-  // 루틴탭은 둘러보기 용도라 전체 루틴을 보여줌(다른 끗짱 담당분 포함) — 홈/인증탭/통계는
-  // 관리 화면이라 그대로 _kMyRoutines()(내 담당 루틴만)로 스코핑 유지
-  const base=state.routines;
+  // "전체"만 둘러보기 용도로 전체 루틴을 보여줌(다른 끗짱 담당분 포함) — 진행중/모집중/완료는
+  // 홈/인증탭/통계와 동일하게 _kMyRoutines()(내 담당 루틴만)로 스코핑
+  const base = type==='all' ? state.routines : _kMyRoutines();
   const filtered=type==='all'?base:base.filter(r=>r.status===type);
   // 진행중 루틴 항상 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
