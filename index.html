@@ -4081,11 +4081,15 @@ function openKRoutineDetail(routineId) {
   openOverlay('routineDetailOverlay');
 }
 
+// 아래 네 함수 모두 .select()로 실제 반영된 행을 확인함 — RLS 조건이 안 맞으면
+// Supabase가 에러 없이 "0건 반영"으로 조용히 끝내버려서, 권한 문제 등으로 실제로는
+// 안 바뀌었는데 성공한 것처럼 넘어가 재접속하면 그대로였던 것처럼 보이는 문제 방지
 async function approveApplicant(routineId, userId) {
   const r = state.routines.find(x=>x.id===routineId);
-  const { error } = await sb.from('routine_participants')
-    .update({status:'approved', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId);
+  const { data, error } = await sb.from('routine_participants')
+    .update({status:'approved', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId).select('user_id');
   if(error){ alert('승인 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('승인에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   // 모집 중이던 루틴은 첫 승인 시 진행 중으로 전환
   if(r && r.status==='recruit') {
     await sb.from('routines').update({status:'active'}).eq('id',routineId);
@@ -4098,18 +4102,20 @@ async function approveApplicant(routineId, userId) {
 async function rejectApplicant(routineId, userId) {
   const reason = prompt('거절 사유를 입력해주세요 (신청자에게 안내돼요, 비워두면 사유 없이 거절돼요):', '');
   if (reason === null) return; // 취소
-  const { error } = await sb.from('routine_participants')
-    .update({status:'rejected', reject_reason: reason || null}).eq('routine_id',routineId).eq('user_id',userId);
+  const { data, error } = await sb.from('routine_participants')
+    .update({status:'rejected', reject_reason: reason || null}).eq('routine_id',routineId).eq('user_id',userId).select('user_id');
   if(error){ alert('거절 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('거절에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);
 }
 
 async function cancelApproval(routineId, userId) {
   if(!confirm('이 참여자의 승인을 취소할까요? 다시 대기 상태로 돌아가요.')) return;
-  const { error } = await sb.from('routine_participants')
-    .update({status:'pending', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId);
+  const { data, error } = await sb.from('routine_participants')
+    .update({status:'pending', reject_reason:null}).eq('routine_id',routineId).eq('user_id',userId).select('user_id');
   if(error){ alert('취소 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('취소에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);
   kRenderRoutineTab();
@@ -4117,8 +4123,9 @@ async function cancelApproval(routineId, userId) {
 
 async function cancelRoutine(routineId) {
   if(!confirm('이 루틴을 폐강 처리할까요? 이미 신청한 청소년들에게 폐강 알림이 자동으로 발송돼요. 이 작업은 되돌릴 수 없어요.')) return;
-  const { error } = await sb.from('routines').update({status:'cancelled'}).eq('id',routineId);
+  const { data, error } = await sb.from('routines').update({status:'cancelled'}).eq('id',routineId).select('id');
   if(error){ alert('폐강 처리 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('폐강 처리에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   await loadRoutines();
   openKRoutineDetail(routineId);
   kRenderRoutineTab();
