@@ -133,6 +133,64 @@
     <button class="export-btn" onclick="exportCSV('kkutjjang')">📥 CSV 내보내기</button>
   </div>
 
+  <div id="routineCreateView" style="display:none;">
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3 id="rtFormTitle">🌱 루틴 등록</h3>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">루틴 이모지 <span style="color:#c00;">*</span></div>
+        <div id="rtEmojiGrid" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="rtName" placeholder="루틴 이름 (예: 아침 루틴 21일)" maxlength="20" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="text" id="rtPartner" placeholder="파트너 기관명 (선택)" maxlength="30" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <select id="rtLeader" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;"><option value="">담당 끗짱 선택 *</option></select>
+        <select id="rtEligibility" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <option value="all">참여 대상: 청소년 누구나</option>
+          <option value="out_of_school">참여 대상: 학교 밖 청소년</option>
+        </select>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">모집 기간 <span style="color:#c00;">*</span> — 이 기간에만 참여 신청을 받아요</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="date" id="rtRecruitStart" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <input type="date" id="rtRecruitEnd" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">진행 기간 <span style="color:#c00;">*</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="date" id="rtStart" onchange="_rtUpdateDuration()" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <input type="date" id="rtEnd" onchange="_rtUpdateDuration()" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        </div>
+        <div id="rtDurationHint" style="font-size:11px;color:#185FA5;margin-top:4px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="number" id="rtMaxPeople" min="1" max="50" value="10" placeholder="최대 인원" style="width:120px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="number" id="rtMinPeople" min="1" max="50" placeholder="최소 인원 (선택, 미달 시 폐강 가능)" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">온라인 모임 (줌, 선택) — 첫날 OT·마지막날 클로징</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="datetime-local" id="rtKickoff" style="flex:1;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <input type="datetime-local" id="rtClosing" style="flex:1;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        </div>
+        <input type="url" id="rtMeetingLink" placeholder="줌 링크 (예: https://zoom.us/j/...)" style="width:100%;margin-top:8px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;">
+      </div>
+      <textarea id="rtDesc" placeholder="루틴 소개 — 어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" rows="3" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">인증 예시 사진 <span style="color:#c00;">*</span> — 청소년에게 어떻게 인증하면 되는지 보여주는 예시 사진</div>
+        <input type="file" id="rtPhotoInput" accept="image/*" onchange="handleRoutinePhotoUpload(event)">
+        <div id="rtPhotoPreviewWrap" style="display:none;margin-top:8px;"><img id="rtPhotoPreview" style="max-width:160px;max-height:100px;border-radius:8px;display:block;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="rtSubmitBtn" onclick="submitRoutineAdmin()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">루틴 등록하기</button>
+        <button id="rtCancelEditBtn" onclick="cancelEditRoutineAdmin()" style="display:none;padding:9px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">수정 취소</button>
+      </div>
+    </div>
+  </div>
+
   <div class="filter-bar" id="routineFilters" style="display:none;">
     <input type="text" id="rSearch" placeholder="루틴명 검색" oninput="renderTable()">
     <select id="rStatusFilter" onchange="renderTable()">
@@ -418,7 +476,7 @@ async function loadData() {
   const [profRes, rpRes, routRes, certRes] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status'),
-    sb.from('routines').select('id,title,status,start_date,end_date,max_people,min_people,archived,led_by,created_by,cover_image_url'),
+    sb.from('routines').select('*'),
     sb.from('certifications').select('routine_id,user_id,created_at'),
   ]);
   const profiles = profRes.data || [];
@@ -445,6 +503,10 @@ async function loadData() {
     maxPeople: r.max_people || 0, minPeople: r.min_people || null, people: approvedCountByRoutine[r.id] || 0,
     coverImageUrl: r.cover_image_url || null,
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
+    ledBy: r.led_by || null, emoji: r.emoji || '🌱', description: r.description || '',
+    partnerOrg: r.partner_org || null, eligibility: r.eligibility || 'all',
+    recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
+    kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
   }));
 
   youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
@@ -479,6 +541,7 @@ function switchTab(tab) {
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
+  document.getElementById('routineCreateView').style.display = tab === 'routine' ? 'block' : 'none';
   document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify' || tab === 'reward' || tab === 'banner') ? 'none' : 'block';
   document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
   document.getElementById('notifyView').style.display = tab === 'notify' ? 'block' : 'none';
@@ -490,6 +553,7 @@ function switchTab(tab) {
   else if (tab === 'notify') renderNotifyView();
   else if (tab === 'reward') renderRewardView();
   else if (tab === 'banner') renderBannerView();
+  else if (tab === 'routine') { renderTable(); renderRoutineCreateView(); }
   else renderTable();
 }
 
@@ -571,6 +635,7 @@ function renderRoutineTable() {
       <td>${r.leaderName}</td>
       <td>${r.archived?'<span class="pill pill-rejected">보관됨</span>':'-'}</td>
       <td>
+        <button onclick="editRoutineAdmin(${r.id})" style="padding:5px 10px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">수정</button>
         ${(r.status==='recruit'||r.status==='active')&&r.minPeople?`<button onclick="cancelRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">폐강 처리</button>`:''}
         <button onclick="toggleArchiveRoutine(${r.id},${!r.archived})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.archived?'복원':'보관'}</button>
         <button onclick="deleteRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
@@ -595,6 +660,150 @@ async function deleteRoutineAdmin(id, title) {
   const { error } = await sb.from('routines').delete().eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
   await loadData();
+}
+
+// ── 루틴 등록/수정 (index.html 청소년/끗짱 앱의 "루틴 만들기"와 동일한 필드·검증) ──
+const RT_EMOJIS = ['🌱','🌿','🌳','🌞','🏃','📚','💧','🍳','🎵','✍️','🧘','🚶'];
+let rtEmoji = '🌱';
+let rtCoverUrl = null;
+let editRoutineAdminId = null;
+
+function renderRtEmojiGrid() {
+  document.getElementById('rtEmojiGrid').innerHTML = RT_EMOJIS.map(e =>
+    `<button type="button" onclick="selectRtEmoji('${e}')" style="width:36px;height:36px;font-size:18px;border-radius:8px;border:1.5px solid ${e===rtEmoji?'#2E33BC':'#ddd'};background:${e===rtEmoji?'#f0f1fb':'#fff'};cursor:pointer;">${e}</button>`
+  ).join('');
+}
+function selectRtEmoji(e) { rtEmoji = e; renderRtEmojiGrid(); }
+
+function _rtUpdateDuration() {
+  const s = document.getElementById('rtStart').value, e = document.getElementById('rtEnd').value;
+  const hint = document.getElementById('rtDurationHint');
+  hint.textContent = (s && e && e >= s) ? `총 ${Math.round((new Date(e) - new Date(s)) / 86400000) + 1}일 루틴` : '';
+}
+
+function populateRtLeaderSelect(selectedId) {
+  const sel = document.getElementById('rtLeader');
+  const approved = kkRows.filter(r => r.status === 'approved');
+  sel.innerHTML = '<option value="">담당 끗짱 선택 *</option>' + approved.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.value = selectedId || '';
+}
+
+function resetRoutineForm() {
+  editRoutineAdminId = null;
+  rtEmoji = '🌱'; rtCoverUrl = null;
+  ['rtName','rtPartner','rtRecruitStart','rtRecruitEnd','rtStart','rtEnd','rtKickoff','rtClosing','rtMeetingLink','rtMinPeople','rtDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('rtMaxPeople').value = 10;
+  document.getElementById('rtEligibility').value = 'all';
+  document.getElementById('rtDurationHint').textContent = '';
+  document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
+  document.getElementById('rtPhotoInput').value = '';
+  document.getElementById('rtFormTitle').textContent = '🌱 루틴 등록';
+  document.getElementById('rtSubmitBtn').textContent = '루틴 등록하기';
+  document.getElementById('rtCancelEditBtn').style.display = 'none';
+  populateRtLeaderSelect();
+  renderRtEmojiGrid();
+}
+
+function renderRoutineCreateView() {
+  if (!editRoutineAdminId) resetRoutineForm();
+  else populateRtLeaderSelect(document.getElementById('rtLeader').value);
+}
+
+async function handleRoutinePhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const path = `admin_${Date.now()}_${file.name}`;
+  const { error } = await sb.storage.from('routine-covers').upload(path, file);
+  if (error) { alert('이미지 업로드 실패: ' + error.message); return; }
+  rtCoverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
+  document.getElementById('rtPhotoPreview').src = rtCoverUrl;
+  document.getElementById('rtPhotoPreviewWrap').style.display = '';
+}
+
+function editRoutineAdmin(id) {
+  const r = routineRows.find(x => x.id === id);
+  if (!r) return;
+  editRoutineAdminId = id;
+  rtEmoji = r.emoji || '🌱';
+  rtCoverUrl = r.coverImageUrl || null;
+  document.getElementById('rtName').value = r.title || '';
+  document.getElementById('rtPartner').value = r.partnerOrg || '';
+  document.getElementById('rtRecruitStart').value = r.recruitStartDate || '';
+  document.getElementById('rtRecruitEnd').value = r.recruitEndDate || r.startDate || '';
+  document.getElementById('rtStart').value = r.startDate || '';
+  document.getElementById('rtEnd').value = r.endDate || '';
+  document.getElementById('rtMaxPeople').value = r.maxPeople || 10;
+  document.getElementById('rtMinPeople').value = r.minPeople || '';
+  document.getElementById('rtKickoff').value = r.kickoffAt ? r.kickoffAt.slice(0,16) : '';
+  document.getElementById('rtClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
+  document.getElementById('rtMeetingLink').value = r.meetingLink || '';
+  document.getElementById('rtDesc').value = r.description || '';
+  document.getElementById('rtEligibility').value = r.eligibility || 'all';
+  if (rtCoverUrl) { document.getElementById('rtPhotoPreview').src = rtCoverUrl; document.getElementById('rtPhotoPreviewWrap').style.display = ''; }
+  else document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
+  _rtUpdateDuration();
+  renderRtEmojiGrid();
+  populateRtLeaderSelect(r.ledBy);
+  document.getElementById('rtFormTitle').textContent = '✏️ 루틴 수정';
+  document.getElementById('rtSubmitBtn').textContent = '수정 완료';
+  document.getElementById('rtCancelEditBtn').style.display = '';
+  switchTab('routine');
+  document.getElementById('rtFormTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function cancelEditRoutineAdmin() { resetRoutineForm(); }
+
+async function submitRoutineAdmin() {
+  const title = document.getElementById('rtName').value.trim();
+  const desc = document.getElementById('rtDesc').value.trim();
+  const partner = document.getElementById('rtPartner').value.trim();
+  const leader = document.getElementById('rtLeader').value;
+  const eligibility = document.getElementById('rtEligibility').value;
+  const recruitStart = document.getElementById('rtRecruitStart').value;
+  const recruitEnd = document.getElementById('rtRecruitEnd').value;
+  const start = document.getElementById('rtStart').value;
+  const end = document.getElementById('rtEnd').value;
+  const maxPeople = document.getElementById('rtMaxPeople').value;
+  const minPeople = document.getElementById('rtMinPeople').value;
+  const kickoff = document.getElementById('rtKickoff').value;
+  const closing = document.getElementById('rtClosing').value;
+  const meetingLink = document.getElementById('rtMeetingLink').value.trim();
+
+  if (!title) { alert('루틴 이름을 입력해주세요.'); return; }
+  if (!leader) { alert('담당 끗짱을 선택해주세요.'); return; }
+  if (!recruitStart || !recruitEnd) { alert('모집 기간을 입력해주세요.'); return; }
+  if (recruitEnd < recruitStart) { alert('모집 마감일은 모집 시작일보다 빠를 수 없어요.'); return; }
+  if (!start || !end || end < start) { alert('진행 기간을 올바르게 설정해주세요.'); return; }
+  if (recruitEnd > start) { alert('모집 마감일은 진행 시작일보다 늦을 수 없어요.'); return; }
+  if (!maxPeople || maxPeople < 1) { alert('최대 참여 인원을 입력해주세요.'); return; }
+  if (minPeople && (parseInt(minPeople) < 1 || parseInt(minPeople) > parseInt(maxPeople))) { alert('최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.'); return; }
+  if ((kickoff || closing) && !meetingLink) { alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.'); return; }
+  if (!desc) { alert('루틴 소개를 입력해주세요.'); return; }
+  if (!rtCoverUrl) { alert('인증 예시 사진을 추가해주세요.'); return; }
+
+  const payload = {
+    title, emoji: rtEmoji, description: desc, partner_org: partner || null,
+    eligibility, led_by: leader,
+    kickoff_at: kickoff ? new Date(kickoff).toISOString() : null,
+    closing_at: closing ? new Date(closing).toISOString() : null,
+    meeting_link: meetingLink || null,
+    recruit_start_date: recruitStart, recruit_end_date: recruitEnd,
+    start_date: start, end_date: end,
+    max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,
+    cover_image_url: rtCoverUrl,
+  };
+
+  const btn = document.getElementById('rtSubmitBtn');
+  btn.disabled = true; btn.textContent = editRoutineAdminId ? '저장 중...' : '등록 중...';
+  const { error } = editRoutineAdminId
+    ? await sb.from('routines').update(payload).eq('id', editRoutineAdminId)
+    : await sb.from('routines').insert({ ...payload, status: 'recruit', created_by: currentUser.id });
+  btn.disabled = false; btn.textContent = editRoutineAdminId ? '수정 완료' : '루틴 등록하기';
+  if (error) { alert((editRoutineAdminId ? '수정' : '등록') + ' 실패: ' + error.message); return; }
+  const wasEdit = !!editRoutineAdminId;
+  resetRoutineForm();
+  await loadData();
+  switchTab('routine');
+  if (!wasEdit) alert('루틴이 등록됐어요!');
 }
 
 function _routineDayCount(start, end) {
