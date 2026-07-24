@@ -678,14 +678,6 @@ select:focus { outline: none; border-color: #2E33BC; }
             <div class="section-hd"><div class="section-hd-title">진행 중인 루틴</div></div>
             <div id="kActiveRoutineList"></div>
           </div>
-          <!-- 오늘 인증 현황 -->
-          <div class="section-card">
-            <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
-              <div class="section-hd-title">오늘 인증 현황</div>
-              <span id="kCertSummary" style="font-size:11px;color:#888;"></span>
-            </div>
-            <div id="kTodayCertList"></div>
-          </div>
         </div>
       </div>
 
@@ -3845,19 +3837,6 @@ function kRenderHome() {
         <div style="font-size:13px;color:#888;margin-bottom:12px;">진행 중인 루틴이 없어요</div>
         ${state.loginType==='both'?`<button onclick="openCreateRoutine()" style="padding:9px 20px;background:#FF006C;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">새 루틴 만들기</button>`:''}
       </div>`;
-
-  // 오늘 인증 현황 — 미인증 우선 정렬
-  const rows = active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
-  rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
-  document.getElementById('kCertSummary').textContent = rows.length>0?`${doneToday}/${rows.length}명 완료`:'';
-  document.getElementById('kTodayCertList').innerHTML = rows.length>0
-    ? rows.map(({r,p})=>`
-      <div class="youth-row" onclick="openKCertDetail(${r.id},'${(p.name||'').replace(/'/g,"\\'")}')">
-        <div class="youth-avatar" style="${p.todayDone?'':'background:#FBEAF0;color:#FF006C;'}">${p.name[0]}</div>
-        <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${r.title} · ${p.day}</div></div>
-        <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
-      </div>`).join('')
-    : `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 청소년이 아직 없어요</div>`;
 }
 
 // ════════════════════════════════════════════════════════
