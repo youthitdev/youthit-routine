@@ -84,17 +84,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .nav-item span { font-size: 10px; color: #888; }
 .nav-item i { font-size: 22px; color: #888; }
 .nav-item.active i, .nav-item.active span { color: #2E33BC; }
-.nav-item-cert { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; cursor: pointer; padding-top: 0; position: relative; }
-.nav-cert-circle {
-  width: 46px; height: 46px; border-radius: 50%; background: var(--role-color, #83CA00);
-  display: flex; align-items: center; justify-content: center;
-  transform: translateY(-14px); box-shadow: 0 6px 14px rgba(0,0,0,0.22), 0 0 0 4px #fff;
-  transition: transform 0.2s;
-}
-.nav-item-cert:active .nav-cert-circle { transform: translateY(-14px) scale(0.94); }
-.nav-cert-circle i { font-size: 22px; color: #fff; }
-.nav-item-cert span { font-size: 10px; color: #888; margin-top: -8px; }
-.nav-item-cert.active span { color: var(--role-color, #83CA00); font-weight: 600; }
 .tab-page { display: none; }
 .tab-page.active { display: block; }
 .scroll-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
@@ -520,29 +509,18 @@ select:focus { outline: none; border-color: #2E33BC; }
     <!-- ══════ 청소년 탭 ══════ -->
     <div id="youthTabs">
 
-      <!-- 홈 -->
-      <div class="tab-page active" id="page-home">
-        <div class="scroll-body">
+      <!-- 루틴 -->
+      <div class="tab-page active" id="page-routine">
+        <div style="padding:12px 16px 0;">
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
           <div id="homeBannerArea" style="display:none;"></div>
-          <!-- 오늘의 미션 -->
-          <div id="meetBannerArea"></div>
           <div id="pushNudgeArea"></div>
           <div id="todayMissionArea"></div>
-          <!-- 참여 중인 루틴 -->
-          <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">참여 중인 루틴</div></div>
-            <div id="activeRoutinesList"></div>
-          </div>
         </div>
-      </div>
-
-      <!-- 루틴 -->
-      <div class="tab-page" id="page-routine">
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="routineFilterBar" style="padding-top:0;flex:1;">
-            <div class="chip active" onclick="filterRoutine('active',this)">참여 중</div>
-            <div class="chip" onclick="filterRoutine('recruit',this)">모집 중</div>
+            <div class="chip active" onclick="filterRoutine('all',this)">전체</div>
+            <div class="chip" id="routineChipRecruit" onclick="filterRoutine('recruit',this)">모집 중</div>
             <div class="chip" onclick="filterRoutine('done',this)">완료</div>
           </div>
           <button onclick="toggleSearch()" id="searchToggleBtn" style="flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
@@ -567,6 +545,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <!-- 인증 -->
       <div class="tab-page" id="page-cert">
         <div class="scroll-body">
+          <div id="certMeetBannerArea"></div>
           <div id="certRoutineList"></div>
         </div>
       </div>
@@ -714,8 +693,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="tab-page" id="kpage-routine">
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="kRoutineFilterBar" style="padding-top:0;flex:1;">
-            <div class="chip active" onclick="kFilterRoutine('active',this)">진행 중</div>
-            <div class="chip" onclick="kFilterRoutine('all',this)">전체</div>
+            <div class="chip active" onclick="kFilterRoutine('all',this)">전체</div>
             <div class="chip" onclick="kFilterRoutine('recruit',this)">모집 중</div>
             <div class="chip" onclick="kFilterRoutine('done',this)">완료</div>
           </div>
@@ -815,16 +793,21 @@ select:focus { outline: none; border-color: #2E33BC; }
   <!-- 네비게이션 -->
   <nav class="nav" id="mainNav" style="display:none;">
     <div id="youthNav" style="display:contents;">
-      <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
-      <div class="nav-item" id="nav-routine" onclick="switchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
-      <div class="nav-item-cert" id="nav-cert" onclick="switchTab('cert')"><div class="nav-cert-circle"><i class="ti ti-camera"></i></div><span>인증</span></div>
+      <div class="nav-item active" id="nav-routine" onclick="switchTab('routine')"><i class="ti ti-list-check"></i><span>홈</span></div>
+      <div class="nav-item" id="nav-cert" onclick="switchTab('cert')">
+        <span style="position:relative;display:inline-flex;">
+          <i class="ti ti-camera"></i>
+          <span id="navCertBadge" style="display:none;position:absolute;top:-4px;right:-8px;min-width:15px;height:15px;border-radius:8px;background:#FF3B30;color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center;padding:0 3px;">0</span>
+        </span>
+        <span>인증</span>
+      </div>
       <div class="nav-item" id="nav-comm" onclick="switchTab('comm')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="nav-my" onclick="switchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
     <div id="kkutjjangNav" style="display:none;contents;">
       <div class="nav-item active" id="knav-home" onclick="kSwitchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
-      <div class="nav-item-cert" id="knav-cert" onclick="kSwitchTab('cert')"><div class="nav-cert-circle"><i class="ti ti-camera"></i></div><span>인증</span></div>
+      <div class="nav-item" id="knav-cert" onclick="kSwitchTab('cert')"><i class="ti ti-camera"></i><span>인증</span></div>
       <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
       <div class="nav-item" id="knav-my" onclick="kSwitchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
@@ -1422,7 +1405,7 @@ async function loadProfileAndEnter() {
     const pt = pendingTab; pendingTab = null;
     history.replaceState(null, '', location.pathname);
     const isYouth = state.currentRole === 'youth';
-    const validTabs = isYouth ? ['home','routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+    const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
     if (validTabs.includes(pt)) { isYouth ? switchTab(pt) : kSwitchTab(pt); }
   }
 }
@@ -1879,7 +1862,7 @@ function _renderBannerSlide(el) {
   const dots = (state.banners||[]).length>1
     ? `<div style="position:absolute;left:12px;bottom:12px;display:flex;gap:4px;">${(state.banners||[]).map((_,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===_bannerRotateIdx?dotOn:dotOff};"></span>`).join('')}</div>`
     : '';
-  el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="position:relative;height:150px;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
+  el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="position:relative;height:75px;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
     ${bgBlock}
     ${scrim}
     ${dots}
@@ -1966,7 +1949,7 @@ function applyRole(role) {
   document.getElementById('themeColor').content = headerColor;
   // CSS 변수로 오버레이 헤더 색상도 동적 변경
   document.documentElement.style.setProperty('--role-color', headerColor);
-  if(isYouth) { renderHome(); renderSwitchBtn(); }
+  if(isYouth) { renderRoutine(); renderSwitchBtn(); }
   else { kRenderHome(); kRenderSwitchBtn(); }
 }
 function renderSwitchBtn() {
@@ -1987,11 +1970,10 @@ function switchRole() {
 // ════════════════════════════════════════════════════════
 function switchTab(tab) {
   document.querySelectorAll('#youthTabs .tab-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('#youthNav .nav-item, #youthNav .nav-item-cert').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('#youthNav .nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+tab).classList.add('active');
   document.getElementById('nav-'+tab).classList.add('active');
-  if(tab==='home') renderHome();
-  else if(tab==='routine') renderRoutine();
+  if(tab==='routine') renderRoutine();
   else if(tab==='cert') renderCertTab();
   else if(tab==='comm') renderComm('all');
   else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
@@ -2039,7 +2021,7 @@ function _greeting() {
 function _myActiveRoutines() {
   return state.routines.filter(r => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
 }
-function renderHome() {
+function renderRoutineBanners() {
   renderNadaeum();
   updateHeaderStreakBadge();
   renderHomeBanner();
@@ -2069,20 +2051,16 @@ function renderHome() {
       }
     });
   });
-  document.getElementById('meetBannerArea').innerHTML = banners.join('');
-  document.getElementById('meetBannerArea').style.display = banners.length?'flex':'none';
-  if(banners.length) { const el=document.getElementById('meetBannerArea'); el.style.flexDirection='column'; el.style.gap='10px'; }
+  const meetEl = document.getElementById('certMeetBannerArea');
+  meetEl.innerHTML = banners.join('');
+  meetEl.style.display = banners.length?'flex':'none';
+  if(banners.length) { meetEl.style.flexDirection='column'; meetEl.style.gap='10px'; }
 
   // 오늘의 미션 카드
   const notDone = active.filter(r=>!r.todayCert);
   const missionEl = document.getElementById('todayMissionArea');
   if(active.length === 0) {
-    missionEl.innerHTML = `<div class="section-card" style="padding:22px 16px;text-align:center;">
-      <div style="font-size:30px;margin-bottom:8px;">🧭</div>
-      <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:4px;">아직 참여 중인 루틴이 없어요</div>
-      <div style="font-size:12px;color:#888;margin-bottom:14px;">나에게 맞는 루틴을 찾아 첫 한끗을 시작해봐요</div>
-      <button onclick="switchTab('routine')" style="padding:10px 22px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">루틴 둘러보기</button>
-    </div>`;
+    missionEl.innerHTML = '';
   } else if(notDone.length === 0) {
     missionEl.innerHTML = '';
   } else {
@@ -2103,58 +2081,36 @@ function renderHome() {
     </div>`;
   }
 
-  document.getElementById('activeRoutinesList').innerHTML = active.map(r => {
-    const todayCerts = (state.certFeed||[]).filter(c=>c.routineId===r.id && isWithin24h(c.ts));
-    const previewHtml = todayCerts.length > 0
-      ? `<div style="margin-top:10px;"><div style="font-size:11px;color:#888;margin-bottom:6px;">오늘 인증한 친구들 👀</div>
-         <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;">
-           ${todayCerts.slice(0,4).map(c=>`
-             <div onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="flex-shrink:0;width:64px;cursor:pointer;">
-               <div style="width:64px;height:64px;border-radius:10px;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-                 ${c.photos&&c.photos[0]?`<img src="${c.photos[0]}" style="width:100%;height:100%;object-fit:cover;">`:`<i class="ti ti-photo" style="font-size:20px;color:rgba(0,0,0,0.15);"></i>`}
-                 <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.45));padding:3px 5px;">
-                   <div style="font-size:9px;color:white;font-weight:500;">${c.name}</div>
-                 </div>
-               </div>
-             </div>`).join('')}
-           ${todayCerts.length>4?`<div onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="flex-shrink:0;width:64px;height:64px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;cursor:pointer;"><div style="font-size:12px;color:#888;font-weight:500;">+${todayCerts.length-4}</div></div>`:''}
-         </div></div>`
-      : `<div style="margin-top:8px;font-size:11px;color:#ccc;">아직 오늘 인증한 친구가 없어요</div>`;
-
-    return `<div style="padding:12px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;" onclick="openRoutineFeed(${r.id})">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <div style="font-size:14px;font-weight:500;color:#111;">${r.emoji} ${r.title}</div>
-        <span class="cert-tag ${r.todayCert?'cert-done':'cert-none'}">${r.todayCert?'오늘 인증 ✓':'오늘 미인증'}</span>
-      </div>
-      <div style="font-size:11px;color:#aaa;">${r.period} · ${r.people}명 참여</div>
-      <div class="progress-wrap"><div class="progress-bar" style="width:${r.progress}%"></div></div>
-      ${_weekGridHtml(r.id)}
-      ${previewHtml}
-    </div>`;
-  }).join('') || `<div style="padding:18px 16px;text-align:center;font-size:12px;color:#aaa;">참여 중인 루틴이 아직 없어요</div>`;
-
+  updateCertNavBadge(notDone.length + banners.length);
   renderPushNudge(); // 알림 미설정자에게 켜기 유도 배너 (비동기)
+}
+function updateCertNavBadge(count) {
+  const el = document.getElementById('navCertBadge');
+  if(!el) return;
+  el.textContent = count>9?'9+':String(count);
+  el.style.display = count>0?'flex':'none';
 }
 function toggleLike(id) {
   const p = state.posts.find(x=>x.id===id);
   if(!p) return;
   p.liked=!p.liked; p.likes+=p.liked?1:-1;
   if(p.liked) state.youth.commCount++;
-  save(); renderHome();
+  save(); renderRoutineBanners();
 }
 
 // ════════════════════════════════════════════════════════
 // 청소년 루틴
 // ════════════════════════════════════════════════════════
-let searchOpen=false, currentFilterType='active';
+let searchOpen=false, currentFilterType='all';
 
 function renderRoutine() {
-  searchOpen=false; currentFilterType='active';
+  renderRoutineBanners();
+  searchOpen=false; currentFilterType='all';
   document.querySelectorAll('#routineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#routineFilterBar .chip').classList.add('active');
   const wrap = document.getElementById('searchBarWrap');
   if(wrap) wrap.style.display='none';
-  renderRoutineGrid('active','');
+  renderRoutineGrid('all','');
 }
 
 function filterRoutine(type, el) {
@@ -2186,12 +2142,10 @@ function renderRoutineGrid(type, q) {
 
   const hl=(text)=>q?text.replace(new RegExp(`(${q})`, 'gi'),'<mark style="background:#FFF176;border-radius:2px;padding:0 1px;">$1</mark>'):text;
 
-  // 참여중 루틴 항상 상단 고정
-  const sorted = [...filtered].sort((a,b) => {
-    if(a.status==='active' && b.status!=='active') return -1;
-    if(a.status!=='active' && b.status==='active') return 1;
-    return 0;
-  });
+  // 모집중 루틴, 그 다음 내가 참여 중인 루틴 순으로 상단 고정
+  const isMineActive = (r) => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  const _rank = (r) => r.status==='recruit' ? 0 : isMineActive(r) ? 1 : 2;
+  const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
@@ -2786,14 +2740,16 @@ async function submitApplyRoutine(){
 let currentCertId=null, certHasPhoto=false;
 function renderCert() { renderCertTab(); }
 function renderCertTab() {
+  renderRoutineBanners();
   const active=_myActiveRoutines();
   const el=document.getElementById('certRoutineList');
   if(!el) return;
   if(active.length===0){
-    el.innerHTML=`<div style="padding:52px 16px;text-align:center;">
-      <div style="font-size:32px;margin-bottom:10px;">📸</div>
-      <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">참여 중인 루틴이 없어요</div>
-      <div style="font-size:12px;color:#aaa;">루틴에 참여하면 여기서 인증할 수 있어요</div>
+    el.innerHTML=`<div style="margin:16px;padding:40px 20px;text-align:center;border:0.5px solid #eee;border-radius:16px;">
+      <div style="font-size:32px;margin-bottom:10px;">🧭</div>
+      <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:6px;">아직 참여 중인 루틴이 없어요</div>
+      <div style="font-size:13px;color:#888;margin-bottom:18px;">나에게 맞는 루틴을 찾아 첫 한끗을 시작해봐요</div>
+      <button onclick="goToRecruitRoutines()" style="padding:12px 24px;background:#2E33BC;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">루틴 둘러보기</button>
     </div>`;
     return;
   }
@@ -2812,6 +2768,10 @@ function renderCertTab() {
         ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
         :`<span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#2E33BC;color:#fff;flex-shrink:0;">인증하기</span>`}
     </div>`).join('');
+}
+function goToRecruitRoutines() {
+  switchTab('routine');
+  filterRoutine('recruit', document.getElementById('routineChipRecruit'));
 }
 function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title); }
 function openCertForm(id,title) {
@@ -3135,7 +3095,7 @@ async function submitCert() {
 }
 function closeCertSuccess() {
   document.getElementById('certSuccess').classList.remove('open');
-  if(state.currentRole === 'youth') { renderCert(); renderHome(); }
+  if(state.currentRole === 'youth') { renderCert(); }
   else { kRenderCertTab(); kRenderHome(); }
 }
 
@@ -3591,7 +3551,7 @@ async function saveProfile() {
   if(isYouth) p.schoolStatus=schoolStatus||null;
   save();
   closeSheet('editProfileBg');
-  if(isYouth) { renderMy(); renderHome(); }
+  if(isYouth) { renderMy(); renderRoutineBanners(); }
   else { kRenderMy(); kRenderHome(); }
 }
 
@@ -3808,7 +3768,7 @@ async function openReport() {
 // ════════════════════════════════════════════════════════
 function kSwitchTab(tab) {
   document.querySelectorAll('#kkutjjangTabs .tab-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('#kkutjjangNav .nav-item, #kkutjjangNav .nav-item-cert').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('#kkutjjangNav .nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('kpage-'+tab).classList.add('active');
   document.getElementById('knav-'+tab).classList.add('active');
   if(tab==='home') kRenderHome();
@@ -3955,7 +3915,7 @@ function kRenderRoutineTab() {
   document.getElementById('kCreateBtn').style.display = state.loginType==='both' ? '' : 'none';
   document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#kRoutineFilterBar .chip').classList.add('active');
-  kFilterRoutine('active',null);
+  kFilterRoutine('all',null);
 }
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
@@ -3963,10 +3923,10 @@ function kFilterRoutine(type,el) {
   // 홈/인증탭/통계와 동일하게 _kMyRoutines()(내 담당 루틴만)로 스코핑
   const base = type==='all' ? state.routines : _kMyRoutines();
   const filtered=type==='all'?base:base.filter(r=>r.status===type);
-  // 진행중 루틴 항상 상단 고정
+  // 모집중 루틴 항상 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
-    if(a.status==='active' && b.status!=='active') return -1;
-    if(a.status!=='active' && b.status==='active') return 1;
+    if(a.status==='recruit' && b.status!=='recruit') return -1;
+    if(a.status!=='recruit' && b.status==='recruit') return 1;
     return 0;
   });
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
@@ -4883,8 +4843,8 @@ window.addEventListener('popstate', () => {
     return;
   }
   const prevTab = [..._navStack].reverse().find(e=>e.type==='tab');
-  const targetTab = prevTab ? prevTab.tab : 'home';
   const targetIsK = prevTab ? prevTab.isK : entry.isK;
+  const targetTab = prevTab ? prevTab.tab : (targetIsK ? 'home' : 'routine');
   _poppingNav = true;
   if(targetIsK) kSwitchTab(targetTab); else switchTab(targetTab);
   _poppingNav = false;
