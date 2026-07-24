@@ -602,22 +602,20 @@ select:focus { outline: none; border-color: #2E33BC; }
           </div>
           <div id="verifyCard"></div>
           <input type="file" id="verifyDocInput" accept="image/*,.pdf" style="display:none;" onchange="handleVerifyDoc(event)">
-          <div style="background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-            <div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;min-width:0;background:linear-gradient(135deg,#2E33BC,#4B50D4);border-radius:16px;padding:14px 16px;">
               <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:2px;">내 나다움 포인트</div>
-              <div style="font-size:24px;font-weight:700;color:white;"><span class="nadaeum-val">0N</span></div>
+              <div style="font-size:24px;font-weight:700;color:white;margin-bottom:4px;"><span class="nadaeum-val">0N</span></div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.6);line-height:1.4;">인증 +10N · 댓글 +1N · 후기 +30N</div>
             </div>
-            <div style="text-align:right;">
-              <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">인증 +10N · 댓글 +1N<br>후기 +30N</div>
-            </div>
+            <button onclick="openShop()" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 20px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;"><span style="font-size:28px;line-height:1;">🎁</span>상점</button>
           </div>
           <div id="myExpiryBanner" style="display:none;background:#FFF3CD;border-radius:12px;padding:10px 14px;font-size:12px;color:#856404;line-height:1.5;"></div>
-          <button onclick="openShop()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;">🎁 상점 — 나다움으로 리워드 교환하기</button>
-          <div class="stats-grid-3" style="grid-template-columns:repeat(2,minmax(0,1fr));">
-            <div class="stat-card"><span style="font-size:18px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label">총 인증 수</span></div>
-            <div class="stat-card"><span style="font-size:18px;">🔥</span><span class="stat-val" id="myStreak">0</span><span class="stat-label">연속 인증</span></div>
-            <div class="stat-card"><span style="font-size:18px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label">소통 수</span></div>
-            <div class="stat-card"><span style="font-size:18px;">🏅</span><span class="stat-val" id="myCompleteCount">0</span><span class="stat-label">완주한 루틴</span></div>
+          <div class="stats-grid-3" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label" style="font-size:10px;">총 인증 수</span></div>
+            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">🔥</span><span class="stat-val" id="myStreak">0</span><span class="stat-label" style="font-size:10px;">연속 인증</span></div>
+            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label" style="font-size:10px;">소통 수</span></div>
+            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">🏅</span><span class="stat-val" id="myCompleteCount">0</span><span class="stat-label" style="font-size:10px;">완주한 루틴</span></div>
           </div>
           <div class="section-card">
             <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;">
