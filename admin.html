@@ -332,7 +332,11 @@
       <h3>수동 포인트 지급</h3>
       <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px;">이벤트 참여, 오프라인 활동 보상 등으로 특정 참가자에게 나다움 포인트를 직접 지급해요.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-        <select id="grantUser" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;"><option value="">청소년 선택</option></select>
+        <div style="position:relative;flex:2;min-width:180px;">
+          <input type="text" id="grantUserSearch" placeholder="닉네임·실명·휴대폰 검색" autocomplete="off" oninput="filterGrantUserOptions()" onfocus="filterGrantUserOptions()" onblur="setTimeout(hideGrantUserDropdown,150)" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;">
+          <input type="hidden" id="grantUser">
+          <div id="grantUserDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:220px;overflow-y:auto;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,0.12);"></div>
+        </div>
         <input type="number" id="grantAmount" placeholder="포인트 (음수 가능)" style="width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1117,7 +1121,7 @@ async function renderRewardView() {
   document.getElementById('kpiCirculating').textContent = (profRes.data || []).reduce((a, p) => a + (p.nadaeum || 0), 0).toLocaleString() + 'N';
   renderRewardList();
   renderRedemptionList();
-  populateGrantUserSelect();
+  resetGrantUserSearch();
 }
 
 function renderRewardList() {
@@ -1303,11 +1307,35 @@ async function fulfillRedemption(id) {
   await renderRewardView();
 }
 
-function populateGrantUserSelect() {
-  const sel = document.getElementById('grantUser');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">청소년 선택</option>' + youthRows.map(y => `<option value="${y.id}">${y.name}${y.realName ? ' (' + y.realName + ')' : ''}</option>`).join('');
-  sel.value = current;
+function resetGrantUserSearch() {
+  document.getElementById('grantUserSearch').value = '';
+  document.getElementById('grantUser').value = '';
+  hideGrantUserDropdown();
+}
+function filterGrantUserOptions() {
+  const q = document.getElementById('grantUserSearch').value.trim().toLowerCase();
+  const dd = document.getElementById('grantUserDropdown');
+  // 선택 후 그대로 둔 텍스트를 다시 눌렀을 때도 검색이 되도록, 선택값과 검색어가 같으면 빈 검색으로 취급
+  const matches = (q ? youthRows.filter(y =>
+    y.name.toLowerCase().includes(q) || y.realName.toLowerCase().includes(q) || y.phone.includes(q)
+  ) : youthRows).slice(0, 30);
+  if (!matches.length) {
+    dd.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:#aaa;">일치하는 청소년이 없어요</div>`;
+  } else {
+    dd.innerHTML = matches.map(y => `
+      <div onmousedown="selectGrantUser('${y.id}','${(y.name + (y.realName ? ' (' + y.realName + ')' : '')).replace(/'/g, "\\'")}')" style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f2f2f2;">
+        ${y.name}${y.realName ? ` <span style="color:#888;">(${y.realName})</span>` : ''}${y.phone ? `<span style="float:right;color:#aaa;font-size:11px;">${y.phone}</span>` : ''}
+      </div>`).join('');
+  }
+  dd.style.display = '';
+}
+function selectGrantUser(id, label) {
+  document.getElementById('grantUser').value = id;
+  document.getElementById('grantUserSearch').value = label;
+  hideGrantUserDropdown();
+}
+function hideGrantUserDropdown() {
+  document.getElementById('grantUserDropdown').style.display = 'none';
 }
 
 async function grantNadaeum() {
@@ -1329,6 +1357,7 @@ async function grantNadaeum() {
   resultEl.textContent = `지급 완료 — 현재 잔액 ${newBalance}N`;
   document.getElementById('grantAmount').value = '';
   document.getElementById('grantReason').value = '';
+  resetGrantUserSearch();
 }
 
 function renderYouthTable() {
