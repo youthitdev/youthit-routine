@@ -2218,7 +2218,7 @@ function renderRoutineGrid(type, q) {
     const coverInner = r.coverImageUrl
       ? `<img src="${r.coverImageUrl}" style="${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
       : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
-    return `<div class="routine-card" onclick="${isActive&&isMine?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
+    return `<div class="routine-card" onclick="${(isActive||isDone)&&isMine?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.8':'1'};">
       <div class="rc-cover">
         ${coverInner}
         <div class="rc-scrim"></div>
@@ -2330,8 +2330,25 @@ function openRoutineFeed(routineId) {
   // 역할 색상 헤더에 직접 적용
   const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
   document.querySelector('#routineFeedOverlay .overlay-hd').style.background = roleColor;
-  const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId&&isWithin24h(c.ts));
-  let html=certs.length===0
+  // 진행중이든 완료든 그 루틴의 전체 기간 누적 인증글을 다 보여줌(예전엔 최근 24시간만 보여서
+  // 완주한 루틴에 들어가면 거의 항상 텅 비어 보였음)
+  const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId);
+  const isDoneRoutine = r.status==='done';
+  const isMyDoneRoutine = isDoneRoutine && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
+  const completeActionsHtml = isDoneRoutine ? `
+    <div style="padding:16px 16px 8px;text-align:center;">
+      <div style="font-size:28px;margin-bottom:6px;">🏅</div>
+      <div style="font-size:13px;color:#888;margin-bottom:14px;">함께한 ${r.people}명, 수고했어요!</div>
+      ${daysSinceEnd<=7 ? `<div style="display:flex;gap:8px;">
+        <button onclick="closeOverlay('routineFeedOverlay');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:11px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
+        <button onclick="closeOverlay('routineFeedOverlay');openLetterOverlay(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="flex:1;padding:11px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
+        ${isMyDoneRoutine?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:11px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
+      </div>` : ''}
+    </div>
+    <div style="padding:4px 16px 0;font-size:13px;font-weight:600;color:#111;">📸 그동안의 인증 기록</div>
+  ` : '';
+  let html=completeActionsHtml + (certs.length===0
     ?`<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
     :`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:12px 16px 16px;">
         ${certs.map(c=>`
@@ -2359,10 +2376,10 @@ function openRoutineFeed(routineId) {
               </div>
             </div>
           </div>`).join('')}
-      </div>`;
+      </div>`);
   document.getElementById('feedOverlayBody').innerHTML=html;
   const myR=state.routines.find(x=>x.id===routineId);
-  const isMyRoutine = currentUser && (myR.participants||[]).some(p=>p.userId===currentUser.id);
+  const isMyRoutine = myR.status==='active' && currentUser && (myR.participants||[]).some(p=>p.userId===currentUser.id);
   document.getElementById('certFloatingBtn').style.display=isMyRoutine?'block':'none';
   document.getElementById('certFloatingAction').style.display=myR.todayCert?'none':'flex';
   document.getElementById('certFloatingDone').style.display=myR.todayCert?'block':'none';
@@ -3346,8 +3363,8 @@ function renderMy() {
     document.getElementById('completedSection').style.display='';
     document.getElementById('completedList').innerHTML=done.map(r=>{
       const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
-      const shareBtn = daysSinceEnd<=7 ? `<button onclick="openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
+      const shareBtn = daysSinceEnd<=7 ? `<button onclick="event.stopPropagation();openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
+      return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
     }).join('');
   }
   renderCal();
