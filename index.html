@@ -896,8 +896,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div id="certPhotoRequired" style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;margin-top:4px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 인증이 불가해요</div>
       </div>
       <div>
-        <div class="field-label">오늘 어땠어요? <span class="required">* 필수</span></div>
-        <textarea id="certMemo" rows="4" placeholder="오늘 루틴을 하면서 어땠는지 15자 이상 적어주세요." maxlength="200" oninput="updateCertCount()"></textarea>
+        <textarea id="certMemo" rows="4" placeholder="내용을 입력해 주세요." maxlength="200" oninput="updateCertCount()"></textarea>
         <div class="count-row">
           <span id="certCountHint" class="count-not">최소 15자 이상 작성해주세요</span>
           <span style="font-size:11px;color:#aaa;"><span id="certCharCount">0</span>/200</span>
@@ -919,7 +918,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
       <div id="rLeaderField" style="display:none;"><div class="field-label">담당 끗짱 <span class="required">* 필수</span></div><select id="rLeader"><option value="">담당 끗짱 선택</option></select></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">청소년 누구나</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">학교 밖 청소년</button></div></div>
-      <div><div class="field-label">기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
+      <div><div class="field-label">모집 마감일 <span class="required">* 필수</span></div><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"><div class="char-end" style="color:#bbb;">이 날짜까지만 참여 신청을 받아요</div></div>
+      <div><div class="field-label">진행 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">첫날 OT와 마지막날 클로징 모임 일시를 정해주세요.</div>
         <div class="date-row"><div class="date-item"><label>OT (첫날)</label><input type="datetime-local" id="rKickoff"></div><div class="date-item"><label>클로징 (마지막날)</label><input type="datetime-local" id="rClosing"></div></div>
@@ -1319,6 +1319,8 @@ function populateSigugunSelect(sidoId, sigugunId){
 var isRecoveryFlow = /type=recovery/.test(location.hash);
 // 공유된 루틴 링크(?routine=ID)로 들어온 경우 로그인 후 해당 루틴 상세를 바로 열기 위해 기억해둠
 var pendingRoutineId = (function(){ const m = location.search.match(/routine=(\d+)/); return m ? parseInt(m[1]) : null; })();
+// 푸시 알림 클릭(?tab=my 등)으로 들어온 경우 로그인 후 해당 탭으로 바로 이동하기 위해 기억해둠
+var pendingTab = (function(){ const m = location.search.match(/tab=(\w+)/); return m ? m[1] : null; })();
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
@@ -1376,7 +1378,10 @@ async function loadProfileAndEnter() {
     showCompleteProfile(profile);
     return;
   }
+  // 가입일이 데모 하드코딩 값(2024년)으로만 보이던 버그 — profiles.created_at(실제 가입 시각)에서 계산
+  const joinDateStr = profile.created_at ? profile.created_at.slice(0,10).replace(/-/g,'.') : '';
   state.youth.name = profile.name;
+  state.youth.joinDate = joinDateStr;
   state.youth.certCount = profile.cert_count || 0;
   state.youth.commCount = profile.comm_count || 0;
   state.youth.nadaeum = profile.nadaeum || 0;
@@ -1391,6 +1396,7 @@ async function loadProfileAndEnter() {
   state.youth.regionSigugun = profile.region_sigugun || '';
   state.youth.schoolStatus = profile.school_status || null;
   state.kkutjjang.name = profile.name;
+  state.kkutjjang.joinDate = joinDateStr;
   state.kkutjjang.status = profile.kkutjjang_status || 'none';
   state.kkutjjang.realName = profile.real_name || '';
   state.kkutjjang.birthDate = profile.birth_date || null;
@@ -1413,6 +1419,13 @@ async function loadProfileAndEnter() {
     const pid = pendingRoutineId; pendingRoutineId = null;
     history.replaceState(null, '', location.pathname);
     if (state.routines.some(r => r.id === pid)) openRoutineDetail(pid);
+  }
+  if (pendingTab) {
+    const pt = pendingTab; pendingTab = null;
+    history.replaceState(null, '', location.pathname);
+    const isYouth = state.currentRole === 'youth';
+    const validTabs = isYouth ? ['home','routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+    if (validTabs.includes(pt)) { isYouth ? switchTab(pt) : kSwitchTab(pt); }
   }
 }
 function showKkutjjangPending(status, reason) {
@@ -1721,6 +1734,7 @@ async function loadRoutines() {
       id: r.id, status: effectiveStatus, title: r.title, emoji: r.emoji || '🌱',
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
+      recruitEndDate: r.recruit_end_date || null,
       people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -2193,7 +2207,7 @@ function renderRoutineGrid(type, q) {
     const bb=isCancelled?'#f0f0f0':isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
     const bc=isCancelled?'#aaa':isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
     // D-day
-    const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
+    const dd = isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 오늘</span>`:'')
       : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">마지막 날</span>`:'');
@@ -2457,7 +2471,7 @@ function renderCertDetail(id) {
       </div>`;
   document.getElementById('rdBody').innerHTML = `
     ${photoHtml}
-    <div style="font-size:14px;color:#111;line-height:1.7;">${c.text}</div>
+    <div style="font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;">${c.text}</div>
     <div style="font-size:12px;color:#aaa;">${timeAgo(c.ts)}</div>
 
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;">
@@ -2482,7 +2496,7 @@ function renderCertDetail(id) {
               <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
               ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deleteCertComment(${c.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
             </div>
-            <div style="font-size:13px;color:#333;line-height:1.5;">${cm.text}</div>
+            <div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>
             <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
           </div>
         </div>`).join('')}
@@ -2581,7 +2595,7 @@ function openPostDetail(id) {
       ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${p.title}</div>
-    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;">${p.content}</div>
+    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;">${p.content}</div>
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:12px;">
       <div onclick="${likeFn}(${p.id})" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:22px;color:${p.liked?'#FF006C':'#ccc'};"></i>
@@ -2602,7 +2616,7 @@ function openPostDetail(id) {
               <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
               ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deletePostComment(${p.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
             </div>
-            <div style="font-size:13px;color:#333;line-height:1.5;">${cm.text}</div>
+            <div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>
             <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
           </div>
         </div>`).join('')}
@@ -2656,7 +2670,8 @@ function openRoutineDetail(id) {
   let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
-    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.period}</div>
+    ${r.status==='recruit'?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
+    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.status==='recruit'?'진행 '+r.period:r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">👤 ${r.people}/${r.maxPeople}</div>
     ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:13px;color:#2E33BC;background:#E6F1FB;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">🔗</div>`:''}
   </div>
@@ -3007,12 +3022,20 @@ async function refreshExpiryBanner() {
   const { data } = await sb.from('nadaeum_log').select('amount,created_at').eq('user_id', currentUser.id);
   renderExpiryBanners(data || []);
 }
+// 관리자가 등록한 리워드 이미지 URL이 만료·오타 등으로 깨져있으면 브라우저 기본
+// "깨진 이미지" 아이콘 대신 원래 폴백(🎁 아이콘)으로 바뀌게 함
+function _rewardImgFallback(imgEl) {
+  const div = document.createElement('div');
+  div.style.cssText = 'width:52px;height:52px;border-radius:10px;background:#f0f1fb;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;';
+  div.textContent = '🎁';
+  imgEl.replaceWith(div);
+}
 function renderShopRewards(rewards) {
   const myN = state.youth.nadaeum||0;
   document.getElementById('shopRewardList').innerHTML = rewards.length ? rewards.map(r => {
     const canAfford = myN >= r.cost && r.stock > 0;
     return `<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:1px solid #e8e8e8;border-radius:14px;">
-      ${r.image_url ? `<img src="${r.image_url}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;">` : `<div style="width:52px;height:52px;border-radius:10px;background:#f0f1fb;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎁</div>`}
+      ${r.image_url ? `<img src="${r.image_url}" onerror="_rewardImgFallback(this)" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;">` : `<div style="width:52px;height:52px;border-radius:10px;background:#f0f1fb;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎁</div>`}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#111;">${r.title}</div>
         ${r.description?`<div style="font-size:11px;color:#888;margin-top:2px;">${r.description}</div>`:''}
@@ -3133,7 +3156,10 @@ function _postCard(p, likeFn) {
       ${canDelete?`<i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
-    <div style="font-size:13px;color:#555;line-height:1.6;">${p.content}</div>
+    ${isNotice
+      ? `<div style="font-size:13px;color:#555;line-height:1.6;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${p.content}</div>
+         <div style="font-size:12px;color:#2E33BC;font-weight:600;margin-top:4px;">더보기</div>`
+      : `<div style="font-size:13px;color:#555;line-height:1.6;white-space:pre-wrap;">${p.content}</div>`}
     <div style="margin-top:12px;display:flex;gap:8px;">
       <span onclick="event.stopPropagation();${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
         <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
@@ -3223,8 +3249,9 @@ function openCommWriteWithRoutine(routineId, type) {
     }
     return;
   }
-  // 완료 루틴 목록 보여주기
-  const done = state.routines.filter(r=>r.status==='done');
+  // 완료 루틴 목록 보여주기 (참여 이력 없이도 org 전체 완료 루틴이 다 뜨던 버그 —
+  // 내가 실제 참여자인 루틴만 보이도록 필터)
+  const done = state.routines.filter(r=>r.status==='done' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
   if(done.length===0) {
     alert('아직 완료한 루틴이 없어요. 루틴을 완주한 후 후기를 남길 수 있어요!');
     return;
@@ -3942,7 +3969,7 @@ function kFilterRoutine(type,el) {
     const sl=isCancelled?'폐강':isActive?'진행 중':isRecruit?'모집 중':'완료';
     const bb=isCancelled?'#e0e0e0':isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
     const bc=isCancelled?'#aaa':isActive?'#fff':isRecruit?'#185FA5':'#aaa';
-    const dd = isRecruit ? _dday(r.startDate) : isActive ? _dday(r.endDate) : null;
+    const dd = isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
     const ddHtml = dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 오늘</span>`:'')
       : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">마지막 날</span>`:'');
@@ -4006,7 +4033,9 @@ async function sendPoke(routineId, toUserId, name) {
 }
 function openKRoutineDetail(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
-  document.getElementById('rdSub').textContent=r.period;
+  document.getElementById('rdSub').textContent = r.status==='recruit'
+    ? `모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')} · 진행 ${r.period}`
+    : r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   const applicants = r.applicants||[];
   const pending = applicants.filter(a=>a.status==='pending');
@@ -4142,7 +4171,7 @@ async function populateLeaderSelect(selectedId) {
   }
 }
 function resetCreateForm() {
-  ['rName','rPartner','rDesc','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
@@ -4175,6 +4204,7 @@ async function openEditRoutine(routineId) {
   selectedEmoji = r.emoji || '🌱';
   document.getElementById('rName').value = r.title || '';
   document.getElementById('rPartner').value = r.partnerOrg || '';
+  document.getElementById('rRecruitEnd').value = r.recruitEndDate || r.startDate || '';
   document.getElementById('rStart').value = r.startDate || '';
   document.getElementById('rEnd').value = r.endDate || '';
   document.getElementById('rPeople').value = r.maxPeople || 10;
@@ -4234,18 +4264,21 @@ function handleCreatePhoto(e){
 function _readCreateFormCommon(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
   const partner=document.getElementById('rPartner').value.trim();
+  const re=document.getElementById('rRecruitEnd').value;
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
   const mp=document.getElementById('rMinPeople').value;
   const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
   const meetLink=document.getElementById('rMeetingLink').value.trim();
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
-  return {n,d,partner,s,e,p,mp,kickoff,closing,meetLink,leader};
+  return {n,d,partner,re,s,e,p,mp,kickoff,closing,meetLink,leader};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
   if(state.loginType==='both'&&!f.leader) return '담당 끗짱을 선택해주세요.';
   if((f.kickoff||f.closing)&&!f.meetLink) return '온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.';
-  if(!f.s||!f.e||f.e<f.s) return '기간을 올바르게 설정해주세요.';
+  if(!f.re) return '모집 마감일을 입력해주세요.';
+  if(!f.s||!f.e||f.e<f.s) return '진행 기간을 올바르게 설정해주세요.';
+  if(f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
   if(f.mp && (parseInt(f.mp)<1 || parseInt(f.mp)>parseInt(f.p))) return '최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.';
   if(!f.d) return '루틴 소개를 입력해주세요.';
@@ -4271,7 +4304,7 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -4301,7 +4334,7 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;

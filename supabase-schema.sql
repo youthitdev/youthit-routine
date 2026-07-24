@@ -1610,3 +1610,37 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_guard_post_update ON posts;
 CREATE TRIGGER trg_guard_post_update BEFORE UPDATE ON posts
   FOR EACH ROW EXECUTE FUNCTION guard_post_update();
+
+-- =====================================================
+-- [마이그레이션 2026-07-24] 루틴 모집기간/진행기간 분리
+-- 지금까지는 start_date 하나가 "모집 마감일"(모집중일 때 D-day 기준)과
+-- "진행 시작일"(진행중일 때 D-day·기간 기준) 두 역할을 동시에 하고 있었음.
+-- recruit_end_date를 별도로 둬서 모집 마감과 실제 시작일 사이에 간격을
+-- 둘 수 있게 함(예: OT/준비 기간). 기존 루틴은 NULL로 남고, 클라이언트가
+-- 화면 표시 시 NULL이면 start_date로 폴백해서 기존 동작 그대로 유지.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS recruit_end_date date;
+
+-- =====================================================
+-- [마이그레이션 2026-07-24b] 알림 배너 클릭 시 MY탭으로 이동
+-- QA: 알림(승인·거절·배지·나다움 등 대부분 MY탭에서 확인하는 내용) 클릭해도
+-- 그냥 앱만 열리고 아무 데도 이동을 안 함 — notify_push()가 모든 알림에
+-- 항상 같은 루트 URL만 써서 그랬음. MY탭으로 가는 쿼리를 붙임(클라이언트가
+-- ?tab=my를 읽어서 로그인 후 자동으로 MY탭 전환, service-worker.js도 이미
+-- 열려있는 창을 새 URL로 navigate하도록 같이 수정함).
+-- =====================================================
+CREATE OR REPLACE FUNCTION notify_push(target_user uuid, push_title text, push_body text)
+RETURNS void AS $$
+DECLARE
+  sr_key text;
+BEGIN
+  INSERT INTO notifications(user_id, title, body) VALUES (target_user, push_title, push_body);
+  SELECT decrypted_secret INTO sr_key FROM vault.decrypted_secrets WHERE name = 'sr_key_for_push';
+  IF sr_key IS NULL THEN RETURN; END IF;
+  PERFORM net.http_post(
+    url := 'https://ynqvhsffoesjzefitafv.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || sr_key),
+    body := jsonb_build_object('user_id', target_user, 'title', push_title, 'body', push_body, 'url', '/youthit-routine/?tab=my')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

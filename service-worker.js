@@ -52,7 +52,11 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
-        if (c.url.includes('/youthit-routine') && 'focus' in c) return c.focus();
+        if (c.url.includes('/youthit-routine') && 'focus' in c) {
+          // 앱이 이미 열려있으면 focus만으로는 URL(예: ?tab=my)이 반영 안 되므로 navigate도 같이 시도
+          if ('navigate' in c) { return c.navigate(url).then(nc => (nc || c).focus()).catch(() => c.focus()); }
+          return c.focus();
+        }
       }
       return clients.openWindow(url);
     })
