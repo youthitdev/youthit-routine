@@ -918,7 +918,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
       <div id="rLeaderField" style="display:none;"><div class="field-label">담당 끗짱 <span class="required">* 필수</span></div><select id="rLeader"><option value="">담당 끗짱 선택</option></select></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">청소년 누구나</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">학교 밖 청소년</button></div></div>
-      <div><div class="field-label">모집 마감일 <span class="required">* 필수</span></div><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"><div class="char-end" style="color:#bbb;">이 날짜까지만 참여 신청을 받아요</div></div>
+      <div><div class="field-label">모집 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rRecruitStart" onchange="updateCreatePreview()"></div><div class="date-item"><label>마감일</label><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"></div></div><div class="char-end" style="color:#bbb;">이 기간에만 참여 신청을 받아요</div></div>
       <div><div class="field-label">진행 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">첫날 OT와 마지막날 클로징 모임 일시를 정해주세요.</div>
@@ -1734,7 +1734,7 @@ async function loadRoutines() {
       id: r.id, status: effectiveStatus, title: r.title, emoji: r.emoji || '🌱',
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
-      recruitEndDate: r.recruit_end_date || null,
+      recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
       people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -2681,6 +2681,9 @@ function openRoutineDetail(id) {
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
   const needsDoc = r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved';
+  const _today = new Date().toISOString().slice(0,10);
+  const beforeRecruitStart = r.recruitStartDate && _today < r.recruitStartDate;
+  const afterRecruitEnd = r.recruitEndDate && _today > r.recruitEndDate;
   const meetHtml = (r.kickoffAt||r.closingAt) ? `
     <div style="background:#f0f1fb;border-radius:12px;padding:12px 14px;margin-bottom:10px;">
       <div style="font-size:12px;font-weight:700;color:#2E33BC;margin-bottom:6px;">💻 온라인 모임 (줌 필수 참여)</div>
@@ -2704,6 +2707,10 @@ function openRoutineDetail(id) {
           ${rejectReason?`<div style="font-size:12px;color:#993556;line-height:1.5;white-space:pre-wrap;">사유: ${rejectReason}</div>`:''}
         </div>
         <button class="primary-btn" onclick="openApplyOverlay(${r.id})">다시 신청하기</button>`
+      : beforeRecruitStart
+      ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;">🗓 아직 모집 시작 전이에요<br>모집 시작일: ${r.recruitStartDate.slice(2).replace(/-/g,'.')}</div>`
+      : afterRecruitEnd
+      ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;">🗓 모집이 마감됐어요</div>`
       : `<button class="primary-btn" onclick="openApplyOverlay(${r.id})">참여 신청하기</button>`
     }`;
   else if(r.status==='cancelled') body+=`
@@ -2746,6 +2753,9 @@ async function submitApplyRoutine(){
     alert('학교밖청소년 확인서 승인 후 루틴에 참여할 수 있어요.\nMY 탭에서 서류를 제출해주세요.');
     return;
   }
+  const _today = new Date().toISOString().slice(0,10);
+  if(r && r.recruitStartDate && _today < r.recruitStartDate){ alert('아직 모집 시작 전이에요.'); return; }
+  if(r && r.recruitEndDate && _today > r.recruitEndDate){ alert('모집이 마감됐어요.'); return; }
   if((state.youth.pendingRoutines||[]).includes(id)) return;
   const btn=document.querySelector('#applyRoutineOverlay .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='신청 중...';}
@@ -4074,7 +4084,7 @@ function openKRoutineDetail(routineId) {
                   <button onclick="cancelApproval(${routineId},'${a.userId}')" style="padding:6px 10px;background:#fff;color:#c00;border:0.5px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">취소</button>`
                 :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
               </div>
-              ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;">💬 ${a.note}</div>`:''}
+              ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap;">💬 ${a.note}</div>`:''}
               ${a.status==='rejected'&&a.rejectReason?`<div style="margin-top:6px;padding:8px 10px;background:#FBEAF0;border-radius:8px;font-size:11px;color:#993556;line-height:1.5;white-space:pre-wrap;">거절 사유: ${a.rejectReason}</div>`:''}
             </div>`).join('')}
         </div>`}`;
@@ -4178,7 +4188,7 @@ async function populateLeaderSelect(selectedId) {
   }
 }
 function resetCreateForm() {
-  ['rName','rPartner','rDesc','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
+  ['rName','rPartner','rDesc','rRecruitStart','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
@@ -4211,6 +4221,7 @@ async function openEditRoutine(routineId) {
   selectedEmoji = r.emoji || '🌱';
   document.getElementById('rName').value = r.title || '';
   document.getElementById('rPartner').value = r.partnerOrg || '';
+  document.getElementById('rRecruitStart').value = r.recruitStartDate || '';
   document.getElementById('rRecruitEnd').value = r.recruitEndDate || r.startDate || '';
   document.getElementById('rStart').value = r.startDate || '';
   document.getElementById('rEnd').value = r.endDate || '';
@@ -4271,19 +4282,22 @@ function handleCreatePhoto(e){
 function _readCreateFormCommon(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
   const partner=document.getElementById('rPartner').value.trim();
+  const rs=document.getElementById('rRecruitStart').value;
   const re=document.getElementById('rRecruitEnd').value;
   const s=document.getElementById('rStart').value,e=document.getElementById('rEnd').value,p=document.getElementById('rPeople').value;
   const mp=document.getElementById('rMinPeople').value;
   const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
   const meetLink=document.getElementById('rMeetingLink').value.trim();
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
-  return {n,d,partner,re,s,e,p,mp,kickoff,closing,meetLink,leader};
+  return {n,d,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
   if(state.loginType==='both'&&!f.leader) return '담당 끗짱을 선택해주세요.';
   if((f.kickoff||f.closing)&&!f.meetLink) return '온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.';
+  if(!f.rs) return '모집 시작일을 입력해주세요.';
   if(!f.re) return '모집 마감일을 입력해주세요.';
+  if(f.re<f.rs) return '모집 마감일은 모집 시작일보다 빠를 수 없어요.';
   if(!f.s||!f.e||f.e<f.s) return '진행 기간을 올바르게 설정해주세요.';
   if(f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
@@ -4311,7 +4325,7 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_start_date:f.rs, recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -4341,7 +4355,7 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_start_date:f.rs, recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;

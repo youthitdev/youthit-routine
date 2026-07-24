@@ -1644,3 +1644,34 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-24c] 모집 시작일 추가 + 모집 기간 신청 차단
+-- 모집 마감일만 있고 모집 시작일이 없어서 "언제부터 신청받을지"가 없었음.
+-- recruit_start_date 신설하고, 신청 자체를 모집 기간(시작일~마감일) 밖에서는
+-- 서버에서 막음. 기존 루틴은 두 필드 다 NULL이라 이 검사를 건너뛰어(기존
+-- 동작 그대로 유지) 새로 만드는 루틴부터만 실제로 적용됨(폼에서 두 필드를
+-- 필수로 받기 시작했으므로).
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS recruit_start_date date;
+
+CREATE OR REPLACE FUNCTION guard_participant_apply() RETURNS TRIGGER AS $$
+DECLARE u_role text; u_verify text; r_elig text; r_start date; r_end date;
+BEGIN
+  SELECT role, verify_status INTO u_role, u_verify FROM profiles WHERE id = NEW.user_id;
+  IF u_role = 'kkutjjang' THEN
+    RAISE EXCEPTION '끗짱은 루틴에 참여 신청할 수 없어요';
+  END IF;
+  SELECT eligibility, recruit_start_date, recruit_end_date INTO r_elig, r_start, r_end FROM routines WHERE id = NEW.routine_id;
+  IF r_elig = 'out_of_school' AND COALESCE(u_verify,'none') <> 'approved' THEN
+    RAISE EXCEPTION '학교밖청소년 확인서 승인 후 신청할 수 있어요';
+  END IF;
+  IF r_start IS NOT NULL AND CURRENT_DATE < r_start THEN
+    RAISE EXCEPTION '아직 모집 시작 전이에요';
+  END IF;
+  IF r_end IS NOT NULL AND CURRENT_DATE > r_end THEN
+    RAISE EXCEPTION '모집이 마감됐어요';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
