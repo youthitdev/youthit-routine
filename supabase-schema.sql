@@ -1863,3 +1863,10 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25d] 후기 글 사진 첨부 (1장)
+-- 후기 작성 시 사진 1장을 선택적으로 첨부할 수 있게 함. 인증글과 동일한
+-- cert-photos 스토리지 버킷을 재사용(워터마크는 후기라 필요 없어 미적용).
+-- =====================================================
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS photo_url text;

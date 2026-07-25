@@ -1026,8 +1026,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="sheet-handle"></div>
       <div style="font-size:13px;color:#2E33BC;font-weight:500;margin-bottom:4px;" id="reviewWriteRoutineName"></div>
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">후기 남기기 ✍️</div>
-      <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="postTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="postContent" rows="4" placeholder="루틴을 하면서 어땠는지 솔직하게 적어주세요."></textarea></div>
+      <div style="margin-bottom:16px;"><div class="field-label">사진 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div class="photo-upload" id="reviewPhotoUpload" style="height:120px;" onclick="document.getElementById('reviewPhotoInput').click()"><i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div></div><input type="file" id="reviewPhotoInput" accept="image/*" style="display:none;" onchange="handleReviewPhoto(event)"></div>
       <button class="primary-btn" onclick="submitPost()">후기 게시하기</button>
     </div>
   </div>
@@ -1754,6 +1754,7 @@ async function loadPosts() {
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
     id: p.id, type: p.type || 'review', title: p.title, content: p.content,
+    routineId: p.routine_id ?? null, photoUrl: p.photo_url || null,
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
@@ -2543,7 +2544,8 @@ function openPostDetail(id) {
       ${canDelete?`<i class="ti ti-pencil" onclick="editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
       ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
-    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${p.title}</div>
+    <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${_postDisplayTitle(p)}</div>
+    ${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}
     <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;">${p.content}</div>
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:12px;">
       <div onclick="${likeFn}(${p.id})" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -3112,6 +3114,12 @@ function _canModerate(authorId) {
   if (ADMINS.includes(currentUser.email)) return true;
   return currentUser.id === authorId;
 }
+// 후기는 참여한 루틴의 후기만 쓸 수 있어서, 직접 입력받는 대신 루틴명으로 제목을 대신함
+function _postDisplayTitle(p) {
+  if (p.type !== 'review') return p.title;
+  const r = state.routines.find(x => x.id === p.routineId);
+  return r ? `${r.emoji} ${r.title} 후기` : '후기';
+}
 function _postCard(p, likeFn) {
   const isNotice=p.type==='notice';
   const canDelete=_canModerate(p.authorId);
@@ -3125,11 +3133,14 @@ function _postCard(p, likeFn) {
       ${canDelete?`<i class="ti ti-pencil" onclick="event.stopPropagation();editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
       ${canDelete?`<i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
-    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${p.title}</div>
-    ${isNotice
-      ? `<div style="font-size:13px;color:#555;line-height:1.6;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${p.content}</div>
-         <div style="font-size:12px;color:#2E33BC;font-weight:600;margin-top:4px;">더보기</div>`
-      : `<div style="font-size:13px;color:#555;line-height:1.6;white-space:pre-wrap;">${p.content}</div>`}
+    <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${_postDisplayTitle(p)}</div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;color:#555;line-height:1.6;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${p.content}</div>
+        <div style="font-size:12px;color:#2E33BC;font-weight:600;margin-top:4px;">더보기</div>
+      </div>
+      ${p.photoUrl?`<img src="${p.photoUrl}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;">`:''}
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
       <span onclick="event.stopPropagation();${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
         <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
@@ -3161,9 +3172,11 @@ function editPost(id) {
   if(!p) return;
   editingPostId = id;
   if(p.type==='review') {
-    document.getElementById('reviewWriteRoutineName').textContent = '';
-    document.getElementById('postTitle').value = p.title;
+    const r = state.routines.find(x=>x.id===p.routineId);
+    document.getElementById('reviewWriteRoutineName').textContent = r ? `${r.emoji} ${r.title}` : '';
     document.getElementById('postContent').value = p.content;
+    _resetReviewPhotoUpload();
+    if(p.photoUrl) { reviewExistingPhotoUrl = p.photoUrl; _showReviewPhotoPreview(p.photoUrl); }
     document.querySelector('#reviewWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('reviewWriteSheetBg');
   } else {
@@ -3202,6 +3215,27 @@ async function togglePostLike(id) {
   save(); renderComm(commFilter);
 }
 let currentReviewRoutineId = null;
+let reviewPhotoFile = null, reviewExistingPhotoUrl = null;
+function _resetReviewPhotoUpload() {
+  reviewPhotoFile = null; reviewExistingPhotoUrl = null;
+  const pu = document.getElementById('reviewPhotoUpload');
+  pu.className = 'photo-upload';
+  pu.innerHTML = `<i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div>`;
+  pu.onclick = () => document.getElementById('reviewPhotoInput').click();
+}
+function _showReviewPhotoPreview(url) {
+  const pu = document.getElementById('reviewPhotoUpload');
+  pu.className = 'photo-upload has-photo';
+  pu.innerHTML = `<img class="photo-prev-img" src="${url}"><div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.5);border-radius:20px;padding:3px 9px;font-size:11px;color:white;">변경</div>`;
+  pu.onclick = () => document.getElementById('reviewPhotoInput').click();
+}
+function handleReviewPhoto(e) {
+  const f = e.target.files[0]; if(!f) return;
+  reviewPhotoFile = f;
+  const r = new FileReader();
+  r.onload = ev => _showReviewPhotoPreview(ev.target.result);
+  r.readAsDataURL(f);
+}
 function openCommWriteWithRoutine(routineId, type) {
   // 완료 루틴 목록으로 글쓰기 시트 열기 (특정 루틴 선택된 상태로)
   if(routineId) {
@@ -3210,8 +3244,8 @@ function openCommWriteWithRoutine(routineId, type) {
       editingPostId = null;
       currentReviewRoutineId = routineId;
       document.getElementById('reviewWriteRoutineName').textContent = r.emoji+' '+r.title;
-      document.getElementById('postTitle').value='';
       document.getElementById('postContent').value='';
+      _resetReviewPhotoUpload();
       document.querySelector('#reviewWriteSheetBg .primary-btn').textContent = '후기 게시하기';
       openSheet('reviewWriteSheetBg');
     } else if(type==='letter') {
@@ -3239,28 +3273,38 @@ function openCommWriteWithRoutine(routineId, type) {
 }
 
 async function submitPost() {
-  const t=document.getElementById('postTitle').value.trim();
   const c=document.getElementById('postContent').value.trim();
-  if(!t||!c){alert('제목과 내용을 입력해주세요.');return;}
+  if(!c){alert('내용을 입력해주세요.');return;}
   if(!currentUser){alert('로그인이 필요해요.');return;}
+  const btn=document.querySelector('#reviewWriteSheetBg .primary-btn');
+  if(btn){btn.disabled=true;}
+  let photoUrl = reviewExistingPhotoUrl;
+  if(reviewPhotoFile) {
+    const ext=(reviewPhotoFile.name.split('.').pop()||'jpg').toLowerCase();
+    const path=`${currentUser.id}/review_${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('cert-photos').upload(path, reviewPhotoFile, { contentType: reviewPhotoFile.type });
+    if(upErr){ alert('사진 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;} return; }
+    photoUrl = sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
+  }
   if(editingPostId) {
-    const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
-    if(error){ alert('수정 실패: '+error.message); return; }
+    const { error } = await sb.from('posts').update({ content:c, photo_url:photoUrl }).eq('id', editingPostId);
+    if(error){ if(btn){btn.disabled=false;} alert('수정 실패: '+error.message); return; }
     editingPostId = null;
   } else {
     const { error } = await sb.from('posts').insert({
-      type:'review', title:t, content:c, author_id:currentUser.id,
+      type:'review', content:c, author_id:currentUser.id, photo_url:photoUrl,
       routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
     });
-    if(error){ alert('게시 실패: '+error.message); return; }
+    if(error){ if(btn){btn.disabled=false;} alert('게시 실패: '+error.message); return; }
     earnNadaeum('review');
   }
+  if(btn){btn.disabled=false;}
   currentReviewRoutineId=null;
+  reviewPhotoFile=null; reviewExistingPhotoUrl=null;
   save();
   await loadPosts();
   closeSheet('writeSheetBg');
   closeSheet('reviewWriteSheetBg');
-  document.getElementById('postTitle').value='';
   document.getElementById('postContent').value='';
   renderComm(commFilter);
 }
@@ -4596,7 +4640,7 @@ function kRenderMy() {
             <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${p.type==='notice'?'#FFF0D4':'#EAF3DE'};color:${p.type==='notice'?'#B8600B':'#3B6D11'};">${p.type==='notice'?'공지':'후기'}</span>
             <span style="font-size:11px;color:#aaa;">${p.date}</span>
           </div>
-          <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:2px;">${p.title}</div>
+          <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:2px;">${_postDisplayTitle(p)}</div>
           <div style="font-size:12px;color:#888;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">${p.content}</div>
           <div style="font-size:11px;color:#aaa;margin-top:4px;">❤️ ${p.likes}</div>
         </div>`).join('')
