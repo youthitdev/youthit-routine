@@ -891,8 +891,9 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">파트너 기관명 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><input type="text" id="rPartner" placeholder="예) OO청소년센터" maxlength="30" oninput="updateCreatePreview()"><div class="char-end" style="color:#bbb;">함께하는 기관이 있다면 적어주세요</div></div>
       <div id="rLeaderField" style="display:none;"><div class="field-label">담당 끗짱 <span class="required">* 필수</span></div><select id="rLeader"><option value="">담당 끗짱 선택</option></select></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">청소년 누구나</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">학교 밖 청소년</button></div></div>
-      <div><div class="field-label">모집 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rRecruitStart" onchange="updateCreatePreview()"></div><div class="date-item"><label>마감일</label><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"></div></div><div class="char-end" style="color:#bbb;">이 기간에만 참여 신청을 받아요</div></div>
-      <div><div class="field-label">진행 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
+      <div><div class="field-label">루틴 타입 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rTypeFixed" onclick="selectRoutineType('fixed')">고정기간</button><button type="button" class="role-btn" id="rTypeFree" onclick="selectRoutineType('free')">자유루틴 (상시모집)</button></div><div class="char-end" style="color:#bbb;" id="rTypeHint">모집 기간이 정해진 일반 루틴이에요</div></div>
+      <div id="rRecruitFieldWrap"><div class="field-label">모집 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rRecruitStart" onchange="updateCreatePreview()"></div><div class="date-item"><label>마감일</label><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"></div></div><div class="char-end" style="color:#bbb;">이 기간에만 참여 신청을 받아요</div></div>
+      <div><div class="field-label">진행 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div><div class="char-end" id="rFreeDurationHint" style="display:none;color:#bbb;">자유루틴은 이 고정 기간 동안 누구나 신청할 수 있어요</div></div>
       <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">첫날 OT와 마지막날 클로징 모임 일시를 정해주세요.</div>
         <div class="date-row"><div class="date-item"><label>OT (첫날)</label><input type="datetime-local" id="rKickoff"></div><div class="date-item"><label>클로징 (마지막날)</label><input type="datetime-local" id="rClosing"></div></div>
@@ -900,6 +901,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       </div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
+      <div id="rRatioFieldWrap"><div class="field-label">완주 인정 비율 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 67%</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rRatio" min="1" max="100" value="67" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">% 이상 인증하면 완주로 인정, 나다움 포인트 지급 기준이에요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 예시 사진 <span class="required" id="createPhotoRequiredMark">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;" id="createPhotoLockHint"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
       <div><div class="field-label">미리보기</div><div class="preview-rcard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:22px;" id="pvEmoji">🌱</span><span style="font-size:15px;font-weight:600;color:white;" id="pvName">루틴 이름을 입력해주세요</span></div><div id="pvPartner" style="display:none;font-size:11px;color:rgba(255,255,255,0.9);margin-bottom:6px;"></div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;" id="pvDesc">루틴 소개를 입력하면 여기에 표시돼요.</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;" id="pvPeriod">기간 미설정</span><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;"><span id="pvPeople">10</span>명 모집</span></div></div></div>
@@ -1001,7 +1003,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:0.5px solid #f0f0f0;font-size:13px;color:#111;">🌳 레벨 3 · 나무<span style="color:#888;">루틴 6개</span></div>
         <div style="display:flex;justify-content:space-between;padding:12px 16px;font-size:13px;color:#111;">🌲 레벨 4 · 숲<span style="color:#888;">루틴 10개+</span></div>
       </div>
-      <div style="background:#f5f5f7;border-radius:12px;padding:14px;"><div style="font-size:13px;font-weight:500;color:#111;margin-bottom:4px;">완주율 기준</div><div style="font-size:12px;color:#888;line-height:1.6;">인증 목표의 2/3 이상 달성 시 완주예요.<br>예) 21일 루틴 → 14일 이상 인증</div></div>
+      <div style="background:#f5f5f7;border-radius:12px;padding:14px;"><div style="font-size:13px;font-weight:500;color:#111;margin-bottom:4px;">완주율 기준</div><div style="font-size:12px;color:#888;line-height:1.6;">루틴마다 설정된 완주 인정 비율(기본 67%) 이상 인증하면 완주예요.<br>예) 67% · 21일 루틴 → 14일 이상 인증. 자유루틴은 완주 기준이 없어요.</div></div>
       <button class="primary-btn" onclick="alert('카카오톡 채널로 이동해요!')">카카오톡 채널 문의</button>
     </div>
   </div>
@@ -1699,7 +1701,8 @@ async function loadRoutines() {
     const certOf = uid => rCerts.filter(c => c.user_id === uid).length;
     const doneToday = uid => rCerts.some(c => c.user_id === uid && (c.created_at || '').slice(0, 10) === today);
     // 종료일이 지난 진행중 루틴은 완주로 간주 (날짜 기반 자동 전환)
-    const effectiveStatus = (r.status === 'active' && r.end_date && r.end_date < today) ? 'done' : r.status;
+    // 자유루틴은 첫 승인 전까지 status가 'recruit'로 남아있을 수 있어 그 경우도 함께 체크
+    const effectiveStatus = ((r.status === 'active') || (r.is_free && r.status === 'recruit')) && r.end_date && r.end_date < today ? 'done' : r.status;
     if (effectiveStatus !== r.status && currentUser && (isAdmin || r.created_by === currentUser.id || r.led_by === currentUser.id)) {
       sb.from('routines').update({ status: effectiveStatus }).eq('id', r.id).then(() => {});
     }
@@ -1708,6 +1711,7 @@ async function loadRoutines() {
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
+      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67,
       people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -2106,6 +2110,7 @@ function renderRoutineGrid(type, q) {
   // '참여 중'(active) 필터는 상태만이 아니라 "내가 참여자인" 루틴만 — 홈의 참여 중 목록과 기준 통일
   const base = type==='all' ? state.routines
     : type==='active' ? state.routines.filter(r=>r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id))
+    : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : state.routines.filter(r=>r.status===type);
   let filtered = base;
   if(q) {
@@ -2126,23 +2131,26 @@ function renderRoutineGrid(type, q) {
 
   // 모집중 루틴, 그 다음 내가 참여 중인 루틴 순으로 상단 고정
   const isMineActive = (r) => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-  const _rank = (r) => r.status==='recruit' ? 0 : isMineActive(r) ? 1 : 2;
+  const _rank = (r) => (r.status==='recruit' || _isFreeOpen(r)) ? 0 : isMineActive(r) ? 1 : 2;
   const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
     const isRejectedApp=!isPending && Object.prototype.hasOwnProperty.call(state.youth.rejectedRoutines||{}, r.id);
     const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+    const isOpenFree=_isFreeOpen(r);
     const cardBg=isDone||isCancelled?'#fafafa':'#fff';
     const cardBorder=isDone||isCancelled?'#e8e8e8':(isActive&&isMine)?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
     const bw=(isActive&&isMine)||isPending||isRejectedApp?'1.5px':'0.5px';
     const tc=isDone||isCancelled?'#aaa':'#111';
-    const sl=isCancelled?'폐강':isActive?(isMine?'참여 중':'진행 중'):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':'모집 중'):'완주';
+    const sl=isCancelled?'폐강':isActive?(isMine?'참여 중':(isOpenFree?'상시 모집':'진행 중')):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':(isOpenFree?'상시 모집':'모집 중')):'완주';
     const bb=isCancelled?'#f0f0f0':isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
     const bc=isCancelled?'#aaa':isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
-    // D-day
-    const dd = isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
-    const ddHtml = dd===null ? '' : isRecruit
+    // D-day (자유루틴이 아직 열려있으면 D-day 대신 "상시 모집" 표시)
+    const dd = isOpenFree ? null : isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
+    const ddHtml = isOpenFree
+      ? `<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">상시 모집</span>`
+      : dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;flex-shrink:0;">모집마감 오늘</span>`:'')
       : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;flex-shrink:0;">마지막 날</span>`:'');
     // 하단 정보줄
@@ -2242,6 +2250,11 @@ function _dday(dateStr) {
   if(!dateStr) return null;
   const t=new Date(); t.setHours(0,0,0,0);
   return Math.round((new Date(dateStr+'T00:00:00') - t) / 86400000);
+}
+// 자유루틴은 첫 승인으로 status가 active가 돼도 종료일 전까지는 계속 "모집중"으로 취급
+function _isFreeOpen(r) {
+  return !!r.isFree && !['done','cancelled'].includes(r.status)
+    && (!r.endDate || new Date().toISOString().slice(0,10) <= r.endDate);
 }
 
 function toggleSearch() {
@@ -2599,13 +2612,14 @@ async function deletePostComment(postId, commentId) {
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
+  const isOpenFree=_isFreeOpen(r);
   document.getElementById('rdSub').textContent=r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
-    ${r.status==='recruit'?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
-    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${r.status==='recruit'?'진행 '+r.period:r.period}</div>
+    ${isOpenFree?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 상시 모집</div>`:r.status==='recruit'?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
+    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${(r.status==='recruit'||isOpenFree)?'진행 '+r.period:r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">👤 ${r.people}/${r.maxPeople}</div>
     ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:13px;color:#2E33BC;background:#E6F1FB;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">🔗</div>`:''}
   </div>
@@ -2624,7 +2638,7 @@ function openRoutineDetail(id) {
       ${r.kickoffAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🚀 OT ${_fmtDT(r.kickoffAt)}</span><a href="${_gcalLink(r.title+' OT',r.kickoffAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
       ${r.closingAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🎉 클로징 ${_fmtDT(r.closingAt)}</span><a href="${_gcalLink(r.title+' 클로징',r.closingAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
     </div>`:'';
-  if(r.status==='recruit') body+=`
+  if(r.status==='recruit' || isOpenFree) body+=`
     ${meetHtml}
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
       <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
@@ -3891,30 +3905,34 @@ function kFilterRoutine(type,el) {
   // "전체"만 둘러보기 용도로 전체 루틴을 보여줌(다른 끗짱 담당분 포함) — 진행중/모집중/완료는
   // 홈/인증탭/통계와 동일하게 _kMyRoutines()(내 담당 루틴만)로 스코핑
   const base = type==='all' ? state.routines : _kMyRoutines();
-  const filtered=type==='all'?base:base.filter(r=>r.status===type);
-  // 모집중 루틴 항상 상단 고정
+  const filtered = type==='all' ? base
+    : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
+    : base.filter(r=>r.status===type);
+  // 모집중(자유루틴은 상시 열려있는 동안 포함) 루틴 항상 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
-    if(a.status==='recruit' && b.status!=='recruit') return -1;
-    if(a.status!=='recruit' && b.status==='recruit') return 1;
-    return 0;
+    const ra=(a.status==='recruit'||_isFreeOpen(a))?0:1, rb=(b.status==='recruit'||_isFreeOpen(b))?0:1;
+    return ra-rb;
   });
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
+    const isOpenFree=_isFreeOpen(r);
     const cardBg=isDone||isCancelled?'#f0f0f0':'#fff';
     const cardBorder=isDone||isCancelled?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
     const bw=isActive?'1.5px':'0.5px';
-    const sl=isCancelled?'폐강':isActive?'진행 중':isRecruit?'모집 중':'완료';
+    const sl=isCancelled?'폐강':isActive?(isOpenFree?'상시 모집':'진행 중'):isRecruit?(isOpenFree?'상시 모집':'모집 중'):'완료';
     const bb=isCancelled?'#e0e0e0':isActive?'#2E33BC':isRecruit?'#E6F1FB':'#e0e0e0';
     const bc=isCancelled?'#aaa':isActive?'#fff':isRecruit?'#185FA5':'#aaa';
-    const dd = isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
-    const ddHtml = dd===null ? '' : isRecruit
+    const dd = isOpenFree ? null : isRecruit ? _dday(r.recruitEndDate||r.startDate) : isActive ? _dday(r.endDate) : null;
+    const ddHtml = isOpenFree
+      ? `<span style="font-size:10px;font-weight:700;color:#FF006C;">상시 모집</span>`
+      : dd===null ? '' : isRecruit
       ? (dd>0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#FF006C;">모집마감 오늘</span>`:'')
       : (dd>0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">종료 D-${dd}</span>`:dd===0?`<span style="font-size:10px;font-weight:700;color:#2E33BC;">마지막 날</span>`:'');
     const coverInner = r.coverImageUrl
       ? `<img src="${r.coverImageUrl}" style="${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
       : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${isDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
     const pending=(r.applicants||[]).filter(a=>a.status==='pending').length;
-    return `<div class="routine-card" onclick="${isActive?`openKRoutineFeed(${r.id})`:`openKRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
+    return `<div class="routine-card" onclick="${isActive&&!isOpenFree?`openKRoutineFeed(${r.id})`:`openKRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${isDone?'0.75':'1'};">
       <div class="rc-cover">
         ${coverInner}
         <div class="rc-scrim"></div>
@@ -3938,17 +3956,23 @@ function kFilterRoutine(type,el) {
 }
 function openKRoutineFeed(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
-  const certGoal=Math.floor(21*2/3);
+  let totalDays=21;
+  if(r.startDate && r.endDate){
+    const s=new Date(r.startDate+'T00:00:00'), e=new Date(r.endDate+'T00:00:00');
+    if(!isNaN(s) && !isNaN(e) && e>=s) totalDays=Math.round((e-s)/86400000)+1;
+  }
+  const ratio=r.completionRatioPct||67;
+  const certGoal=Math.max(1, Math.floor(totalDays*ratio/100));
   const achievers=r.participants.filter(p=>p.cert>=certGoal).length;
   const rate=r.participants.length?Math.round(achievers/r.participants.length*100):0;
   const colors=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
   document.getElementById('rdSub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   document.getElementById('rdBody').innerHTML=`
-    <div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (목표의 2/3 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
+    ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (목표의 ${ratio}% 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
-    </div>
+    </div>`}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">전체 인증글</div>
     <div class="feed-grid">
       ${r.participants.map((p,i)=>p.todayDone
@@ -3970,7 +3994,10 @@ async function sendPoke(routineId, toUserId, name) {
 }
 function openKRoutineDetail(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
-  document.getElementById('rdSub').textContent = r.status==='recruit'
+  const isOpenFree=_isFreeOpen(r);
+  document.getElementById('rdSub').textContent = isOpenFree
+    ? `상시 모집 · 진행 ${r.period}`
+    : r.status==='recruit'
     ? `모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')} · 진행 ${r.period}`
     : r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
@@ -4085,12 +4112,24 @@ function openKCertDetail(rid,name) {
 
 // 루틴 만들기
 const EMOJIS=['🌱','🌿','🌳','🌞','🏃','📚','💧','🍳','🎵','✍️','🧘','🚶'];
-let selectedEmoji='🌱', createHasPhoto=false, createEligibility='all';
+let selectedEmoji='🌱', createHasPhoto=false, createEligibility='all', createRoutineType='fixed';
 let editRoutineId=null, editExistingCoverUrl=null;
 function selectEligibility(v){
   createEligibility=v;
   document.getElementById('rEligAll').classList.toggle('active', v==='all');
   document.getElementById('rEligOos').classList.toggle('active', v==='out_of_school');
+}
+function selectRoutineType(v){
+  createRoutineType=v;
+  const isFree=v==='free';
+  document.getElementById('rTypeFixed').classList.toggle('active', !isFree);
+  document.getElementById('rTypeFree').classList.toggle('active', isFree);
+  document.getElementById('rRecruitFieldWrap').style.display = isFree?'none':'';
+  document.getElementById('rRatioFieldWrap').style.display = isFree?'none':'';
+  document.getElementById('rFreeDurationHint').style.display = isFree?'':'none';
+  document.getElementById('rTypeHint').textContent = isFree
+    ? '모집이 상시로 열려있어요. 포인트는 지급되지 않아요.'
+    : '모집 기간이 정해진 일반 루틴이에요';
 }
 async function populateLeaderSelect(selectedId) {
   const leaderField=document.getElementById('rLeaderField');
@@ -4117,10 +4156,12 @@ async function populateLeaderSelect(selectedId) {
 function resetCreateForm() {
   ['rName','rPartner','rDesc','rRecruitStart','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
+  document.getElementById('rRatio').value=67;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
   createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱'; editRoutineId=null; editExistingCoverUrl=null;
   selectEligibility('all');
+  selectRoutineType('fixed');
   const pu=document.getElementById('createPhotoUpload');
   pu.className='photo-upload';
   pu.innerHTML=`<i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;" id="createPhotoLockHint"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div>`;
@@ -4158,7 +4199,9 @@ async function openEditRoutine(routineId) {
   document.getElementById('rKickoff').value = r.kickoffAt ? r.kickoffAt.slice(0,16) : '';
   document.getElementById('rClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
   document.getElementById('rMeetingLink').value = r.meetingLink || '';
+  document.getElementById('rRatio').value = r.completionRatioPct || 67;
   selectEligibility(r.eligibility || 'all');
+  selectRoutineType(r.isFree ? 'free' : 'fixed');
   document.getElementById('nameCount').textContent = (r.title||'').length;
   document.getElementById('descCount').textContent = (r.desc||'').length;
   updateDuration();
@@ -4216,19 +4259,24 @@ function _readCreateFormCommon(){
   const kickoff=document.getElementById('rKickoff').value, closing=document.getElementById('rClosing').value;
   const meetLink=document.getElementById('rMeetingLink').value.trim();
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
-  return {n,d,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader};
+  const isFree=createRoutineType==='free';
+  const ratio=document.getElementById('rRatio').value;
+  return {n,d,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
   if(state.loginType==='both'&&!f.leader) return '담당 끗짱을 선택해주세요.';
   if((f.kickoff||f.closing)&&!f.meetLink) return '온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.';
-  if(!f.rs) return '모집 시작일을 입력해주세요.';
-  if(!f.re) return '모집 마감일을 입력해주세요.';
-  if(f.re<f.rs) return '모집 마감일은 모집 시작일보다 빠를 수 없어요.';
+  if(!f.isFree){
+    if(!f.rs) return '모집 시작일을 입력해주세요.';
+    if(!f.re) return '모집 마감일을 입력해주세요.';
+    if(f.re<f.rs) return '모집 마감일은 모집 시작일보다 빠를 수 없어요.';
+  }
   if(!f.s||!f.e||f.e<f.s) return '진행 기간을 올바르게 설정해주세요.';
-  if(f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
+  if(!f.isFree && f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
   if(f.mp && (parseInt(f.mp)<1 || parseInt(f.mp)>parseInt(f.p))) return '최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.';
+  if(!f.isFree && (!f.ratio || f.ratio<1 || f.ratio>100)) return '완주 인정 비율은 1~100 사이로 입력해주세요.';
   if(!f.d) return '루틴 소개를 입력해주세요.';
   return null;
 }
@@ -4252,7 +4300,8 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    recruit_start_date:f.rs, recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio),
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -4282,7 +4331,8 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    recruit_start_date:f.rs, recruit_end_date:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio),
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.s, end_date:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;
@@ -4665,7 +4715,7 @@ function openKReportCard(routineId) {
     const s = new Date(r.startDate+'T00:00:00'), e = new Date(r.endDate+'T00:00:00');
     if (!isNaN(s) && !isNaN(e) && e >= s) totalDays = Math.round((e - s) / 86400000) + 1;
   }
-  const certGoal = Math.max(1, Math.floor(totalDays*2/3));
+  const certGoal = Math.max(1, Math.floor(totalDays*(r.completionRatioPct||67)/100));
   const achievers = parts.filter(p=>p.cert>=certGoal).length;
   document.getElementById('reportCardPreview').innerHTML = _kReportCardHtml(r, {
     people: parts.length,

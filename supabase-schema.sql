@@ -1675,3 +1675,95 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25] 자유루틴(상시 모집) + 루틴별 완주 인정 비율
+-- 포인트 없이 누구나 상시로 참여할 수 있는 "자유루틴" 타입 추가(is_free).
+-- 모집은 상시로 열려있지만 진행기간(start_date~end_date)은 여전히 고정
+-- 캘린더 구간 — 첫 승인으로 status가 active로 바뀌어도 계속 신청받아야
+-- 하므로, 신청 차단은 status(done/cancelled)와 진행 종료일 기준으로 재구성.
+-- 완주 인정 비율(기존 전역 2/3 하드코딩)도 루틴마다 설정 가능하게 함
+-- (completion_ratio_pct, 기본 67 = 기존 2/3와 동일 → 기존 루틴 동작 그대로).
+-- 자유루틴은 이 비율을 아예 안 읽고 나다움 지급 자체를 스킵함.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS is_free boolean NOT NULL DEFAULT false;
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS completion_ratio_pct int NOT NULL DEFAULT 67
+  CHECK (completion_ratio_pct BETWEEN 1 AND 100);
+
+CREATE OR REPLACE FUNCTION on_cert_nadaeum_payout()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_start date;
+  r_end date;
+  r_title text;
+  r_is_free boolean;
+  r_ratio int;
+  day_count int;
+  cert_goal int;
+  paid boolean;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  SELECT start_date, end_date, title, is_free, completion_ratio_pct
+    INTO r_start, r_end, r_title, r_is_free, r_ratio FROM routines WHERE id = NEW.routine_id;
+
+  IF r_is_free THEN
+    RETURN NEW; -- 자유루틴은 나다움 지급 대상이 아님
+  END IF;
+
+  day_count := GREATEST(1, COALESCE((r_end - r_start), 20) + 1);
+  cert_goal := GREATEST(1, FLOOR(day_count * r_ratio / 100.0)::int);
+
+  SELECT nadaeum_paid INTO paid FROM routine_participants WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+
+  IF paid THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 10 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 10, '루틴 인증 (완주 후 추가 인증)');
+  ELSIF cnt >= cert_goal THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + (cnt * 10) WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, cnt * 10, '루틴 완주 기준 달성 (인증 ' || cnt || '회 적립분 일괄 지급)');
+    UPDATE routine_participants SET nadaeum_paid = true WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 완주 기준 달성!',
+      '"' || coalesce(r_title, '루틴') || '"에서 나다움 ' || (cnt * 10) || 'N이 지급됐어요. 상점에서 리워드로 교환해보세요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION guard_participant_apply() RETURNS TRIGGER AS $$
+DECLARE
+  u_role text; u_verify text; r_elig text; r_start date; r_end date;
+  r_is_free boolean; r_status text; r_end_date date;
+BEGIN
+  SELECT role, verify_status INTO u_role, u_verify FROM profiles WHERE id = NEW.user_id;
+  IF u_role = 'kkutjjang' THEN
+    RAISE EXCEPTION '끗짱은 루틴에 참여 신청할 수 없어요';
+  END IF;
+  SELECT eligibility, recruit_start_date, recruit_end_date, is_free, status, end_date
+    INTO r_elig, r_start, r_end, r_is_free, r_status, r_end_date FROM routines WHERE id = NEW.routine_id;
+  IF r_elig = 'out_of_school' AND COALESCE(u_verify,'none') <> 'approved' THEN
+    RAISE EXCEPTION '학교밖청소년 확인서 승인 후 신청할 수 있어요';
+  END IF;
+  IF r_is_free THEN
+    IF r_status IN ('done','cancelled') THEN
+      RAISE EXCEPTION '이 루틴은 더 이상 신청할 수 없어요';
+    END IF;
+    IF r_end_date IS NOT NULL AND CURRENT_DATE > r_end_date THEN
+      RAISE EXCEPTION '모집이 마감됐어요';
+    END IF;
+  ELSE
+    IF r_start IS NOT NULL AND CURRENT_DATE < r_start THEN
+      RAISE EXCEPTION '아직 모집 시작 전이에요';
+    END IF;
+    IF r_end IS NOT NULL AND CURRENT_DATE > r_end THEN
+      RAISE EXCEPTION '모집이 마감됐어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -150,8 +150,12 @@
           <option value="all">참여 대상: 청소년 누구나</option>
           <option value="out_of_school">참여 대상: 학교 밖 청소년</option>
         </select>
+        <select id="rtType" onchange="_rtToggleFreeFields()" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <option value="fixed">루틴 타입: 고정기간</option>
+          <option value="free">루틴 타입: 자유루틴(상시모집)</option>
+        </select>
       </div>
-      <div style="margin-bottom:8px;">
+      <div id="rtRecruitFieldWrap" style="margin-bottom:8px;">
         <div style="font-size:11px;color:#888;margin-bottom:4px;">모집 기간 <span style="color:#c00;">*</span> — 이 기간에만 참여 신청을 받아요</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <input type="date" id="rtRecruitStart" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
@@ -159,7 +163,7 @@
         </div>
       </div>
       <div style="margin-bottom:8px;">
-        <div style="font-size:11px;color:#888;margin-bottom:4px;">진행 기간 <span style="color:#c00;">*</span></div>
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">진행 기간 <span style="color:#c00;">*</span> <span id="rtFreeDurationHint" style="display:none;color:#993556;">— 자유루틴은 이 고정 기간 동안 누구나 상시 신청할 수 있어요</span></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <input type="date" id="rtStart" onchange="_rtUpdateDuration()" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
           <input type="date" id="rtEnd" onchange="_rtUpdateDuration()" style="flex:1;min-width:150px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
@@ -169,6 +173,10 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <input type="number" id="rtMaxPeople" min="1" max="50" value="10" placeholder="최대 인원" style="width:120px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <input type="number" id="rtMinPeople" min="1" max="50" placeholder="최소 인원 (선택, 미달 시 폐강 가능)" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div id="rtRatioFieldWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input type="number" id="rtRatio" min="1" max="100" value="67" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <span style="font-size:11px;color:#888;">% 이상 인증하면 완주 인정 (나다움 포인트 지급 기준, 기본 67%)</span>
       </div>
       <div style="margin-bottom:8px;">
         <div style="font-size:11px;color:#888;margin-bottom:4px;">온라인 모임 (줌, 선택) — 첫날 OT·마지막날 클로징</div>
@@ -511,6 +519,7 @@ async function loadData() {
     partnerOrg: r.partner_org || null, eligibility: r.eligibility || 'all',
     recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
     kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
+    isFree: !!r.is_free, completionRatio: r.completion_ratio_pct || 67,
   }));
 
   youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
@@ -633,7 +642,7 @@ function renderRoutineTable() {
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
       <td>${r.title}</td>
-      <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':r.status==='cancelled'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='cancelled'?'#aaa':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span></td>
+      <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':r.status==='cancelled'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='cancelled'?'#aaa':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span>${r.isFree?` <span class="pill" style="background:#FBEAF0;color:#993556;">자유루틴</span>`:''}</td>
       <td>${r.startDate} ~ ${r.endDate}</td>
       <td>${r.people}/${r.maxPeople}${r.minPeople?` (최소 ${r.minPeople})`:''}</td>
       <td>${r.leaderName}</td>
@@ -684,6 +693,12 @@ function _rtUpdateDuration() {
   const hint = document.getElementById('rtDurationHint');
   hint.textContent = (s && e && e >= s) ? `총 ${Math.round((new Date(e) - new Date(s)) / 86400000) + 1}일 루틴` : '';
 }
+function _rtToggleFreeFields() {
+  const isFree = document.getElementById('rtType').value === 'free';
+  document.getElementById('rtRecruitFieldWrap').style.display = isFree ? 'none' : '';
+  document.getElementById('rtRatioFieldWrap').style.display = isFree ? 'none' : '';
+  document.getElementById('rtFreeDurationHint').style.display = isFree ? '' : 'none';
+}
 
 function populateRtLeaderSelect(selectedId) {
   const sel = document.getElementById('rtLeader');
@@ -698,6 +713,9 @@ function resetRoutineForm() {
   ['rtName','rtPartner','rtRecruitStart','rtRecruitEnd','rtStart','rtEnd','rtKickoff','rtClosing','rtMeetingLink','rtMinPeople','rtDesc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('rtMaxPeople').value = 10;
   document.getElementById('rtEligibility').value = 'all';
+  document.getElementById('rtType').value = 'fixed';
+  document.getElementById('rtRatio').value = 67;
+  _rtToggleFreeFields();
   document.getElementById('rtDurationHint').textContent = '';
   document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
   document.getElementById('rtPhotoInput').value = '';
@@ -743,6 +761,9 @@ function editRoutineAdmin(id) {
   document.getElementById('rtMeetingLink').value = r.meetingLink || '';
   document.getElementById('rtDesc').value = r.description || '';
   document.getElementById('rtEligibility').value = r.eligibility || 'all';
+  document.getElementById('rtType').value = r.isFree ? 'free' : 'fixed';
+  document.getElementById('rtRatio').value = r.completionRatio || 67;
+  _rtToggleFreeFields();
   if (rtCoverUrl) { document.getElementById('rtPhotoPreview').src = rtCoverUrl; document.getElementById('rtPhotoPreviewWrap').style.display = ''; }
   else document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
   _rtUpdateDuration();
@@ -762,24 +783,29 @@ async function submitRoutineAdmin() {
   const partner = document.getElementById('rtPartner').value.trim();
   const leader = document.getElementById('rtLeader').value;
   const eligibility = document.getElementById('rtEligibility').value;
+  const isFree = document.getElementById('rtType').value === 'free';
   const recruitStart = document.getElementById('rtRecruitStart').value;
   const recruitEnd = document.getElementById('rtRecruitEnd').value;
   const start = document.getElementById('rtStart').value;
   const end = document.getElementById('rtEnd').value;
   const maxPeople = document.getElementById('rtMaxPeople').value;
   const minPeople = document.getElementById('rtMinPeople').value;
+  const ratio = document.getElementById('rtRatio').value;
   const kickoff = document.getElementById('rtKickoff').value;
   const closing = document.getElementById('rtClosing').value;
   const meetingLink = document.getElementById('rtMeetingLink').value.trim();
 
   if (!title) { alert('루틴 이름을 입력해주세요.'); return; }
   if (!leader) { alert('담당 끗짱을 선택해주세요.'); return; }
-  if (!recruitStart || !recruitEnd) { alert('모집 기간을 입력해주세요.'); return; }
-  if (recruitEnd < recruitStart) { alert('모집 마감일은 모집 시작일보다 빠를 수 없어요.'); return; }
+  if (!isFree) {
+    if (!recruitStart || !recruitEnd) { alert('모집 기간을 입력해주세요.'); return; }
+    if (recruitEnd < recruitStart) { alert('모집 마감일은 모집 시작일보다 빠를 수 없어요.'); return; }
+  }
   if (!start || !end || end < start) { alert('진행 기간을 올바르게 설정해주세요.'); return; }
-  if (recruitEnd > start) { alert('모집 마감일은 진행 시작일보다 늦을 수 없어요.'); return; }
+  if (!isFree && recruitEnd > start) { alert('모집 마감일은 진행 시작일보다 늦을 수 없어요.'); return; }
   if (!maxPeople || maxPeople < 1) { alert('최대 참여 인원을 입력해주세요.'); return; }
   if (minPeople && (parseInt(minPeople) < 1 || parseInt(minPeople) > parseInt(maxPeople))) { alert('최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.'); return; }
+  if (!isFree && (!ratio || ratio < 1 || ratio > 100)) { alert('완주 인정 비율은 1~100 사이로 입력해주세요.'); return; }
   if ((kickoff || closing) && !meetingLink) { alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.'); return; }
   if (!desc) { alert('루틴 소개를 입력해주세요.'); return; }
   if (!rtCoverUrl) { alert('인증 예시 사진을 추가해주세요.'); return; }
@@ -790,7 +816,8 @@ async function submitRoutineAdmin() {
     kickoff_at: kickoff ? new Date(kickoff).toISOString() : null,
     closing_at: closing ? new Date(closing).toISOString() : null,
     meeting_link: meetingLink || null,
-    recruit_start_date: recruitStart, recruit_end_date: recruitEnd,
+    is_free: isFree, completion_ratio_pct: isFree ? 67 : parseInt(ratio),
+    recruit_start_date: isFree ? null : recruitStart, recruit_end_date: isFree ? null : recruitEnd,
     start_date: start, end_date: end,
     max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,
     cover_image_url: rtCoverUrl,
@@ -822,9 +849,9 @@ function computeRoutineCompletion() {
     const key = c.routine_id + '_' + c.user_id;
     certByRoutineUser[key] = (certByRoutineUser[key] || 0) + 1;
   });
-  return routineRows.filter(r => !r.archived && (r.status === 'active' || r.status === 'done')).map(r => {
+  return routineRows.filter(r => !r.archived && !r.isFree && (r.status === 'active' || r.status === 'done')).map(r => {
     const approvedUserIds = rawParticipants.filter(p => p.routine_id === r.id && p.status === 'approved').map(p => p.user_id);
-    const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
+    const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * (r.completionRatio || 67) / 100));
     const achievers = approvedUserIds.filter(uid => (certByRoutineUser[r.id + '_' + uid] || 0) >= certGoal).length;
     const rate = approvedUserIds.length ? Math.round(achievers / approvedUserIds.length * 100) : 0;
     return { id: r.id, title: r.title, status: r.status, period: `${r.startDate || '-'} ~ ${r.endDate || '-'}`, approvedCount: approvedUserIds.length, achievers, rate };
@@ -1001,13 +1028,13 @@ function _monitoringSection(id) {
     certCountBy[c.user_id] = (certCountBy[c.user_id] || 0) + 1;
   });
 
-  const goal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * 2 / 3));
-  const headers = ['닉네임', '실명', ...dates.map(d => d.slice(5)), '총 인증 수', `완주기준(${goal}회)`, '완주'];
+  const goal = r.isFree ? null : Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * (r.completionRatio || 67) / 100));
+  const headers = ['닉네임', '실명', ...dates.map(d => d.slice(5)), '총 인증 수', r.isFree ? '완주기준(자유루틴)' : `완주기준(${goal}회)`, '완주'];
   const lines = members.map(m => {
     const prof = profileById[m.user_id] || { name: '(알 수 없음)', realName: '' };
     const days = certDaysBy[m.user_id] || new Set();
     const total = certCountBy[m.user_id] || 0;
-    return [prof.name, prof.realName, ...dates.map(d => days.has(d) ? '✓' : ''), total, goal, total >= goal ? 'O' : ''];
+    return [prof.name, prof.realName, ...dates.map(d => days.has(d) ? '✓' : ''), total, r.isFree ? '-' : goal, r.isFree ? '-' : (total >= goal ? 'O' : '')];
   });
   return [[`[${r.title}] ${r.startDate || '-'} ~ ${r.endDate || '-'}`], headers, ...lines];
 }
