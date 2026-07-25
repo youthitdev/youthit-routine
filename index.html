@@ -1684,7 +1684,11 @@ function _personalPeriod(r, p) {
   if (!r || !r.isFree) return { startDate: r?.startDate||null, endDate: r?.endDate||null, isDone: r?.status==='done' };
   if (!p || !p.approvedAt) return { startDate: null, endDate: null, isDone: false };
   const start = p.approvedAt.slice(0,10);
-  const end = new Date(new Date(start+'T00:00:00').getTime() + (p.durationDays-1)*86400000).toISOString().slice(0,10);
+  // setDate로 로컬 날짜 필드를 직접 연산 — ms 덧셈 후 toISOString()으로 뽑으면
+  // UTC+9 등 타임존에서 하루 밀리는 버그가 있어서(실기기 검증 중 발견) 이렇게 피함
+  const endD = new Date(start+'T00:00:00');
+  endD.setDate(endD.getDate() + (p.durationDays - 1));
+  const end = `${endD.getFullYear()}-${String(endD.getMonth()+1).padStart(2,'0')}-${String(endD.getDate()).padStart(2,'0')}`;
   const today = new Date().toISOString().slice(0,10);
   return { startDate: start, endDate: end, isDone: today > end };
 }
