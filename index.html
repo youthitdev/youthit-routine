@@ -1071,8 +1071,8 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">프로필 편집</div>
-      <div style="margin-bottom:14px;"><div class="field-label">닉네임 <span class="required">* 필수</span></div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10"></div>
-      <div style="margin-bottom:14px;"><div class="field-label">이름(실명) <span class="required">* 필수</span></div><input type="text" id="editRealName" placeholder="이름(실명)"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">닉네임은 변경할 수 없어요</div></div>
+      <div style="margin-bottom:14px;"><div class="field-label">이름(실명)</div><input type="text" id="editRealName" placeholder="이름(실명)" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">실명은 변경할 수 없어요</div></div>
       <div style="margin-bottom:14px;"><div class="field-label">생년월일</div><input type="date" id="editBirth"></div>
       <div style="margin-bottom:14px;"><div class="field-label">휴대폰번호</div><input type="tel" id="editPhone" placeholder="휴대폰번호 ('-' 없이 입력)"></div>
       <div style="margin-bottom:14px;"><div class="field-label">지역</div><div style="display:flex;gap:6px;">
@@ -3635,21 +3635,17 @@ async function saveReminderHour() {
   if (error) alert('리마인드 설정 저장 실패: ' + error.message);
 }
 async function saveProfile() {
-  const n=document.getElementById('editNickname').value.trim();
-  const realName=document.getElementById('editRealName').value.trim();
   const birth=document.getElementById('editBirth').value;
   const phone=document.getElementById('editPhone').value.trim();
   const sido=document.getElementById('editSido').value;
   const sigugun=document.getElementById('editSigugun').value;
   const isYouth = state.currentRole==='youth';
   const schoolStatus = isYouth ? document.getElementById('editSchoolStatus').value : null;
-  if(!n){alert('닉네임을 입력해주세요.');return;}
-  if(!realName){alert('이름(실명)을 입력해주세요.');return;}
   if(!currentUser){alert('로그인이 필요해요.');return;}
   const btn=document.querySelector('#editProfileBg .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   const payload = {
-    name:n, real_name:realName, birth_date: birth||null, phone: phone||null,
+    birth_date: birth||null, phone: phone||null,
     region_sido: sido||null, region_sigugun: sigugun||null,
   };
   if(isYouth) payload.school_status = schoolStatus||null;
@@ -3657,7 +3653,7 @@ async function saveProfile() {
   if(btn){btn.disabled=false;btn.textContent='저장하기';}
   if(error){alert('저장 실패: '+error.message);return;}
   const p = _profileState();
-  p.name=n; p.realName=realName; p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||'';
+  p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||'';
   if(isYouth) p.schoolStatus=schoolStatus||null;
   save();
   closeSheet('editProfileBg');
