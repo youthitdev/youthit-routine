@@ -1870,3 +1870,47 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- cert-photos 스토리지 버킷을 재사용(워터마크는 후기라 필요 없어 미적용).
 -- =====================================================
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS photo_url text;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25f] 자유루틴 개인별 참여기간(5/15/30/66/100일)
+-- 자유루틴의 진행기간을 담당 끗짱이 정하는 공유 캘린더 구간에서, 참여자
+-- 각자가 신청할 때 고르는 개인 기간으로 변경. routines.start_date/end_date는
+-- 자유루틴에서 더 이상 안 씀(null로 저장) — 대신 참여자별 duration_days +
+-- 승인 시점(approved_at)으로 개인 시작/종료일을 계산함.
+-- =====================================================
+ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS duration_days int
+  CHECK (duration_days IS NULL OR duration_days IN (5,15,30,66,100));
+ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS approved_at timestamptz;
+
+CREATE OR REPLACE FUNCTION guard_participant_apply() RETURNS TRIGGER AS $$
+DECLARE
+  u_role text; u_verify text; r_elig text; r_start date; r_end date;
+  r_is_free boolean; r_status text;
+BEGIN
+  SELECT role, verify_status INTO u_role, u_verify FROM profiles WHERE id = NEW.user_id;
+  IF u_role = 'kkutjjang' THEN
+    RAISE EXCEPTION '끗짱은 루틴에 참여 신청할 수 없어요';
+  END IF;
+  SELECT eligibility, recruit_start_date, recruit_end_date, is_free, status
+    INTO r_elig, r_start, r_end, r_is_free, r_status FROM routines WHERE id = NEW.routine_id;
+  IF r_elig = 'out_of_school' AND COALESCE(u_verify,'none') <> 'approved' THEN
+    RAISE EXCEPTION '학교밖청소년 확인서 승인 후 신청할 수 있어요';
+  END IF;
+  IF r_is_free THEN
+    IF r_status IN ('done','cancelled') THEN
+      RAISE EXCEPTION '이 루틴은 더 이상 신청할 수 없어요';
+    END IF;
+    IF NEW.duration_days IS NULL OR NEW.duration_days NOT IN (5,15,30,66,100) THEN
+      RAISE EXCEPTION '참여 기간을 선택해주세요';
+    END IF;
+  ELSE
+    IF r_start IS NOT NULL AND CURRENT_DATE < r_start THEN
+      RAISE EXCEPTION '아직 모집 시작 전이에요';
+    END IF;
+    IF r_end IS NOT NULL AND CURRENT_DATE > r_end THEN
+      RAISE EXCEPTION '모집이 마감됐어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
