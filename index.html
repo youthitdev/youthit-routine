@@ -1073,12 +1073,15 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">프로필 편집</div>
       <div style="margin-bottom:14px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">닉네임은 변경할 수 없어요</div></div>
       <div style="margin-bottom:14px;"><div class="field-label">이름(실명)</div><input type="text" id="editRealName" placeholder="이름(실명)" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">실명은 변경할 수 없어요</div></div>
-      <div style="margin-bottom:14px;"><div class="field-label">생년월일</div><input type="date" id="editBirth"></div>
-      <div style="margin-bottom:14px;"><div class="field-label">휴대폰번호</div><input type="tel" id="editPhone" placeholder="휴대폰번호 ('-' 없이 입력)"></div>
+      <div style="margin-bottom:14px;" class="date-row">
+        <div class="date-item"><label>생년월일</label><input type="date" id="editBirth"></div>
+        <div class="date-item"><label>휴대폰번호</label><input type="tel" id="editPhone" placeholder="'-' 없이 입력"></div>
+      </div>
       <div style="margin-bottom:14px;"><div class="field-label">지역</div><div style="display:flex;gap:6px;">
         <select id="editSido" style="flex:1;" onfocus="populateSidoSelect('editSido')" onchange="populateSigugunSelect('editSido','editSigugun')"><option value="">시/도 선택</option></select>
         <select id="editSigugun" style="flex:1;"><option value="">시/군/구 선택</option></select>
       </div></div>
+      <div style="margin-bottom:14px;"><div class="field-label">소속</div><input type="text" id="editAffiliation" placeholder="없음" maxlength="30"></div>
       <div id="editYouthExtra" style="margin-bottom:14px;"><div class="field-label">재학 상태</div>
         <select id="editSchoolStatus">
           <option value="">재학 상태 선택</option>
@@ -1383,6 +1386,7 @@ async function loadProfileAndEnter() {
   state.youth.regionSido = profile.region_sido || '';
   state.youth.regionSigugun = profile.region_sigugun || '';
   state.youth.schoolStatus = profile.school_status || null;
+  state.youth.affiliation = profile.affiliation || '';
   state.kkutjjang.name = profile.name;
   state.kkutjjang.joinDate = joinDateStr;
   state.kkutjjang.status = profile.kkutjjang_status || 'none';
@@ -1391,6 +1395,7 @@ async function loadProfileAndEnter() {
   state.kkutjjang.phone = profile.phone || '';
   state.kkutjjang.regionSido = profile.region_sido || '';
   state.kkutjjang.regionSigugun = profile.region_sigugun || '';
+  state.kkutjjang.affiliation = profile.affiliation || '';
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
   persistState();
@@ -1751,6 +1756,7 @@ async function loadRoutines() {
         cert: certOf(p.user_id), todayDone: doneToday(p.user_id),
         day: _dayLabel(r.is_free ? (p.approved_at ? p.approved_at.slice(0,10) : null) : r.start_date),
         durationDays: p.duration_days || null, approvedAt: p.approved_at || null,
+        celebratedAt: p.celebrated_at || null,
       })),
       applicants: rParts.map(p => ({
         userId: p.user_id, name: nameById[p.user_id] || '익명',
@@ -3469,7 +3475,8 @@ function renderMy() {
     document.getElementById('completedList').innerHTML=done.map(r=>{
       const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
       const shareBtn = daysSinceEnd<=7 ? `<button onclick="event.stopPropagation();openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
-      return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
+      const celebrateBtn = `<button onclick="event.stopPropagation();openCompleteSuccess(${r.id})" style="padding:5px 10px;background:#FFFBE6;color:#B8860B;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">🎉 다시보기</button>`;
+      return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${celebrateBtn}${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
     }).join('');
   }
   renderCal();
@@ -3579,6 +3586,7 @@ function openEditProfile() {
   document.getElementById('editSido').value = p.regionSido || '';
   populateSigugunSelect('editSido','editSigugun');
   document.getElementById('editSigugun').value = p.regionSigugun || '';
+  document.getElementById('editAffiliation').value = p.affiliation || '';
   document.getElementById('editYouthExtra').style.display = isYouth ? '' : 'none';
   document.getElementById('editSchoolStatus').value = isYouth ? (p.schoolStatus || '') : '';
   openSheet('editProfileBg');
@@ -3639,6 +3647,7 @@ async function saveProfile() {
   const phone=document.getElementById('editPhone').value.trim();
   const sido=document.getElementById('editSido').value;
   const sigugun=document.getElementById('editSigugun').value;
+  const affiliation=document.getElementById('editAffiliation').value.trim();
   const isYouth = state.currentRole==='youth';
   const schoolStatus = isYouth ? document.getElementById('editSchoolStatus').value : null;
   if(!currentUser){alert('로그인이 필요해요.');return;}
@@ -3647,13 +3656,14 @@ async function saveProfile() {
   const payload = {
     birth_date: birth||null, phone: phone||null,
     region_sido: sido||null, region_sigugun: sigugun||null,
+    affiliation: affiliation||null,
   };
   if(isYouth) payload.school_status = schoolStatus||null;
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if(btn){btn.disabled=false;btn.textContent='저장하기';}
   if(error){alert('저장 실패: '+error.message);return;}
   const p = _profileState();
-  p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||'';
+  p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||''; p.affiliation=affiliation||'';
   if(isYouth) p.schoolStatus=schoolStatus||null;
   save();
   closeSheet('editProfileBg');
@@ -4768,12 +4778,20 @@ function closeCompleteSuccess() {
   document.getElementById('confettiWrap').innerHTML='';
 }
 // 루틴이 done으로 전환된 걸 감지해서 완주 축하 화면을 한 번만 자동으로 띄움
+// "이미 축하함" 여부는 서버(routine_participants.celebrated_at)에 기록 — localStorage에만
+// 의존하면 브라우저 저장소가 지워지거나 다른 기기로 접속할 때 같은 루틴에 대해
+// 반복 노출되는 문제가 있었음(기기/브라우저와 무관하게 한 번만 뜨도록 함)
 function _maybeCelebrateCompletion() {
   if (!currentUser || state.currentRole !== 'youth') return;
-  const target = _myCompletedRoutines().find(r =>
-    !localStorage.getItem('hankkut_celebrated_' + currentUser.id + '_' + r.id));
+  const target = _myCompletedRoutines().find(r => {
+    const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
+    return me && !me.celebratedAt;
+  });
   if (!target) return;
-  localStorage.setItem('hankkut_celebrated_' + currentUser.id + '_' + target.id, '1');
+  const me = (target.participants||[]).find(p=>p.userId===currentUser.id);
+  me.celebratedAt = new Date().toISOString(); // 같은 세션에서 재호출돼도 중복 노출 안 되게 즉시 반영
+  sb.from('routine_participants').update({ celebrated_at: me.celebratedAt })
+    .eq('routine_id', target.id).eq('user_id', currentUser.id).then(()=>{});
   openCompleteSuccess(target.id);
 }
 function spawnConfetti() {

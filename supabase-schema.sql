@@ -1923,3 +1923,21 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 그대로 재사용, 별도 RLS 변경 불필요.
 -- =====================================================
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25h] 완주 축하화면 중복 노출 버그 수정 (DB 기반 플래그로 전환)
+-- 기존엔 localStorage로만 "이미 축하함"을 기록해서, 브라우저 저장소가 지워지거나
+-- 다른 기기/브라우저로 접속하면 같은 루틴에 대해 축하화면이 반복 노출되는 문제가
+-- 있었음. routine_participants.celebrated_at으로 서버에 기록해 기기/브라우저와
+-- 무관하게 한 번만 뜨도록 함. 본인 행이라 기존 rp_update 정책(auth.uid()=user_id)
+-- 그대로 재사용, 별도 RLS 변경 불필요.
+-- =====================================================
+ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS celebrated_at timestamptz;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25i] 프로필에 "소속" 필드 추가
+-- 청소년(센터/학교 등)·끗짱(회사 등) 공용 자유텍스트 소속 필드. 선택 입력이라
+-- 없으면 null로 저장, 편집 화면에서는 빈 칸에 "없음"을 placeholder로 안내.
+-- 별도 RLS 변경 불필요 — 기존 profiles_update(auth.uid()=id) 그대로 적용됨.
+-- =====================================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS affiliation text;
