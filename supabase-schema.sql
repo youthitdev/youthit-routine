@@ -1767,3 +1767,43 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25b] 비로그인 전체 조회 차단 (보안 긴급 수정)
+-- profiles/routines/routine_participants/certifications/cert_likes/cert_comments/
+-- posts/post_likes/post_comments의 SELECT 정책이 전부 USING (true)라
+-- 로그인 여부와 무관하게 anon key만으로 전체 조회가 가능했음 — profiles엔
+-- real_name/birth_date/phone/region_sido·sigugun/verify_doc_url까지 있고
+-- certifications/cert_comments 등엔 인증 사진·소감 같은 콘텐츠가 있어서
+-- 미성년자 개인정보·활동기록이 사실상 공개돼있던 상태.
+-- 로그인한 사용자(auth.uid() 존재)만 조회 가능하도록 최소 수정 — 앱은 항상
+-- 로그인 후에만 이 테이블들을 조회하므로 기존 기능엔 영향 없음.
+-- rewards(리워드 카탈로그)는 민감정보 없어서 그대로 공개 유지.
+-- (후기 공개 노출 기능은 이 위에 "공개 허용된 후기만" 별도 정책을 얹어 처리 예정)
+-- =====================================================
+DROP POLICY IF EXISTS "profiles_select" ON profiles;
+CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "routines_select" ON routines;
+CREATE POLICY "routines_select" ON routines FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "rp_select" ON routine_participants;
+CREATE POLICY "rp_select" ON routine_participants FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "cert_select" ON certifications;
+CREATE POLICY "cert_select" ON certifications FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "cl_select" ON cert_likes;
+CREATE POLICY "cl_select" ON cert_likes FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "cc_select" ON cert_comments;
+CREATE POLICY "cc_select" ON cert_comments FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "posts_select" ON posts;
+CREATE POLICY "posts_select" ON posts FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "pl_select" ON post_likes;
+CREATE POLICY "pl_select" ON post_likes FOR SELECT USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "pc_select" ON post_comments;
+CREATE POLICY "pc_select" ON post_comments FOR SELECT USING (auth.uid() IS NOT NULL);
