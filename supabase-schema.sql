@@ -1807,3 +1807,59 @@ CREATE POLICY "pl_select" ON post_likes FOR SELECT USING (auth.uid() IS NOT NULL
 
 DROP POLICY IF EXISTS "pc_select" ON post_comments;
 CREATE POLICY "pc_select" ON post_comments FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- =====================================================
+-- [마이그레이션 2026-07-25c] 루틴별 인증 지급 포인트 설정
+-- 인증 1회당 지급되는 나다움(기존 전역 10 하드코딩)을 루틴마다 다르게
+-- 설정 가능하게 함(cert_point_amount, 기본 10 = 기존과 동일 결과).
+-- 댓글(+1)/후기(+30)는 특정 루틴에 안 묶이는 케이스가 있어(공지 댓글 등)
+-- 이번 범위에서 제외, 전역 고정 유지. 자유루틴은 여전히 지급 대상 아님.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS cert_point_amount int NOT NULL DEFAULT 10
+  CHECK (cert_point_amount BETWEEN 1 AND 1000);
+
+CREATE OR REPLACE FUNCTION on_cert_nadaeum_payout()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_start date;
+  r_end date;
+  r_title text;
+  r_is_free boolean;
+  r_ratio int;
+  r_point int;
+  day_count int;
+  cert_goal int;
+  paid boolean;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  SELECT start_date, end_date, title, is_free, completion_ratio_pct, cert_point_amount
+    INTO r_start, r_end, r_title, r_is_free, r_ratio, r_point FROM routines WHERE id = NEW.routine_id;
+
+  IF r_is_free THEN
+    RETURN NEW; -- 자유루틴은 나다움 지급 대상이 아님
+  END IF;
+
+  day_count := GREATEST(1, COALESCE((r_end - r_start), 20) + 1);
+  cert_goal := GREATEST(1, FLOOR(day_count * r_ratio / 100.0)::int);
+
+  SELECT nadaeum_paid INTO paid FROM routine_participants WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+
+  IF paid THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + r_point WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, r_point, '루틴 인증 (완주 후 추가 인증)');
+  ELSIF cnt >= cert_goal THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + (cnt * r_point) WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, cnt * r_point, '루틴 완주 기준 달성 (인증 ' || cnt || '회 적립분 일괄 지급)');
+    UPDATE routine_participants SET nadaeum_paid = true WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 완주 기준 달성!',
+      '"' || coalesce(r_title, '루틴') || '"에서 나다움 ' || (cnt * r_point) || 'N이 지급됐어요. 상점에서 리워드로 교환해보세요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

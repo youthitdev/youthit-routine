@@ -178,6 +178,10 @@
         <input type="number" id="rtRatio" min="1" max="100" value="67" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <span style="font-size:11px;color:#888;">% 이상 인증하면 완주 인정 (나다움 포인트 지급 기준, 기본 67%)</span>
       </div>
+      <div id="rtPointFieldWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input type="number" id="rtPointAmount" min="1" max="1000" value="10" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <span style="font-size:11px;color:#888;">N — 인증 1회당 지급되는 나다움 포인트 (기본 10N)</span>
+      </div>
       <div style="margin-bottom:8px;">
         <div style="font-size:11px;color:#888;margin-bottom:4px;">온라인 모임 (줌, 선택) — 첫날 OT·마지막날 클로징</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -519,7 +523,7 @@ async function loadData() {
     partnerOrg: r.partner_org || null, eligibility: r.eligibility || 'all',
     recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
     kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
-    isFree: !!r.is_free, completionRatio: r.completion_ratio_pct || 67,
+    isFree: !!r.is_free, completionRatio: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10,
   }));
 
   youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
@@ -697,6 +701,7 @@ function _rtToggleFreeFields() {
   const isFree = document.getElementById('rtType').value === 'free';
   document.getElementById('rtRecruitFieldWrap').style.display = isFree ? 'none' : '';
   document.getElementById('rtRatioFieldWrap').style.display = isFree ? 'none' : '';
+  document.getElementById('rtPointFieldWrap').style.display = isFree ? 'none' : '';
   document.getElementById('rtFreeDurationHint').style.display = isFree ? '' : 'none';
 }
 
@@ -715,6 +720,7 @@ function resetRoutineForm() {
   document.getElementById('rtEligibility').value = 'all';
   document.getElementById('rtType').value = 'fixed';
   document.getElementById('rtRatio').value = 67;
+  document.getElementById('rtPointAmount').value = 10;
   _rtToggleFreeFields();
   document.getElementById('rtDurationHint').textContent = '';
   document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
@@ -763,6 +769,7 @@ function editRoutineAdmin(id) {
   document.getElementById('rtEligibility').value = r.eligibility || 'all';
   document.getElementById('rtType').value = r.isFree ? 'free' : 'fixed';
   document.getElementById('rtRatio').value = r.completionRatio || 67;
+  document.getElementById('rtPointAmount').value = r.certPointAmount || 10;
   _rtToggleFreeFields();
   if (rtCoverUrl) { document.getElementById('rtPhotoPreview').src = rtCoverUrl; document.getElementById('rtPhotoPreviewWrap').style.display = ''; }
   else document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
@@ -791,6 +798,7 @@ async function submitRoutineAdmin() {
   const maxPeople = document.getElementById('rtMaxPeople').value;
   const minPeople = document.getElementById('rtMinPeople').value;
   const ratio = document.getElementById('rtRatio').value;
+  const pointAmount = document.getElementById('rtPointAmount').value;
   const kickoff = document.getElementById('rtKickoff').value;
   const closing = document.getElementById('rtClosing').value;
   const meetingLink = document.getElementById('rtMeetingLink').value.trim();
@@ -806,6 +814,7 @@ async function submitRoutineAdmin() {
   if (!maxPeople || maxPeople < 1) { alert('최대 참여 인원을 입력해주세요.'); return; }
   if (minPeople && (parseInt(minPeople) < 1 || parseInt(minPeople) > parseInt(maxPeople))) { alert('최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.'); return; }
   if (!isFree && (!ratio || ratio < 1 || ratio > 100)) { alert('완주 인정 비율은 1~100 사이로 입력해주세요.'); return; }
+  if (!isFree && (!pointAmount || pointAmount < 1 || pointAmount > 1000)) { alert('인증당 지급 포인트는 1~1000 사이로 입력해주세요.'); return; }
   if ((kickoff || closing) && !meetingLink) { alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.'); return; }
   if (!desc) { alert('루틴 소개를 입력해주세요.'); return; }
   if (!rtCoverUrl) { alert('인증 예시 사진을 추가해주세요.'); return; }
@@ -816,7 +825,7 @@ async function submitRoutineAdmin() {
     kickoff_at: kickoff ? new Date(kickoff).toISOString() : null,
     closing_at: closing ? new Date(closing).toISOString() : null,
     meeting_link: meetingLink || null,
-    is_free: isFree, completion_ratio_pct: isFree ? 67 : parseInt(ratio),
+    is_free: isFree, completion_ratio_pct: isFree ? 67 : parseInt(ratio), cert_point_amount: isFree ? 10 : parseInt(pointAmount),
     recruit_start_date: isFree ? null : recruitStart, recruit_end_date: isFree ? null : recruitEnd,
     start_date: start, end_date: end,
     max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,
