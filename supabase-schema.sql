@@ -1914,3 +1914,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25g] 루틴 상단 고정
+-- 특정 루틴을 청소년/끗짱 루틴탭 목록 맨 위에 항상 노출할 수 있게 함
+-- (모집중/참여중 우선순위보다도 최우선으로 정렬). 담당 끗짱 또는 관리자가
+-- 루틴 생성/수정 폼에서 토글 — 기존 routines_update 정책(created_by/led_by/admin)
+-- 그대로 재사용, 별도 RLS 변경 불필요.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;

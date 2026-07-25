@@ -912,6 +912,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       </div>
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
+      <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rPinned" style="width:17px;height:17px;flex-shrink:0;">📌 루틴 목록 상단에 고정</label><div class="char-end" style="color:#bbb;">체크하면 루틴탭 목록 맨 위에 항상 노출돼요</div></div>
       <div id="rRatioFieldWrap"><div class="field-label">완주 인정 비율 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 67%</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rRatio" min="1" max="100" value="67" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">% 이상 인증하면 완주로 인정, 나다움 포인트 지급 기준이에요</span></div></div>
       <div id="rPointFieldWrap"><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
@@ -1737,7 +1738,7 @@ async function loadRoutines() {
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
-      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10,
+      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned,
       people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -2173,9 +2174,9 @@ function renderRoutineGrid(type, q) {
 
   const hl=(text)=>q?text.replace(new RegExp(`(${q})`, 'gi'),'<mark style="background:#FFF176;border-radius:2px;padding:0 1px;">$1</mark>'):text;
 
-  // 모집중 루틴, 그 다음 내가 참여 중인 루틴 순으로 상단 고정
+  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 모집중, 그 다음 내가 참여 중인 루틴 순으로 상단 고정
   const isMineActive = (r) => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-  const _rank = (r) => (r.status==='recruit' || _isFreeOpen(r)) ? 0 : isMineActive(r) ? 1 : 2;
+  const _rank = (r) => r.pinned ? -1 : (r.status==='recruit' || _isFreeOpen(r)) ? 0 : isMineActive(r) ? 1 : 2;
   const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
@@ -2240,7 +2241,7 @@ function renderRoutineGrid(type, q) {
         ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">
-        <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:${r.partnerOrg?'3px':'5px'};min-height:17px;">${effDone?'✓ ':''}${hl(r.title)}</div>
+        <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:${r.partnerOrg?'3px':'5px'};min-height:17px;">${r.pinned?'📌 ':''}${effDone?'✓ ':''}${hl(r.title)}</div>
         ${r.partnerOrg?`<div style="font-size:11px;color:${effDone?'#bbb':'#2E33BC'};font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🤝 ${hl(r.partnerOrg)}</div>`:''}
         <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
           <span style="font-size:11px;color:${effDone?'#ccc':'#999'};">${r.period}</span>
@@ -3141,7 +3142,8 @@ async function submitCert() {
   await loadRoutines();
   await loadCertFeed();
   closeOverlay('certFormOverlay');
-  if(isYouth && currentUser) {
+  const certR = state.routines.find(x=>x.id===currentCertId);
+  if(isYouth && currentUser && !certR?.isFree) {
     // 인증은 완주 기준 달성 시에만 서버 트리거가 실제 지급하므로, 저장 직후 다시 조회해서 반영
     const { data: freshProfile } = await sb.from('profiles').select('nadaeum').eq('id', currentUser.id).single();
     const newNadaeum = freshProfile?.nadaeum ?? prevNadaeum;
@@ -3152,12 +3154,11 @@ async function submitCert() {
     const noteEl = document.getElementById('certNadaeumNote');
     if (gained > 0) { amountEl.textContent = `+${gained} 나다움`; noteEl.textContent = '완주 기준 달성! 지급됐어요'; }
     else {
-      const certR = state.routines.find(x=>x.id===currentCertId);
       amountEl.textContent = `+${certR?.certPointAmount || 10} 나다움`;
       noteEl.textContent = '쌓이고 있어요 (완주하면 지급돼요)';
     }
   }
-  document.getElementById('certNadaeumBadge').style.display = isYouth ? '' : 'none';
+  document.getElementById('certNadaeumBadge').style.display = (isYouth && !certR?.isFree) ? '' : 'none';
   document.getElementById('certSuccess').classList.add('open');
 }
 function closeCertSuccess() {
@@ -4021,9 +4022,9 @@ function kFilterRoutine(type,el) {
   const filtered = type==='all' ? base
     : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : base.filter(r=>r.status===type);
-  // 모집중(자유루틴은 상시 열려있는 동안 포함) 루틴 항상 상단 고정
+  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 모집중(자유루틴은 상시 열려있는 동안 포함) 루틴 순으로 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
-    const ra=(a.status==='recruit'||_isFreeOpen(a))?0:1, rb=(b.status==='recruit'||_isFreeOpen(b))?0:1;
+    const ra=a.pinned?-1:(a.status==='recruit'||_isFreeOpen(a))?0:1, rb=b.pinned?-1:(b.status==='recruit'||_isFreeOpen(b))?0:1;
     return ra-rb;
   });
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
@@ -4056,7 +4057,7 @@ function kFilterRoutine(type,el) {
         ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">
-        <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;margin-bottom:${r.partnerOrg?'3px':'5px'};">${isDone?'✓ ':''}${r.title}</div>
+        <div style="font-size:13px;font-weight:600;color:${isDone?'#aaa':'#111'};line-height:1.3;margin-bottom:${r.partnerOrg?'3px':'5px'};">${r.pinned?'📌 ':''}${isDone?'✓ ':''}${r.title}</div>
         ${r.partnerOrg?`<div style="font-size:11px;color:${isDone?'#bbb':'#2E33BC'};font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🤝 ${r.partnerOrg}</div>`:''}
         <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
           <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.period}</span>
@@ -4272,6 +4273,7 @@ function resetCreateForm() {
   document.getElementById('rPeople').value=10;
   document.getElementById('rRatio').value=67;
   document.getElementById('rPointAmount').value=10;
+  document.getElementById('rPinned').checked=false;
   ['nameCount','descCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
   createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱'; editRoutineId=null; editExistingCoverUrl=null;
@@ -4316,6 +4318,7 @@ async function openEditRoutine(routineId) {
   document.getElementById('rMeetingLink').value = r.meetingLink || '';
   document.getElementById('rRatio').value = r.completionRatioPct || 67;
   document.getElementById('rPointAmount').value = r.certPointAmount || 10;
+  document.getElementById('rPinned').checked = !!r.pinned;
   selectEligibility(r.eligibility || 'all');
   selectRoutineType(r.isFree ? 'free' : 'fixed');
   document.getElementById('nameCount').textContent = (r.title||'').length;
@@ -4378,7 +4381,8 @@ function _readCreateFormCommon(){
   const isFree=createRoutineType==='free';
   const ratio=document.getElementById('rRatio').value;
   const pointAmount=document.getElementById('rPointAmount').value;
-  return {n,d,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio,pointAmount};
+  const pinned=document.getElementById('rPinned').checked;
+  return {n,d,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio,pointAmount,pinned};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -4419,7 +4423,7 @@ async function submitCreateRoutine(){
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
     is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
-    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -4450,7 +4454,7 @@ async function submitEditRoutine(){
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
     is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
-    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null,
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;
