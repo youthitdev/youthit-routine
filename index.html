@@ -883,6 +883,10 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div style="font-size:11px;opacity:0.75;">인증하기</div><div style="font-size:16px;font-weight:600;" id="certFormTitle"></div></div>
     </div>
     <div class="overlay-body">
+      <div id="certGuideBanner" style="display:none;background:#f5f5f7;border-radius:12px;padding:12px 14px;">
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">🎯 이렇게 인증해 주세요</div>
+        <div style="font-size:13.5px;color:#111;line-height:1.6;" id="certGuideText"></div>
+      </div>
       <div>
         <div class="field-label">오늘의 인증 사진 <span class="required">* 필수</span> <span style="font-size:11px;color:#888;font-weight:400;">최대 5장</span></div>
         <div id="certPhotoGrid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:6px;"></div>
@@ -2393,6 +2397,16 @@ function openRoutineFeed(routineId) {
   // 역할 색상 헤더에 직접 적용
   const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
   document.querySelector('#routineFeedOverlay .overlay-hd').style.background = roleColor;
+  // 인증글은 그 루틴 참여자(또는 담당 끗짱/관리자)만 볼 수 있음 — 서버(RLS)에서도 막지만,
+  // 참여자가 아니면 "인증글이 없어요"처럼 보이지 않고 이유를 명확히 알려주기 위한 클라이언트 가드
+  const isParticipant = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  const isLeaderOrAdmin = currentUser && (r.createdBy===currentUser.id || r.ledBy===currentUser.id || ADMINS.includes(currentUser.email));
+  if (!isParticipant && !isLeaderOrAdmin) {
+    document.getElementById('feedOverlayBody').innerHTML = `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🔒 이 루틴에 참여한 사람만<br>인증글을 볼 수 있어요</div>`;
+    document.getElementById('certFloatingBtn').style.display='none';
+    openOverlay('routineFeedOverlay');
+    return;
+  }
   // 진행중이든 완료든 그 루틴의 전체 기간 누적 인증글을 다 보여줌(예전엔 최근 24시간만 보여서
   // 완주한 루틴에 들어가면 거의 항상 텅 비어 보였음)
   const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId);
@@ -2855,9 +2869,10 @@ function renderCert() { renderCertTab(); }
 function renderCertTab() {
   renderRoutineBanners();
   const active=_myActiveRoutines();
+  const done = _myCompletedRoutines();
   const el=document.getElementById('certRoutineList');
   if(!el) return;
-  if(active.length===0){
+  if(active.length===0 && done.length===0){
     el.innerHTML=`<div style="margin:16px;padding:40px 20px;text-align:center;border:0.5px solid #eee;border-radius:16px;">
       <div style="font-size:32px;margin-bottom:10px;">🧭</div>
       <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:6px;">아직 참여 중인 루틴이 없어요</div>
@@ -2867,11 +2882,13 @@ function renderCertTab() {
     return;
   }
   const doneCount = active.filter(r=>r.todayCert).length;
-  el.innerHTML = `<div style="padding:14px 16px 6px;">
+  // 카드 전체 클릭은 그 루틴의 인증글 피드로 이동(참여자만 볼 수 있음, openRoutineFeed에서
+  // 가드). "인증하기" 버튼만 별도로 눌러야 인증 폼이 열리도록 stopPropagation 분리
+  el.innerHTML = (active.length>0 ? `<div style="padding:14px 16px 6px;">
       <div style="font-size:15px;font-weight:700;color:#111;">오늘의 인증</div>
       <div style="font-size:12px;color:#888;margin-top:2px;">${doneCount}/${active.length}개 완료</div>
     </div>` +
-    active.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid ${r.todayCert?'#e8e8e8':'#2E33BC'};border-radius:16px;cursor:pointer;background:${r.todayCert?'#fafafa':'#fff'};" onclick="${r.todayCert?'':`selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')`}">
+    active.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid ${r.todayCert?'#e8e8e8':'#2E33BC'};border-radius:16px;cursor:pointer;background:${r.todayCert?'#fafafa':'#fff'};" onclick="openRoutineFeed(${r.id})">
       <div style="width:42px;height:42px;border-radius:12px;background:${r.todayCert?'#eee':'#f0f1fb'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:600;color:${r.todayCert?'#aaa':'#111'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
@@ -2883,8 +2900,19 @@ function renderCertTab() {
       </div>
       ${r.todayCert
         ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
-        :`<span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#2E33BC;color:#fff;flex-shrink:0;">인증하기</span>`}
-    </div>`).join('');
+        :`<span onclick="event.stopPropagation();selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#2E33BC;color:#fff;flex-shrink:0;">인증하기</span>`}
+    </div>`).join('') : '') +
+    (done.length>0 ? `<div style="padding:20px 16px 6px;">
+      <div style="font-size:15px;font-weight:700;color:#111;">완주한 루틴</div>
+      <div style="font-size:12px;color:#888;margin-top:2px;">인증글을 모아볼 수 있어요</div>
+    </div>` + done.map(r=>`<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid #e8e8e8;border-radius:16px;cursor:pointer;background:#fafafa;">
+      <div style="width:42px;height:42px;border-radius:12px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+        <div style="font-size:11px;color:#bbb;margin-top:2px;">${r.period}</div>
+      </div>
+      <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#f0f0f0;color:#aaa;flex-shrink:0;">🏅 완주</span>
+    </div>`).join('') : '');
 }
 function goToRecruitRoutines() {
   switchTab('routine');
@@ -2894,6 +2922,10 @@ function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title);
 function openCertForm(id,title) {
   currentCertId=id; certHasPhoto=false; certPhotos=[]; certPhotoWatermarked=[];
   document.getElementById('certFormTitle').textContent=title;
+  const r=state.routines.find(x=>x.id===id);
+  const guideBanner=document.getElementById('certGuideBanner');
+  if(r&&r.certGuide){ guideBanner.style.display=''; document.getElementById('certGuideText').textContent=r.certGuide; }
+  else guideBanner.style.display='none';
   renderCertPhotoGrid();
   document.getElementById('certMemo').value='';
   document.getElementById('certCharCount').textContent='0';

@@ -1949,3 +1949,18 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS affiliation text;
 -- 별도 RLS 변경 불필요 — 기존 routines_update(created_by/led_by/admin) 그대로 적용됨.
 -- =====================================================
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS cert_guide text;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25k] 인증글은 그 루틴 참여자만 볼 수 있도록 제한
+-- 기존 cert_select 정책이 로그인 여부만 체크해서(auth.uid() IS NOT NULL),
+-- 로그인한 사용자면 참여 안 한 루틴의 인증 사진·소감도 전부 볼 수 있었음.
+-- 참여자 본인 + 그 루틴의 담당 끗짱/작성자(created_by)/관리자만 조회 가능하도록 축소.
+-- =====================================================
+DROP POLICY IF EXISTS "cert_select" ON certifications;
+CREATE POLICY "cert_select" ON certifications FOR SELECT USING (
+  auth.uid() = user_id
+  OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = certifications.routine_id AND status = 'approved')
+  OR auth.uid() IN (SELECT created_by FROM routines WHERE id = certifications.routine_id)
+  OR auth.uid() IN (SELECT led_by FROM routines WHERE id = certifications.routine_id)
+  OR is_admin()
+);
