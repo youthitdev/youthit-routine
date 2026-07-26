@@ -263,6 +263,13 @@ select:focus { outline: none; border-color: #2E33BC; }
 @media (max-width: 480px) {
   .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
 }
+/* 휴대폰을 가로로 돌려도 화면 레이아웃이 안 바뀌도록(세로 전용 앱) — 터치 기반
+   기기에서만 감지(hover:none 등)해서, 데스크톱에서 가로로 넓은 창을 쓰는 것까지
+   "회전"으로 오인해 이 안내를 덮어씌우지 않게 함 */
+.rotate-lock-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: #111; color: #fff; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 12px; }
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .rotate-lock-overlay { display: flex; }
+}
 </style>
 </head>
 <body>
@@ -5177,6 +5184,11 @@ async function refetchOnResume() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);
 </script>
+<div class="rotate-lock-overlay">
+  <div style="font-size:44px;">📱</div>
+  <div style="font-size:16px;font-weight:600;">세로 모드로 사용해주세요</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.6;">한끗루틴은 세로 화면에 최적화돼 있어요.<br>휴대폰을 세로로 돌려주세요.</div>
+</div>
 <script>
 if('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
