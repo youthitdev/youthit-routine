@@ -151,7 +151,7 @@
           <option value="out_of_school">참여 대상: 학교 밖 청소년</option>
         </select>
         <select id="rtType" onchange="_rtToggleFreeFields()" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
-          <option value="fixed">루틴 타입: 고정기간</option>
+          <option value="fixed">루틴 타입: 기획루틴</option>
           <option value="free">루틴 타입: 자유루틴(상시모집)</option>
         </select>
       </div>
@@ -192,7 +192,8 @@
         </div>
         <input type="url" id="rtMeetingLink" placeholder="줌 링크 (예: https://zoom.us/j/...)" style="width:100%;margin-top:8px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;">
       </div>
-      <textarea id="rtDesc" placeholder="루틴 소개 — 어떤 활동인지, 어떻게 인증하면 되는지 알려주세요." maxlength="200" rows="3" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
+      <textarea id="rtDesc" placeholder="루틴 소개 — 어떤 활동인지 알려주세요." maxlength="200" rows="3" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
+      <textarea id="rtCertGuide" placeholder="인증 방법 (선택) — 예) 아침에 일어나자마자 물 한 잔 마시는 사진과 함께 오늘의 다짐을 적어주세요." maxlength="200" rows="2" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
       <div style="margin-bottom:10px;">
         <div style="font-size:11px;color:#888;margin-bottom:4px;">인증 예시 사진 <span style="color:#c00;">*</span> — 청소년에게 어떻게 인증하면 되는지 보여주는 예시 사진</div>
         <input type="file" id="rtPhotoInput" accept="image/*" onchange="handleRoutinePhotoUpload(event)">
@@ -522,6 +523,7 @@ async function loadData() {
     coverImageUrl: r.cover_image_url || null,
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
     ledBy: r.led_by || null, emoji: r.emoji || '🌱', description: r.description || '',
+    certGuide: r.cert_guide || '',
     partnerOrg: r.partner_org || null, eligibility: r.eligibility || 'all',
     recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
     kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
@@ -719,7 +721,7 @@ function populateRtLeaderSelect(selectedId) {
 function resetRoutineForm() {
   editRoutineAdminId = null;
   rtEmoji = '🌱'; rtCoverUrl = null;
-  ['rtName','rtPartner','rtRecruitStart','rtRecruitEnd','rtStart','rtEnd','rtKickoff','rtClosing','rtMeetingLink','rtMinPeople','rtDesc'].forEach(id => document.getElementById(id).value = '');
+  ['rtName','rtPartner','rtRecruitStart','rtRecruitEnd','rtStart','rtEnd','rtKickoff','rtClosing','rtMeetingLink','rtMinPeople','rtDesc','rtCertGuide'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('rtMaxPeople').value = 10;
   document.getElementById('rtEligibility').value = 'all';
   document.getElementById('rtType').value = 'fixed';
@@ -771,6 +773,7 @@ function editRoutineAdmin(id) {
   document.getElementById('rtClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
   document.getElementById('rtMeetingLink').value = r.meetingLink || '';
   document.getElementById('rtDesc').value = r.description || '';
+  document.getElementById('rtCertGuide').value = r.certGuide || '';
   document.getElementById('rtEligibility').value = r.eligibility || 'all';
   document.getElementById('rtType').value = r.isFree ? 'free' : 'fixed';
   document.getElementById('rtRatio').value = r.completionRatio || 67;
@@ -793,6 +796,7 @@ function cancelEditRoutineAdmin() { resetRoutineForm(); }
 async function submitRoutineAdmin() {
   const title = document.getElementById('rtName').value.trim();
   const desc = document.getElementById('rtDesc').value.trim();
+  const certGuide = document.getElementById('rtCertGuide').value.trim();
   const partner = document.getElementById('rtPartner').value.trim();
   const leader = document.getElementById('rtLeader').value;
   const eligibility = document.getElementById('rtEligibility').value;
@@ -827,7 +831,7 @@ async function submitRoutineAdmin() {
   if (!rtCoverUrl) { alert('인증 예시 사진을 추가해주세요.'); return; }
 
   const payload = {
-    title, emoji: rtEmoji, description: desc, partner_org: partner || null,
+    title, emoji: rtEmoji, description: desc, cert_guide: certGuide || null, partner_org: partner || null,
     eligibility, led_by: leader,
     kickoff_at: kickoff ? new Date(kickoff).toISOString() : null,
     closing_at: closing ? new Date(closing).toISOString() : null,

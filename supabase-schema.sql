@@ -1941,3 +1941,11 @@ ALTER TABLE routine_participants ADD COLUMN IF NOT EXISTS celebrated_at timestam
 -- 별도 RLS 변경 불필요 — 기존 profiles_update(auth.uid()=id) 그대로 적용됨.
 -- =====================================================
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS affiliation text;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25j] 루틴에 "인증 방법" 필드 추가
+-- 루틴 소개(어떤 활동인지)와 별개로 "이렇게 인증해 주세요"를 명확히 안내하는
+-- 선택 텍스트 필드. 상세화면에서 루틴 소개 바로 아래, 값이 있을 때만 노출.
+-- 별도 RLS 변경 불필요 — 기존 routines_update(created_by/led_by/admin) 그대로 적용됨.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS cert_guide text;
