@@ -2203,7 +2203,9 @@ function filterRoutine(type, el) {
 
 function renderRoutineGrid(type, q) {
   // '참여 중'(active) 필터는 상태만이 아니라 "내가 참여자인" 루틴만 — 홈의 참여 중 목록과 기준 통일
-  const base = type==='all' ? state.routines
+  // '전체' 기본 필터에선 완료된 루틴은 빼서 "지금 뭘 시작할 수 있나" 탐색에 집중되게 함
+  // (완료 루틴은 "완료" 칩으로 여전히 볼 수 있고, MY탭·인증탭에도 별도 진입점이 있음)
+  const base = type==='all' ? state.routines.filter(r=>r.status!=='done')
     : type==='active' ? state.routines.filter(r=>r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id))
     : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : state.routines.filter(r=>r.status===type);
