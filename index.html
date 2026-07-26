@@ -21,13 +21,6 @@
 :root { --role-color: #2E33BC; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; display: flex; justify-content: center; min-height: 100vh; align-items: flex-start; }
 .app { background: #fff; width: 100%; max-width: 390px; min-height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-/* 실제 폰 화면에서는 데스크톱용 "폰 프레임" 폭 제한(390px)을 없애서 양쪽에 여백/실선이
-   보이지 않게 함. 390px는 구형 iPhone 기준이라 iPhone 14/15/16(393px)·Pro Max(430px)·
-   흔한 안드로이드(360~412px) 등 요즘 폰 뷰포트를 못 덮어서 실기기에서 여백이 보이던 문제 —
-   실제 폰이 거의 다 들어오도록 480px로 넉넉하게 올림 */
-@media (max-width: 480px) {
-  .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
-}
 @media (min-width: 500px) {
   body { align-items: center; padding: 24px 0; min-height: 100vh; box-sizing: border-box; }
   .app { min-height: 0; height: min(844px, calc(100vh - 48px)); border-radius: 40px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); overflow: hidden; }
@@ -259,6 +252,17 @@ select:focus { outline: none; border-color: #2E33BC; }
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes pulse { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+/* 실제 폰 화면에서는 데스크톱용 "폰 프레임" 폭 제한(390px)을 없애서 양쪽에 여백/실선이
+   보이지 않게 함. 390px는 구형 iPhone 기준이라 iPhone 14/15/16(393px)·Pro Max(430px)·
+   흔한 안드로이드(360~412px) 등 요즘 폰 뷰포트를 못 덮어서 실기기에서 여백이 보이던 문제 —
+   실제 폰이 거의 다 들어오도록 480px로 넉넉하게 올림. 이 블록은 스타일시트 맨 끝에 둬야 함 —
+   .nav/.overlay/.sheet/.success-scr/.complete-scr의 기본 max-width:390px 규칙이 이 블록보다
+   나중에 선언돼 있으면(동일 우선순위라 소스 순서로 승부) 오히려 이 오버라이드를 덮어써서
+   완주축하화면 등에서 양옆 흰줄이 다시 보이는 버그가 있었음(2026-07-25 QA에서 발견) */
+@media (max-width: 480px) {
+  .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -1193,6 +1197,14 @@ select:focus { outline: none; border-color: #2E33BC; }
     <button class="primary-btn" style="width:auto;padding:12px 32px;margin-top:4px;" onclick="closeCertSuccess()">확인</button>
   </div>
 
+  <!-- 완료 화면: 편지 전송 -->
+  <div class="success-scr" id="letterSuccess">
+    <div class="success-icon" style="background:#2E33BC;"><span style="font-size:30px;">💌</span></div>
+    <div style="font-size:18px;font-weight:600;color:#111;">편지를 보냈어요!</div>
+    <div style="font-size:14px;color:#888;text-align:center;line-height:1.6;">끗짱이 편지를 읽으면<br>큰 힘이 될 거예요.</div>
+    <button class="primary-btn" style="width:auto;padding:12px 32px;margin-top:4px;" onclick="closeLetterSuccess()">확인</button>
+  </div>
+
   <!-- 완료 화면: 루틴 완주 -->
   <div class="complete-scr" id="completeSuccess">
     <div class="confetti-wrap" id="confettiWrap"></div>
@@ -1403,7 +1415,7 @@ async function loadProfileAndEnter() {
     showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
     return;
   }
-  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); } catch(e) { console.error('데이터 로드 실패', e); }
+  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadLetters(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
@@ -1842,6 +1854,26 @@ async function loadCertFeed() {
 async function loadBanners() {
   const { data } = await sb.from('banners').select('*').eq('active', true).order('sort_order', { ascending: true }).limit(10);
   state.banners = data || [];
+}
+// 편지는 letters 테이블 실데이터 연결 — RLS(letters_select)가 보낸 사람 본인 또는
+// 그 루틴의 담당 끗짱/관리자에게만 자동으로 스코핑해줌
+async function loadLetters() {
+  if (!currentUser) { state.letters = []; return; }
+  const { data, error } = await sb.from('letters').select('id,from_user_id,routine_id,content,opened,created_at').order('created_at', { ascending: false });
+  if (error) { console.error('편지 로드 실패', error); return; }
+  const rows = data || [];
+  const userIds = [...new Set(rows.map(l => l.from_user_id))];
+  const routineIds = [...new Set(rows.map(l => l.routine_id))];
+  const [profRes, routRes] = await Promise.all([
+    userIds.length ? sb.from('profiles').select('id,name').in('id', userIds) : Promise.resolve({ data: [] }),
+    routineIds.length ? sb.from('routines').select('id,title').in('id', routineIds) : Promise.resolve({ data: [] }),
+  ]);
+  const nameById = {}; (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  const titleById = {}; (routRes.data || []).forEach(r => titleById[r.id] = r.title);
+  state.letters = rows.map(l => ({
+    id: l.id, from: nameById[l.from_user_id] || '익명', routine: titleById[l.routine_id] || '',
+    content: l.content, opened: !!l.opened, date: _relDate(l.created_at),
+  }));
 }
 let _bannerRotateIdx = 0;
 let _bannerRotateTimer = null;
@@ -4739,6 +4771,7 @@ function openAllLetters() {
 function openLetter(id) {
   const l=state.letters.find(x=>x.id===id);
   if(!l) return;
+  const wasUnread = !l.opened;
   l.opened=true; save();
   document.getElementById('letterDetailFrom').textContent=l.from;
   document.getElementById('letterDetailMeta').textContent=`${l.routine} 완주 · ${l.date}`;
@@ -4746,6 +4779,7 @@ function openLetter(id) {
   document.getElementById('letterDetailSign').textContent=`— ${l.from} 드림`;
   kRenderMy();
   openOverlay('letterDetailOverlay');
+  if(wasUnread) sb.from('letters').update({ opened: true }).eq('id', id).then(()=>{});
 }
 
 // ════════════════════════════════════════════════════════
@@ -4950,14 +4984,21 @@ function updateLetterCount() {
   else{h.textContent=`최소 20자 이상 작성해주세요 (${20-v}자 남음)`;h.className='count-not';}
   document.getElementById('letterSubmitBtn').disabled=v<20;
 }
-function submitLetter() {
-  const r=state.routines.find(x=>x.id===currentLetterRoutineId);
+async function submitLetter() {
+  if(!currentUser){alert('로그인이 필요해요.');return;}
   const content=document.getElementById('letterContent').value.trim();
-  if(!state.letters) state.letters=[];
-  state.letters.push({id:Date.now(),from:state.youth.name,routine:r?r.title:'',content,date:'방금',opened:false});
-  save();
+  const btn=document.getElementById('letterSubmitBtn');
+  if(btn){btn.disabled=true;btn.textContent='보내는 중...';}
+  const { error } = await sb.from('letters').insert({
+    from_user_id: currentUser.id, routine_id: currentLetterRoutineId, content,
+  });
+  if(btn){btn.disabled=false;btn.textContent='편지 보내기 💌';}
+  if(error){alert('편지 보내기 실패: '+error.message);return;}
   closeOverlay('letterOverlay');
-  document.getElementById('certSuccess').classList.add('open');
+  document.getElementById('letterSuccess').classList.add('open');
+}
+function closeLetterSuccess() {
+  document.getElementById('letterSuccess').classList.remove('open');
 }
 
 // ════════════════════════════════════════════════════════
@@ -5091,7 +5132,7 @@ async function refetchOnResume() {
   if (now - _lastRefetchAt < 8000) return; // 너무 잦은 재조회 방지
   _lastRefetchAt = now;
   try {
-    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners()]);
+    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners(), loadLetters()]);
   } catch (e) { console.error('재조회 실패', e); return; }
   const isYouth = state.currentRole === 'youth';
   const prefix = isYouth ? 'page-' : 'kpage-';
