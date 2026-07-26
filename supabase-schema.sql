@@ -1964,3 +1964,36 @@ CREATE POLICY "cert_select" ON certifications FOR SELECT USING (
   OR auth.uid() IN (SELECT led_by FROM routines WHERE id = certifications.routine_id)
   OR is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-25l] 인증글 좋아요/댓글도 참여자만 볼 수 있도록 제한
+-- cert_select와 같은 이유로, cert_likes/cert_comments도 로그인 여부만 체크하고
+-- 있어서 비참여자가 REST로 직접 조회하면 댓글 내용이 새어나갈 수 있었음.
+-- 해당 인증글(certifications)을 볼 수 있는 사람만 그 좋아요/댓글도 볼 수 있게 축소.
+-- =====================================================
+DROP POLICY IF EXISTS "cl_select" ON cert_likes;
+CREATE POLICY "cl_select" ON cert_likes FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM certifications c WHERE c.id = cert_likes.cert_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+    )
+  )
+  OR is_admin()
+);
+DROP POLICY IF EXISTS "cc_select" ON cert_comments;
+CREATE POLICY "cc_select" ON cert_comments FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM certifications c WHERE c.id = cert_comments.cert_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+    )
+  )
+  OR is_admin()
+);
