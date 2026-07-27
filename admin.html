@@ -176,6 +176,7 @@
         <input type="number" id="rtMinPeople" min="1" max="50" placeholder="최소 인원 (선택, 미달 시 폐강 가능)" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="rtPinned" style="width:16px;height:16px;">📌 루틴 목록 상단에 고정</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="rtCameraOnly" style="width:16px;height:16px;">📸 실시간 촬영만 허용 (갤러리 업로드 불가)</label>
       <div id="rtRatioFieldWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <input type="number" id="rtRatio" min="1" max="100" value="67" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <span style="font-size:11px;color:#888;">% 이상 인증하면 완주 인정 (나다움 포인트 지급 기준, 기본 67%)</span>
@@ -528,7 +529,7 @@ async function loadData() {
     recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
     kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
     isFree: !!r.is_free, completionRatio: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10,
-    pinned: !!r.pinned,
+    pinned: !!r.pinned, cameraOnly: !!r.camera_only,
   }));
 
   youthRows = profiles.filter(p => p.role === 'youth').map(p => ({
@@ -728,6 +729,7 @@ function resetRoutineForm() {
   document.getElementById('rtRatio').value = 67;
   document.getElementById('rtPointAmount').value = 10;
   document.getElementById('rtPinned').checked = false;
+  document.getElementById('rtCameraOnly').checked = false;
   _rtToggleFreeFields();
   document.getElementById('rtDurationHint').textContent = '';
   document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
@@ -779,6 +781,7 @@ function editRoutineAdmin(id) {
   document.getElementById('rtRatio').value = r.completionRatio || 67;
   document.getElementById('rtPointAmount').value = r.certPointAmount || 10;
   document.getElementById('rtPinned').checked = !!r.pinned;
+  document.getElementById('rtCameraOnly').checked = !!r.cameraOnly;
   _rtToggleFreeFields();
   if (rtCoverUrl) { document.getElementById('rtPhotoPreview').src = rtCoverUrl; document.getElementById('rtPhotoPreviewWrap').style.display = ''; }
   else document.getElementById('rtPhotoPreviewWrap').style.display = 'none';
@@ -813,6 +816,7 @@ async function submitRoutineAdmin() {
   const closing = document.getElementById('rtClosing').value;
   const meetingLink = document.getElementById('rtMeetingLink').value.trim();
   const pinned = document.getElementById('rtPinned').checked;
+  const cameraOnly = document.getElementById('rtCameraOnly').checked;
 
   if (!title) { alert('루틴 이름을 입력해주세요.'); return; }
   if (!leader) { alert('담당 끗짱을 선택해주세요.'); return; }
@@ -840,7 +844,7 @@ async function submitRoutineAdmin() {
     recruit_start_date: isFree ? null : recruitStart, recruit_end_date: isFree ? null : recruitEnd,
     start_date: isFree ? null : start, end_date: isFree ? null : end,
     max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,
-    cover_image_url: rtCoverUrl, pinned,
+    cover_image_url: rtCoverUrl, pinned, camera_only: cameraOnly,
   };
 
   const btn = document.getElementById('rtSubmitBtn');

@@ -889,6 +889,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       </div>
       <div>
         <div class="field-label">오늘의 인증 사진 <span class="required">* 필수</span> <span style="font-size:11px;color:#888;font-weight:400;">최대 5장</span></div>
+        <div id="certCameraOnlyNotice" style="display:none;font-size:11px;color:#3B6D11;background:#f7fbf0;border:1px solid #83CA00;border-radius:8px;padding:6px 10px;margin-bottom:6px;">📸 이 루틴은 실시간 촬영만 가능해요 (갤러리 선택 불가)</div>
         <div id="certPhotoGrid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:6px;"></div>
         <input type="file" id="certPhotoInput" accept="image/*" multiple style="display:none;" onchange="handleCertPhotos(event)">
         <input type="file" id="certCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handleCertCameraPhoto(event)">
@@ -928,6 +929,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">최대 참여 인원 <span class="required">* 필수</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPeople" min="1" max="50" value="10" style="width:80px;text-align:center;" oninput="updateCreatePreview()"><span style="font-size:12px;color:#888;">명 (최대 50명)</span></div></div>
       <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
       <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rPinned" style="width:17px;height:17px;flex-shrink:0;">📌 루틴 목록 상단에 고정</label><div class="char-end" style="color:#bbb;">체크하면 루틴탭 목록 맨 위에 항상 노출돼요</div></div>
+      <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rCameraOnly" style="width:17px;height:17px;flex-shrink:0;">📸 실시간 촬영만 허용</label><div class="char-end" style="color:#bbb;">체크하면 인증 사진을 갤러리에서 못 고르고, 그 자리에서 카메라로 찍은 사진(촬영 시각 워터마크 자동 포함)만 올릴 수 있어요</div></div>
       <div id="rRatioFieldWrap"><div class="field-label">완주 인정 비율 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 67%</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rRatio" min="1" max="100" value="67" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">% 이상 인증하면 완주로 인정, 나다움 포인트 지급 기준이에요</span></div></div>
       <div id="rPointFieldWrap"><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
@@ -1255,8 +1257,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="display:flex;justify-content:center;margin-bottom:18px;">
         <div id="reportCardPreview" style="width:100%;max-width:280px;aspect-ratio:4/5;border-radius:20px;overflow:hidden;box-shadow:0 6px 24px rgba(46,51,188,0.25);"></div>
       </div>
-      <button class="primary-btn" id="reportShareBtn" onclick="shareReportCard()" style="margin-bottom:8px;">📤 공유하기</button>
-      <button onclick="downloadReportCard()" style="width:100%;padding:12px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">📥 이미지로 저장</button>
+      <button class="primary-btn" id="reportShareBtn" onclick="shareReportCard()">📤 공유하기</button>
     </div>
   </div>
 
@@ -1767,7 +1768,7 @@ async function loadRoutines() {
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
-      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned,
+      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
       people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', certGuide: r.cert_guide || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -2420,8 +2421,8 @@ function openRoutineFeed(routineId) {
       <div style="font-size:28px;margin-bottom:6px;">🏅</div>
       <div style="font-size:13px;color:#888;margin-bottom:14px;">함께한 ${r.people}명, 수고했어요!</div>
       ${daysSinceEnd<=7 ? `<div style="display:flex;gap:8px;">
-        <button onclick="closeOverlay('routineFeedOverlay');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:11px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
-        <button onclick="closeOverlay('routineFeedOverlay');openLetterOverlay(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="flex:1;padding:11px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
+        <button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:11px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
+        <button onclick="openLetterOverlay(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="flex:1;padding:11px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
         ${isMyDoneRoutine?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:11px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
       </div>` : ''}
     </div>
@@ -2799,8 +2800,8 @@ function openRoutineDetail(id) {
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
     ${withinGrace?`<div style="display:flex;gap:8px;">
-      <button onclick="closeOverlay('routineDetailOverlay');openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
-      <button onclick="closeOverlay('routineDetailOverlay');openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
+      <button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
+      <button onclick="openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
       ${isMyDone?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:13px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
     </div>`:''}`;
   }
@@ -2928,6 +2929,7 @@ function openCertForm(id,title) {
   const guideBanner=document.getElementById('certGuideBanner');
   if(r&&r.certGuide){ guideBanner.style.display=''; document.getElementById('certGuideText').textContent=r.certGuide; }
   else guideBanner.style.display='none';
+  document.getElementById('certCameraOnlyNotice').style.display = (r&&r.cameraOnly) ? '' : 'none';
   renderCertPhotoGrid();
   document.getElementById('certMemo').value='';
   document.getElementById('certCharCount').textContent='0';
@@ -2940,6 +2942,8 @@ let certPhotos = [];
 let certPhotoWatermarked = []; // certPhotos와 같은 인덱스로 "지금 찍기"(워터마크 적용) 여부 추적
 
 function handleCertPhotos(e) {
+  const r = state.routines.find(x=>x.id===currentCertId);
+  if(r && r.cameraOnly){ e.target.value=''; alert('이 루틴은 실시간 촬영만 가능해요. "📸 지금 찍기"로 올려주세요.'); return; }
   const files = Array.from(e.target.files);
   const remaining = 5 - certPhotos.length;
   const toAdd = files.slice(0, remaining);
@@ -2960,6 +2964,8 @@ function handleCertPhotos(e) {
 function renderCertPhotoGrid() {
   const grid = document.getElementById('certPhotoGrid');
   const req = document.getElementById('certPhotoRequired');
+  const r = state.routines.find(x=>x.id===currentCertId);
+  const cameraOnly = !!(r && r.cameraOnly);
   // 작은 미리보기 타일에서는 사진에 새긴 워터마크 글자가 너무 작아 안 보여서
   // "워터마크가 적용 안 된 것 같다"는 문의가 있었음 — 타일 위에 별도 뱃지로 명확히 표시
   let html = certPhotos.map((src, i) => `
@@ -2971,10 +2977,14 @@ function renderCertPhotoGrid() {
       </button>
     </div>`).join('');
   if(certPhotos.length < 5) {
-    html += `<div onclick="document.getElementById('certPhotoInput').click()" style="aspect-ratio:1;border-radius:10px;border:1.5px dashed #ccc;background:#f9f9f9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;">
-      <i class="ti ti-plus" style="font-size:20px;color:#aaa;"></i>
-      <span style="font-size:10px;color:#aaa;">${certPhotos.length}/5</span>
-    </div>`;
+    // 실시간 촬영만 허용하는 루틴은 갤러리(+) 타일 자체를 숨겨서 그 자리에서 찍은
+    // 사진(타임스탬프 워터마크 자동 포함)만 올릴 수 있게 함
+    if(!cameraOnly) {
+      html += `<div onclick="document.getElementById('certPhotoInput').click()" style="aspect-ratio:1;border-radius:10px;border:1.5px dashed #ccc;background:#f9f9f9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;">
+        <i class="ti ti-plus" style="font-size:20px;color:#aaa;"></i>
+        <span style="font-size:10px;color:#aaa;">${certPhotos.length}/5</span>
+      </div>`;
+    }
     html += `<div onclick="document.getElementById('certCameraInput').click()" style="aspect-ratio:1;border-radius:10px;border:1.5px dashed #83CA00;background:#f7fbf0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;">
       <span style="font-size:18px;">📸</span>
       <span style="font-size:10px;color:#3B6D11;font-weight:600;">지금 찍기</span>
@@ -4364,6 +4374,7 @@ function resetCreateForm() {
   document.getElementById('rRatio').value=67;
   document.getElementById('rPointAmount').value=10;
   document.getElementById('rPinned').checked=false;
+  document.getElementById('rCameraOnly').checked=false;
   ['nameCount','descCount','certGuideCount'].forEach(i=>document.getElementById(i).textContent='0');
   document.getElementById('durationBadge').style.display='none';
   createHasPhoto=false; createPhotoFile=null; selectedEmoji='🌱'; editRoutineId=null; editExistingCoverUrl=null;
@@ -4410,6 +4421,7 @@ async function openEditRoutine(routineId) {
   document.getElementById('rRatio').value = r.completionRatioPct || 67;
   document.getElementById('rPointAmount').value = r.certPointAmount || 10;
   document.getElementById('rPinned').checked = !!r.pinned;
+  document.getElementById('rCameraOnly').checked = !!r.cameraOnly;
   selectEligibility(r.eligibility || 'all');
   selectRoutineType(r.isFree ? 'free' : 'fixed');
   document.getElementById('nameCount').textContent = (r.title||'').length;
@@ -4475,7 +4487,8 @@ function _readCreateFormCommon(){
   const ratio=document.getElementById('rRatio').value;
   const pointAmount=document.getElementById('rPointAmount').value;
   const pinned=document.getElementById('rPinned').checked;
-  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio,pointAmount,pinned};
+  const cameraOnly=document.getElementById('rCameraOnly').checked;
+  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio,pointAmount,pinned,cameraOnly};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -4516,7 +4529,7 @@ async function submitCreateRoutine(){
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
     is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
-    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned,
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
@@ -4547,7 +4560,7 @@ async function submitEditRoutine(){
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
     is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
-    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned,
+    recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     cover_image_url:coverUrl,
   };
   if(state.loginType==='both') payload.led_by = f.leader;
@@ -4948,7 +4961,6 @@ function openKReportCard(routineId) {
     totalCerts: r.certCount||0,
     achieveRate: parts.length ? Math.round(achievers/parts.length*100) : 0,
   });
-  document.getElementById('reportShareBtn').style.display = (navigator.share) ? '' : 'none';
   openSheet('reportCardBg');
 }
 let reportRoutineTitle = '';
@@ -4967,7 +4979,6 @@ function openReportCard(routineId) {
   }
   const rate = totalDays > 0 ? Math.min(100, Math.round(myCerts / totalDays * 100)) : 0;
   document.getElementById('reportCardPreview').innerHTML = _reportCardHtml(r, { totalDays, myCerts, rate });
-  document.getElementById('reportShareBtn').style.display = (navigator.share) ? '' : 'none';
   openSheet('reportCardBg');
 }
 function closeReportCard() { closeSheet('reportCardBg'); }
@@ -5012,11 +5023,6 @@ async function _captureReportCardBlob() {
     const canvas = await html2canvas(el, { scale: 3, backgroundColor: null });
     return await new Promise(res => canvas.toBlob(res, 'image/png'));
   } catch (e) { alert('이미지 생성에 실패했어요: ' + (e.message || e)); return null; }
-}
-async function downloadReportCard() {
-  const blob = await _captureReportCardBlob();
-  if (!blob) return;
-  _downloadBlob(blob, '한끗루틴_완주리포트.png');
 }
 async function shareReportCard() {
   const blob = await _captureReportCardBlob();

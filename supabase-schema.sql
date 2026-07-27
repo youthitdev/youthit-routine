@@ -1997,3 +1997,12 @@ CREATE POLICY "cc_select" ON cert_comments FOR SELECT USING (
   )
   OR is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-25m] 루틴별 "실시간 촬영만 허용" 옵션
+-- 인증 사진을 갤러리에서 고르지 못하고 그 자리에서 카메라로 찍은 사진만
+-- 올릴 수 있게 강제하는 루틴 옵션. 기존 "지금 찍기"(촬영 시각 워터마크)
+-- 기능을 그대로 재사용 — 이 옵션이 켜진 루틴은 갤러리 업로드 타일을 숨김.
+-- 별도 RLS 변경 불필요 — 기존 routines_update(created_by/led_by/admin) 재사용.
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS camera_only boolean NOT NULL DEFAULT false;
