@@ -2006,3 +2006,13 @@ CREATE POLICY "cc_select" ON cert_comments FOR SELECT USING (
 -- 별도 RLS 변경 불필요 — 기존 routines_update(created_by/led_by/admin) 재사용.
 -- =====================================================
 ALTER TABLE routines ADD COLUMN IF NOT EXISTS camera_only boolean NOT NULL DEFAULT false;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25n] 루틴별 완주 인정 비율 커스터마이징 기능 철회
+-- 참가자들이 "완주 인정 비율 67%"라는 숫자를 직관적으로 이해하기 어렵다는
+-- 피드백으로, 루틴마다 비율을 다르게 설정하던 기능을 철회하고 전체 67%로
+-- 통일. 생성/수정 폼에서 입력칸 제거, 화면엔 %를 노출하지 않고 실제 기간
+-- 기준 일수("총 N일 중 M일")로만 안내. 기존에 67%가 아니게 커스터마이징된
+-- 루틴이 있었다면 이 마이그레이션으로 전부 67%로 되돌림.
+-- =====================================================
+UPDATE routines SET completion_ratio_pct = 67 WHERE completion_ratio_pct IS DISTINCT FROM 67;

@@ -177,10 +177,6 @@
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="rtPinned" style="width:16px;height:16px;">📌 루틴 목록 상단에 고정</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="rtCameraOnly" style="width:16px;height:16px;">📸 실시간 촬영만 허용 (갤러리 업로드 불가)</label>
-      <div id="rtRatioFieldWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <input type="number" id="rtRatio" min="1" max="100" value="67" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
-        <span style="font-size:11px;color:#888;">% 이상 인증하면 완주 인정 (나다움 포인트 지급 기준, 기본 67%)</span>
-      </div>
       <div id="rtPointFieldWrap" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <input type="number" id="rtPointAmount" min="1" max="1000" value="10" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <span style="font-size:11px;color:#888;">N — 인증 1회당 지급되는 나다움 포인트 (기본 10N)</span>
@@ -706,7 +702,6 @@ function _rtUpdateDuration() {
 function _rtToggleFreeFields() {
   const isFree = document.getElementById('rtType').value === 'free';
   document.getElementById('rtRecruitFieldWrap').style.display = isFree ? 'none' : '';
-  document.getElementById('rtRatioFieldWrap').style.display = isFree ? 'none' : '';
   document.getElementById('rtPointFieldWrap').style.display = isFree ? 'none' : '';
   document.getElementById('rtDurationFieldWrap').style.display = isFree ? 'none' : '';
   document.getElementById('rtFreeNote').style.display = isFree ? '' : 'none';
@@ -726,7 +721,6 @@ function resetRoutineForm() {
   document.getElementById('rtMaxPeople').value = 10;
   document.getElementById('rtEligibility').value = 'all';
   document.getElementById('rtType').value = 'fixed';
-  document.getElementById('rtRatio').value = 67;
   document.getElementById('rtPointAmount').value = 10;
   document.getElementById('rtPinned').checked = false;
   document.getElementById('rtCameraOnly').checked = false;
@@ -778,7 +772,6 @@ function editRoutineAdmin(id) {
   document.getElementById('rtCertGuide').value = r.certGuide || '';
   document.getElementById('rtEligibility').value = r.eligibility || 'all';
   document.getElementById('rtType').value = r.isFree ? 'free' : 'fixed';
-  document.getElementById('rtRatio').value = r.completionRatio || 67;
   document.getElementById('rtPointAmount').value = r.certPointAmount || 10;
   document.getElementById('rtPinned').checked = !!r.pinned;
   document.getElementById('rtCameraOnly').checked = !!r.cameraOnly;
@@ -810,7 +803,6 @@ async function submitRoutineAdmin() {
   const end = document.getElementById('rtEnd').value;
   const maxPeople = document.getElementById('rtMaxPeople').value;
   const minPeople = document.getElementById('rtMinPeople').value;
-  const ratio = document.getElementById('rtRatio').value;
   const pointAmount = document.getElementById('rtPointAmount').value;
   const kickoff = document.getElementById('rtKickoff').value;
   const closing = document.getElementById('rtClosing').value;
@@ -828,7 +820,6 @@ async function submitRoutineAdmin() {
   if (!isFree && recruitEnd > start) { alert('모집 마감일은 진행 시작일보다 늦을 수 없어요.'); return; }
   if (!maxPeople || maxPeople < 1) { alert('최대 참여 인원을 입력해주세요.'); return; }
   if (minPeople && (parseInt(minPeople) < 1 || parseInt(minPeople) > parseInt(maxPeople))) { alert('최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.'); return; }
-  if (!isFree && (!ratio || ratio < 1 || ratio > 100)) { alert('완주 인정 비율은 1~100 사이로 입력해주세요.'); return; }
   if (!isFree && (!pointAmount || pointAmount < 1 || pointAmount > 1000)) { alert('인증당 지급 포인트는 1~1000 사이로 입력해주세요.'); return; }
   if ((kickoff || closing) && !meetingLink) { alert('온라인 모임 일시를 정했다면 줌 링크도 입력해주세요.'); return; }
   if (!desc) { alert('루틴 소개를 입력해주세요.'); return; }
@@ -840,7 +831,7 @@ async function submitRoutineAdmin() {
     kickoff_at: kickoff ? new Date(kickoff).toISOString() : null,
     closing_at: closing ? new Date(closing).toISOString() : null,
     meeting_link: meetingLink || null,
-    is_free: isFree, completion_ratio_pct: isFree ? 67 : parseInt(ratio), cert_point_amount: isFree ? 10 : parseInt(pointAmount),
+    is_free: isFree, completion_ratio_pct: 67, cert_point_amount: isFree ? 10 : parseInt(pointAmount),
     recruit_start_date: isFree ? null : recruitStart, recruit_end_date: isFree ? null : recruitEnd,
     start_date: isFree ? null : start, end_date: isFree ? null : end,
     max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,

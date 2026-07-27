@@ -930,7 +930,6 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
       <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rPinned" style="width:17px;height:17px;flex-shrink:0;">📌 루틴 목록 상단에 고정</label><div class="char-end" style="color:#bbb;">체크하면 루틴탭 목록 맨 위에 항상 노출돼요</div></div>
       <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rCameraOnly" style="width:17px;height:17px;flex-shrink:0;">📸 실시간 촬영만 허용</label><div class="char-end" style="color:#bbb;">체크하면 인증 사진을 갤러리에서 못 고르고, 그 자리에서 카메라로 찍은 사진(촬영 시각 워터마크 자동 포함)만 올릴 수 있어요</div></div>
-      <div id="rRatioFieldWrap"><div class="field-label">완주 인정 비율 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 67%</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rRatio" min="1" max="100" value="67" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">% 이상 인증하면 완주로 인정, 나다움 포인트 지급 기준이에요</span></div></div>
       <div id="rPointFieldWrap"><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 방법 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><textarea id="rCertGuide" rows="3" placeholder="예) 아침에 일어나자마자 물 한 잔 마시는 사진과 함께 오늘의 다짐을 적어주세요." maxlength="200" oninput="document.getElementById('certGuideCount').textContent=this.value.length"></textarea><div class="char-end"><span id="certGuideCount">0</span>/200</div></div>
@@ -1034,7 +1033,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:0.5px solid #f0f0f0;font-size:13px;color:#111;">🌳 레벨 3 · 나무<span style="color:#888;">루틴 6개</span></div>
         <div style="display:flex;justify-content:space-between;padding:12px 16px;font-size:13px;color:#111;">🌲 레벨 4 · 숲<span style="color:#888;">루틴 10개+</span></div>
       </div>
-      <div style="background:#f5f5f7;border-radius:12px;padding:14px;"><div style="font-size:13px;font-weight:500;color:#111;margin-bottom:4px;">완주율 기준</div><div style="font-size:12px;color:#888;line-height:1.6;">루틴마다 설정된 완주 인정 비율(기본 67%) 이상 인증하면 완주예요.<br>예) 67% · 21일 루틴 → 14일 이상 인증. 자유루틴은 완주 기준이 없어요.</div></div>
+      <div style="background:#f5f5f7;border-radius:12px;padding:14px;"><div style="font-size:13px;font-weight:500;color:#111;margin-bottom:4px;">완주 기준</div><div style="font-size:12px;color:#888;line-height:1.6;">루틴 기간 중 일정 일수 이상 인증하면 완주예요. 각 루틴 상세화면에서 구체적인 기준(예: N일 중 M일)을 확인할 수 있어요. 자유루틴은 완주 기준이 없어요.</div></div>
       <button class="primary-btn" onclick="alert('카카오톡 채널로 이동해요!')">카카오톡 채널 문의</button>
     </div>
   </div>
@@ -1737,6 +1736,17 @@ function _computeProgress(r) {
   const e = new Date(r.end_date + 'T00:00:00').getTime();
   if (e <= s) return 0;
   return Math.max(0, Math.min(100, Math.round((Date.now() - s) / (e - s) * 100)));
+}
+// 완주 인정 비율(completionRatioPct, 내부 기본 67%)을 사용자에게는 %가 아니라
+// "총 N일 중 M일" 형태의 구체적인 일수로 안내하기 위한 공용 계산
+function _completionGoal(r) {
+  let totalDays = 21;
+  if (r.startDate && r.endDate) {
+    const s = new Date(r.startDate+'T00:00:00'), e = new Date(r.endDate+'T00:00:00');
+    if (!isNaN(s) && !isNaN(e) && e >= s) totalDays = Math.round((e-s)/86400000)+1;
+  }
+  const certGoal = Math.max(1, Math.floor(totalDays * (r.completionRatioPct||67) / 100));
+  return { totalDays, certGoal };
 }
 
 async function loadRoutines() {
@@ -2747,7 +2757,7 @@ function openRoutineDetail(id) {
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;">${r.certGuide}</div>`:''}
-  ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · <b>${r.completionRatioPct}%</b> 이상 인증하면 완주 인정</div>`:''}`;
+  ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
@@ -4167,13 +4177,7 @@ function kFilterRoutine(type,el) {
 }
 function openKRoutineFeed(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
-  let totalDays=21;
-  if(r.startDate && r.endDate){
-    const s=new Date(r.startDate+'T00:00:00'), e=new Date(r.endDate+'T00:00:00');
-    if(!isNaN(s) && !isNaN(e) && e>=s) totalDays=Math.round((e-s)/86400000)+1;
-  }
-  const ratio=r.completionRatioPct||67;
-  const certGoal=Math.max(1, Math.floor(totalDays*ratio/100));
+  const {totalDays, certGoal}=_completionGoal(r);
   const achievers=r.participants.filter(p=>p.cert>=certGoal).length;
   const rate=r.participants.length?Math.round(achievers/r.participants.length*100):0;
   const colors=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
@@ -4181,7 +4185,7 @@ function openKRoutineFeed(routineId) {
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
   document.getElementById('rdBody').innerHTML=`
     ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (목표의 ${ratio}% 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
+      <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (총 ${totalDays}일 중 ${certGoal}일 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
     </div>`}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">전체 인증글</div>
@@ -4339,7 +4343,6 @@ function selectRoutineType(v){
   document.getElementById('rTypeFixed').classList.toggle('active', !isFree);
   document.getElementById('rTypeFree').classList.toggle('active', isFree);
   document.getElementById('rRecruitFieldWrap').style.display = isFree?'none':'';
-  document.getElementById('rRatioFieldWrap').style.display = isFree?'none':'';
   document.getElementById('rPointFieldWrap').style.display = isFree?'none':'';
   document.getElementById('rDurationFieldWrap').style.display = isFree?'none':'';
   document.getElementById('rTypeHint').textContent = isFree
@@ -4371,7 +4374,6 @@ async function populateLeaderSelect(selectedId) {
 function resetCreateForm() {
   ['rName','rPartner','rDesc','rCertGuide','rRecruitStart','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
-  document.getElementById('rRatio').value=67;
   document.getElementById('rPointAmount').value=10;
   document.getElementById('rPinned').checked=false;
   document.getElementById('rCameraOnly').checked=false;
@@ -4418,7 +4420,6 @@ async function openEditRoutine(routineId) {
   document.getElementById('rKickoff').value = r.kickoffAt ? r.kickoffAt.slice(0,16) : '';
   document.getElementById('rClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
   document.getElementById('rMeetingLink').value = r.meetingLink || '';
-  document.getElementById('rRatio').value = r.completionRatioPct || 67;
   document.getElementById('rPointAmount').value = r.certPointAmount || 10;
   document.getElementById('rPinned').checked = !!r.pinned;
   document.getElementById('rCameraOnly').checked = !!r.cameraOnly;
@@ -4484,11 +4485,10 @@ function _readCreateFormCommon(){
   const meetLink=document.getElementById('rMeetingLink').value.trim();
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
   const isFree=createRoutineType==='free';
-  const ratio=document.getElementById('rRatio').value;
   const pointAmount=document.getElementById('rPointAmount').value;
   const pinned=document.getElementById('rPinned').checked;
   const cameraOnly=document.getElementById('rCameraOnly').checked;
-  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,ratio,pointAmount,pinned,cameraOnly};
+  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,pointAmount,pinned,cameraOnly};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -4503,7 +4503,6 @@ function _validateCreateForm(f){
   if(!f.isFree && f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
   if(f.mp && (parseInt(f.mp)<1 || parseInt(f.mp)>parseInt(f.p))) return '최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.';
-  if(!f.isFree && (!f.ratio || f.ratio<1 || f.ratio>100)) return '완주 인정 비율은 1~100 사이로 입력해주세요.';
   if(!f.isFree && (!f.pointAmount || f.pointAmount<1 || f.pointAmount>1000)) return '인증당 지급 포인트는 1~1000 사이로 입력해주세요.';
   if(!f.d) return '루틴 소개를 입력해주세요.';
   return null;
@@ -4528,7 +4527,7 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
+    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
@@ -4559,7 +4558,7 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    is_free:f.isFree, completion_ratio_pct:f.isFree?67:parseInt(f.ratio), cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
+    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     cover_image_url:coverUrl,
   };
