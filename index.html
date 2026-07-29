@@ -685,9 +685,9 @@ select:focus { outline: none; border-color: #2E33BC; }
           <!-- 승인 대기 알림 -->
           <div id="kMeetBanner"></div>
           <div id="kPendingAlert"></div>
-          <!-- 진행 중인 루틴 -->
+          <!-- 참여 중인 루틴 -->
           <div class="section-card">
-            <div class="section-hd"><div class="section-hd-title">진행 중인 루틴</div></div>
+            <div class="section-hd"><div class="section-hd-title">참여 중인 루틴</div></div>
             <div id="kActiveRoutineList"></div>
           </div>
         </div>
@@ -2071,6 +2071,9 @@ function applyRole(role) {
   document.getElementById('kkutjjangTabs').style.display = isYouth ? 'none' : '';
   document.getElementById('youthNav').style.display = isYouth ? 'contents' : 'none';
   document.getElementById('kkutjjangNav').style.display = isYouth ? 'none' : 'contents';
+  // 루틴탭은 루틴 등록/수정 권한이 있는 관리자(미리보기 포함)만 필요 — 일반 끗짱은
+  // 담당 루틴 정보를 홈/인증탭에서 이미 다 볼 수 있어서 청소년과 같은 4탭 구성으로 축소
+  document.getElementById('knav-routine').style.display = (!isYouth && state.loginType!=='both') ? 'none' : '';
   document.getElementById('headerRoleBadge').textContent = isYouth ? '청소년' : '끗짱';
   // 역할별 색상 전체 적용
   const headerColor = isYouth ? '#83CA00' : '#FF006C';
@@ -4169,20 +4172,23 @@ function _kUpcomingRoutines() {
 }
 function _kUpcomingListHtml(list) {
   if(!list.length) return '';
-  return `<div style="padding:13px 16px 4px;">
-      <div style="font-size:13px;font-weight:700;color:#888;">🗓 곧 시작해요</div>
-    </div>` + list.map(r=>{
-      const pendingCount=(r.applicants||[]).filter(a=>a.status==='pending').length;
-      const dd=_dday(r.startDate);
-      const ddText = dd>0?`D-${dd}`:dd===0?'오늘 시작':'모집중';
-      return `<div style="padding:13px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;" onclick="openKRoutineDetail(${r.id})">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <span style="font-size:14px;font-weight:600;color:#111;">${r.emoji} ${r.title}</span>
-          <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;background:#E6F1FB;color:#185FA5;flex-shrink:0;">${ddText}</span>
-        </div>
-        <div style="font-size:11px;color:#aaa;">${r.people}명 승인${pendingCount>0?` · ⏳ 대기 ${pendingCount}명`:''}</div>
-      </div>`;
-    }).join('');
+  return list.map(r=>{
+    const pendingCount=(r.applicants||[]).filter(a=>a.status==='pending').length;
+    const parts=r.participants||[];
+    const dd=_dday(r.startDate);
+    const ddText = dd>0?`D-${dd}`:dd===0?'오늘 시작':'모집중';
+    return `<div style="padding:13px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;" onclick="openKRoutineDetail(${r.id})">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:14px;font-weight:600;color:#111;">${r.emoji} ${r.title}</span>
+        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;background:#E6F1FB;color:#185FA5;flex-shrink:0;">${ddText}</span>
+      </div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:8px;">${r.period} · ${r.people}명 승인${pendingCount>0?` · ⏳ 대기 ${pendingCount}명`:''}</div>
+      ${parts.length>0?`<div style="display:flex;">
+        ${parts.slice(0,4).map((p,i)=>`<div style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;border:1.5px solid white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#aaa;${i>0?'margin-left:-7px;':''}">${p.name[0]}</div>`).join('')}
+        ${parts.length>4?`<div style="width:24px;height:24px;border-radius:50%;background:#f5f5f5;border:1.5px solid white;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888;margin-left:-7px;">+${parts.length-4}</div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
 }
 function kRenderHome() {
   const now=new Date();
