@@ -532,6 +532,7 @@ select:focus { outline: none; border-color: #2E33BC; }
           <div class="filter-bar" id="routineFilterBar" style="padding-top:0;flex:1;">
             <div class="chip active" onclick="filterRoutine('all',this)">전체</div>
             <div class="chip" id="routineChipRecruit" onclick="filterRoutine('recruit',this)">모집 중</div>
+            <div class="chip" onclick="filterRoutine('active',this)">진행 중</div>
             <div class="chip" onclick="filterRoutine('done',this)">완료</div>
           </div>
           <button onclick="toggleSearch()" id="searchToggleBtn" style="flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
