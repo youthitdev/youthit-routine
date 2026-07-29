@@ -698,6 +698,7 @@ select:focus { outline: none; border-color: #2E33BC; }
           <div class="filter-bar" id="kRoutineFilterBar" style="padding-top:0;flex:1;">
             <div class="chip active" onclick="kFilterRoutine('all',this)">전체</div>
             <div class="chip" onclick="kFilterRoutine('recruit',this)">모집 중</div>
+            <div class="chip" onclick="kFilterRoutine('active',this)">진행 중</div>
             <div class="chip" onclick="kFilterRoutine('done',this)">완료</div>
           </div>
           <button id="kCreateBtn" onclick="openCreateRoutine()" style="display:none;flex-shrink:0;padding:6px 12px;background:none;border:none;cursor:pointer;">
@@ -842,7 +843,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="flex:1;display:flex;gap:6px;align-items:center;background:#f5f5f7;border-radius:24px;padding:8px 14px;">
           <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요..." maxlength="100"
             style="flex:1;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
-            onkeydown="if(event.key==='Enter')submitCommentFromBar()">
+            onkeydown="if(event.key==='Enter' && !event.isComposing)submitCommentFromBar()">
           <button onclick="submitCommentFromBar()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;">
             <i class="ti ti-send" style="font-size:18px;color:#2E33BC;"></i>
           </button>
@@ -885,7 +886,7 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-body">
       <div id="certGuideBanner" style="display:none;background:#f5f5f7;border-radius:12px;padding:12px 14px;">
         <div style="font-size:12px;color:#888;margin-bottom:4px;">🎯 이렇게 인증해 주세요</div>
-        <div style="font-size:13.5px;color:#111;line-height:1.6;" id="certGuideText"></div>
+        <div style="font-size:13.5px;color:#111;line-height:1.6;white-space:pre-wrap;" id="certGuideText"></div>
       </div>
       <div>
         <div class="field-label">오늘의 인증 사진 <span class="required">* 필수</span> <span style="font-size:11px;color:#888;font-weight:400;">최대 5장</span></div>
@@ -2585,13 +2586,19 @@ function renderCertDetail(id) {
     </div>`;
 }
 
+let _submittingComment = false;
 async function submitCommentFromBar() {
-  if(!currentUser) return;
+  if(!currentUser || _submittingComment) return;
   const input = document.getElementById('rdCommentInput');
   const text = input.value.trim();
   if(!text) return;
-  if(currentPostDetailId){ await _submitPostComment(text, input); return; }
-  if(!currentCertDetailId) return;
+  // 한글 IME 조합 중 Enter가 keydown을 두 번 발생시키는 브라우저가 있어서(윈도우 PC에서
+  // "댓글이 2개씩 달림" 버그로 접수됨) — onkeydown에서 isComposing으로 1차 방어하고,
+  // 여기서도 진행 중 플래그로 이중 제출을 막음(마우스로 전송 버튼 연타하는 경우도 방어)
+  _submittingComment = true;
+  try {
+    if(currentPostDetailId){ await _submitPostComment(text, input); return; }
+    if(!currentCertDetailId) return;
   const c = (state.certFeed||[]).find(x=>x.id===currentCertDetailId);
   if(!c) return;
   const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
@@ -2626,6 +2633,9 @@ async function submitCommentFromBar() {
   // 피드 카운트도 업데이트
   const feedEl=document.getElementById('feedComment_'+currentCertDetailId);
   if(feedEl) feedEl.textContent=cnt;
+  } finally {
+    _submittingComment = false;
+  }
 }
 async function deleteCertComment(certId, commentId) {
   if(!confirm('이 댓글을 삭제할까요?')) return;
@@ -2759,9 +2769,9 @@ function openRoutineDetail(id) {
     ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:13px;color:#2E33BC;background:#E6F1FB;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">🔗</div>`:''}
   </div>
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
-  <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>
+  <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
-  <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;">${r.certGuide}</div>`:''}
+  <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
   ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
@@ -4133,6 +4143,7 @@ function kFilterRoutine(type,el) {
   const base = type==='all' ? state.routines : _kMyRoutines();
   const filtered = type==='all' ? base
     : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
+    : type==='active' ? base.filter(r=>r.status==='active' && !_isFreeOpen(r))
     : base.filter(r=>r.status===type);
   // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 모집중(자유루틴은 상시 열려있는 동안 포함) 루틴 순으로 상단 고정
   const kSorted = [...filtered].sort((a,b)=>{
@@ -4242,9 +4253,9 @@ function openKRoutineDetail(routineId) {
       ${r.status==='done'?`<button onclick="openKReportCard(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 완주 리포트</button>`:''}
     </div>
     ${r.status==='cancelled'?`<div style="padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:12.5px;color:#888;margin-bottom:14px;">🙏 최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강된 루틴이에요</div>`:''}
-    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;">${r.desc}</div>
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
     ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
-    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;">${r.certGuide}</div>`:''}
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
     ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · <b>${r.completionRatioPct}%</b> 이상 인증하면 완주 인정</div>`:''}
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
       신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>

@@ -2016,3 +2016,33 @@ ALTER TABLE routines ADD COLUMN IF NOT EXISTS camera_only boolean NOT NULL DEFAU
 -- 루틴이 있었다면 이 마이그레이션으로 전부 67%로 되돌림.
 -- =====================================================
 UPDATE routines SET completion_ratio_pct = 67 WHERE completion_ratio_pct IS DISTINCT FROM 67;
+
+-- =====================================================
+-- [마이그레이션 2026-07-25o] 편지 받으면 담당 끗짱에게 푸시 알림
+-- 편지 기능을 실제 DB에 연결(2026-07-25 세션)하면서도 수신 알림은 빠져있었음.
+-- on_post_comment_push()와 동일한 패턴 — 편지가 insert되면 그 루틴의 담당
+-- 끗짱(led_by, 없으면 created_by)에게 notify_push().
+-- =====================================================
+CREATE OR REPLACE FUNCTION on_letter_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  recipient uuid;
+  sender_name text;
+  routine_title text;
+BEGIN
+  SELECT COALESCE(led_by, created_by), title INTO recipient, routine_title FROM routines WHERE id = NEW.routine_id;
+  IF recipient IS NULL OR recipient = NEW.from_user_id THEN RETURN NEW; END IF;
+  SELECT name INTO sender_name FROM profiles WHERE id = NEW.from_user_id;
+  PERFORM notify_push(
+    recipient,
+    '💌 편지가 도착했어요',
+    coalesce(sender_name,'누군가') || '님이 "' || coalesce(routine_title,'루틴') || '"에서 편지를 보냈어요'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_letter_push ON letters;
+CREATE TRIGGER trg_letter_push
+  AFTER INSERT ON letters
+  FOR EACH ROW EXECUTE FUNCTION on_letter_push();
