@@ -5321,6 +5321,11 @@ const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay
 // 뒤로가기 즉시 앱이 꺼지는 것보다는 훨씬 나은 절충.
 let _navStack = []; // {type:'modal', kind, id} | {type:'tab', tab, isK}
 let _poppingNav = false; // popstate가 유발한 내부 탭 전환인지 구분(재귀 push 방지)
+// closeOverlay()/closeSheet()가 직접 history.back()을 호출했을 때, 그로 인해
+// 비동기로 나중에 발생하는 popstate 이벤트를 "진짜 사용자의 뒤로가기"로 착각해서
+// _navStack을 한 번 더 pop하지 않도록 막는 카운터 (여러 개가 같은 틱에 연달아
+// 닫혀도 안전하도록 boolean 대신 카운트로 관리)
+let _selfTriggeredBackCount = 0;
 
 function _navPushModal(kind, id) {
   _navStack.push({type:'modal', kind, id});
@@ -5329,8 +5334,9 @@ function _navPushModal(kind, id) {
 function _navRemoveModal(kind, id) {
   for(let i=_navStack.length-1;i>=0;i--){
     const e=_navStack[i];
-    if(e.type==='modal' && e.kind===kind && e.id===id){ _navStack.splice(i,1); break; }
+    if(e.type==='modal' && e.kind===kind && e.id===id){ _navStack.splice(i,1); return true; }
   }
+  return false;
 }
 function _navPushTab(tab, isK) {
   if(_poppingNav) return;
@@ -5340,6 +5346,7 @@ function _navPushTab(tab, isK) {
   history.pushState({}, '');
 }
 window.addEventListener('popstate', () => {
+  if(_selfTriggeredBackCount > 0) { _selfTriggeredBackCount--; return; } // 이미 위에서 직접 처리한 close
   const entry = _navStack.pop();
   if(!entry) return; // 더 쌓인 게 없으면 기본 동작(진짜 종료 등)에 맡김
   if(entry.type === 'modal') {
@@ -5367,7 +5374,14 @@ function openOverlay(id) {
 }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
-  _navRemoveModal('overlay', id);
+  // _navRemoveModal이 실제로 스택에서 지운 경우에만(=진짜 열려있던 오버레이를 지금
+  // 처음 닫는 경우에만) 남아있는 history 항목을 함께 소비함 — 화면 상의 "←" 버튼이
+  // closeOverlay()를 직접 불러 화면만 닫고 history.pushState()로 쌓인 항목은 그대로
+  // 남겨두면, 나중에 진짜 뒤로가기(브라우저/제스처)를 누를 때 그 밀린 항목들 때문에
+  // 화면을 여러 단계 건너뛰어 홈으로 가버리는 문제가 있었음. popstate 핸들러가
+  // 이미 _navStack.pop()으로 지운 뒤 호출한 경우엔 여기서 false가 나와 중복으로
+  // history.back()을 부르지 않음
+  const wasOpen = _navRemoveModal('overlay', id);
   if(id==='routineFeedOverlay') {
     document.getElementById('certFloatingBtn').style.display='none';
   }
@@ -5383,9 +5397,14 @@ function closeOverlay(id) {
     const anyOpen = DEPTH3_OVERLAYS.some(oid => oid!==id && document.getElementById(oid)?.classList.contains('open'));
     if(!anyOpen) document.getElementById('mainNav').style.display = '';
   }
+  if(wasOpen) { _selfTriggeredBackCount++; history.back(); }
 }
 function openSheet(id) { document.getElementById(id).classList.add('open'); _navPushModal('sheet', id); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); _navRemoveModal('sheet', id); }
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('open');
+  const wasOpen = _navRemoveModal('sheet', id); // closeOverlay와 동일한 이유
+  if(wasOpen) { _selfTriggeredBackCount++; history.back(); }
+}
 
 // ════════════════════════════════════════════════════════
 // 온보딩
