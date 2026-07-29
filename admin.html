@@ -418,6 +418,12 @@ const SB_URL = 'https://ynqvhsffoesjzefitafv.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlucXZoc2Zmb2VzanplZml0YWZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjMxNDIsImV4cCI6MjA5ODg5OTE0Mn0.l16KP5amowhtrtoBaKL1M8wtcPMgUxniVcjoLC6YOIQ';
 const sb = supabase.createClient(SB_URL, SB_KEY);
 const ADMINS = ['dev@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
+// new Date().toISOString()는 UTC 기준이라 한국 자정~오전 9시 사이엔 어제 날짜로
+// 계산되는 버그가 있었음(index.html에서 발견) — 로컬 타임존 기준 YYYY-MM-DD로 통일
+function _todayStr(d) {
+  d = d || new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
 
 const REGION_DATA = {
   '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
@@ -528,7 +534,7 @@ async function loadData() {
   // 관리자 세션은 항상 쓰기 권한이 있어서(is_admin()), 여기서 본 김에 실제로 보정해둠
   // (index.html에서도 동일 로직으로 보정하지만, 일반 끗짱/청소년 세션은 더 이상 쓰기 권한이
   // 없어서 관리자가 admin.html을 열 때가 오히려 더 확실한 보정 시점).
-  const _today = new Date().toISOString().slice(0, 10);
+  const _today = _todayStr();
   routines.forEach(r => {
     const eff = r.status === 'active' && r.end_date && r.end_date < _today ? 'done'
       : r.status === 'recruit' && r.start_date && r.start_date <= _today ? 'active'
@@ -1554,7 +1560,7 @@ function _downloadCSVRows(label, rows) {
   const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `한끗루틴_${label}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.href = url; a.download = `한끗루틴_${label}_${_todayStr()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
