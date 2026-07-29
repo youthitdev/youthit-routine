@@ -4245,22 +4245,11 @@ function openKRoutineDetail(routineId) {
   const approved = applicants.filter(a=>a.status==='approved');
   const rejected = applicants.filter(a=>a.status==='rejected');
   const canCancel = (r.status==='recruit'||r.status==='active') && r.minPeople;
-  document.getElementById('rdBody').innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button onclick="openEditRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#FF006C;border:1.5px solid #FF006C;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-pencil" style="font-size:14px;"></i> 루틴 수정</button>
-      ${(r.status==='recruit'||r.status==='active')?`<button onclick="shareRoutineLink(${routineId},'${(r.title||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">🔗 공유</button>`:''}
-      ${canCancel?`<button onclick="cancelRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#888;border:1.5px solid #ddd;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-ban" style="font-size:14px;"></i> 폐강 처리</button>`:''}
-      ${r.status==='done'?`<button onclick="openKReportCard(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 완주 리포트</button>`:''}
-    </div>
-    ${r.status==='cancelled'?`<div style="padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:12.5px;color:#888;margin-bottom:14px;">🙏 최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강된 루틴이에요</div>`:''}
-    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
-    ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
-    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-    ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · <b>${r.completionRatioPct}%</b> 이상 인증하면 완주 인정</div>`:''}
-    <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
-      신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>
-    </div>
-    ${applicants.length===0
+  // 루틴 수정·폐강·신청자 승인/거절/취소는 관리자만 — 담당 끗짱(개인 계정)은 승인된
+  // 참여자 모니터링만 하고, 신청 심사는 유스보이스(관리자)가 전담하기로 결정(2026-07-25)
+  const isAdmin = state.loginType==='both';
+  const applicantsSectionHtml = isAdmin
+    ? (applicants.length===0
       ? `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 신청자가 없어요</div>`
       : `${pending.length>0?`
         <div style="font-size:11px;font-weight:500;color:#856404;background:#FFF3CD;padding:4px 10px;border-radius:8px;margin-bottom:8px;display:inline-block;">⏳ 승인 대기 ${pending.length}명</div>`:''}
@@ -4283,7 +4272,36 @@ function openKRoutineDetail(routineId) {
               ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap;">💬 ${a.note}</div>`:''}
               ${a.status==='rejected'&&a.rejectReason?`<div style="margin-top:6px;padding:8px 10px;background:#FBEAF0;border-radius:8px;font-size:11px;color:#993556;line-height:1.5;white-space:pre-wrap;">거절 사유: ${a.rejectReason}</div>`:''}
             </div>`).join('')}
-        </div>`}`;
+        </div>`)
+    : (approved.length===0
+      ? `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 승인된 참여자가 없어요</div>`
+      : `<div style="display:flex;flex-direction:column;gap:8px;">
+          ${approved.map(a=>`
+            <div style="padding:12px;background:#EAF3DE;border:0.5px solid #83CA00;border-radius:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${a.name}</div></div>
+                <span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 참여 중</span>
+              </div>
+            </div>`).join('')}
+        </div>`);
+  document.getElementById('rdBody').innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      ${isAdmin?`<button onclick="openEditRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#FF006C;border:1.5px solid #FF006C;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-pencil" style="font-size:14px;"></i> 루틴 수정</button>`:''}
+      ${(r.status==='recruit'||r.status==='active')?`<button onclick="shareRoutineLink(${routineId},'${(r.title||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">🔗 공유</button>`:''}
+      ${isAdmin&&canCancel?`<button onclick="cancelRoutine(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#888;border:1.5px solid #ddd;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;"><i class="ti ti-ban" style="font-size:14px;"></i> 폐강 처리</button>`:''}
+      ${r.status==='done'?`<button onclick="openKReportCard(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 완주 리포트</button>`:''}
+    </div>
+    ${r.status==='cancelled'?`<div style="padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:12.5px;color:#888;margin-bottom:14px;">🙏 최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강된 루틴이에요</div>`:''}
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
+    ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
+    <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
+    ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}
+    <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
+      ${isAdmin?`신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>`:`참여자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${approved.length}명 / 최대 ${r.maxPeople}명)</span>`}
+    </div>
+    ${!isAdmin?`<div style="font-size:11px;color:#aaa;margin-bottom:8px;">신청 승인·거절은 유스보이스에서 진행해요</div>`:''}
+    ${applicantsSectionHtml}`;
   openOverlay('routineDetailOverlay');
 }
 

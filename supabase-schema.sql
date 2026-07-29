@@ -2046,3 +2046,25 @@ DROP TRIGGER IF EXISTS trg_letter_push ON letters;
 CREATE TRIGGER trg_letter_push
   AFTER INSERT ON letters
   FOR EACH ROW EXECUTE FUNCTION on_letter_push();
+
+-- =====================================================
+-- [마이그레이션 2026-07-25p] 루틴 수정·참여자 승인 권한을 관리자만으로 축소
+-- 지금까지는 담당 끗짱(led_by)도 자기 루틴을 수정하고 신청자를 승인/거절/
+-- 승인취소할 수 있었음. QA 피드백으로 이 권한을 관리자(유스보이스)에게만
+-- 두고, 담당 끗짱(개인 계정)은 승인된 참여자 모니터링만 하도록 축소하기로
+-- 결정 — routines_update/rp_update 정책에서 led_by 조건을 제거.
+-- (created_by는 루틴 개설이 관리자 전용이라 실질적으로 is_admin()과 동일)
+-- 관리자가 loginType='both'로 끗짱 화면을 미리볼 때는 is_admin()이 그대로
+-- 통과하므로 기존처럼 전체 권한 유지됨.
+-- =====================================================
+DROP POLICY IF EXISTS "routines_update" ON routines;
+CREATE POLICY "routines_update" ON routines FOR UPDATE USING (
+  auth.uid() = created_by OR is_admin()
+);
+
+DROP POLICY IF EXISTS "rp_update" ON routine_participants;
+CREATE POLICY "rp_update" ON routine_participants FOR UPDATE USING (
+  auth.uid() = user_id
+  OR auth.uid() IN (SELECT created_by FROM routines WHERE id = routine_id)
+  OR is_admin()
+);
