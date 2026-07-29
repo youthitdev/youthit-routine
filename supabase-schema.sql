@@ -2116,3 +2116,39 @@ REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM anon;
 CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
   SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr', 'ai@youthvoice.or.kr');
 $$ LANGUAGE sql STABLE;
+
+-- =====================================================
+-- [마이그레이션 2026-07-29b] ai@ 계정을 관리자 → 일반 끗짱으로 되돌리고 데모 루틴 준비
+-- 심사위원이 "관리자가 전체를 보는 화면"이 아니라 "끗짱 한 명이 자기 담당 루틴만
+-- 보는 실제 화면"을 체험하도록, ai@youthvoice.or.kr을 관리자에서 제외하고
+-- 데모용 루틴 하나를 이 계정 담당(led_by)으로 만들어둠. (ADMINS 배열도
+-- index.html/admin.html에서 함께 되돌려둠 — 3곳 동일 유지)
+-- =====================================================
+CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
+  SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr');
+$$ LANGUAGE sql STABLE;
+
+INSERT INTO routines (
+  title, emoji, description, cert_guide, eligibility, led_by, created_by,
+  is_free, completion_ratio_pct, cert_point_amount,
+  start_date, end_date, max_people, status
+)
+SELECT
+  '☀️ 심사용 데모 루틴', '✨', '지원사업 심사위원 체험용 데모 루틴이에요. 매일 오늘 하루를 요약하는 사진과 짧은 소감을 인증해주세요.',
+  '오늘 있었던 일을 나타내는 사진과 한 줄 소감을 남겨주세요.', 'all',
+  (SELECT id FROM auth.users WHERE email = 'ai@youthvoice.or.kr'),
+  (SELECT id FROM auth.users WHERE email = 'dev@youthvoice.or.kr'),
+  false, 67, 10,
+  '2026-07-25', '2026-08-10', 10, 'active';
+
+-- =====================================================
+-- [마이그레이션 2026-07-29c] 심사용 청소년 계정을 데모 루틴에 승인된 참여자로 등록
+-- youthpd@youthvoice.or.kr이 신청→승인 대기 없이 바로 인증 체험을 할 수 있도록
+-- "☀️ 심사용 데모 루틴"에 승인 상태로 바로 등록.
+-- =====================================================
+INSERT INTO routine_participants (routine_id, user_id, status)
+SELECT r.id, u.id, 'approved'
+FROM routines r, auth.users u
+WHERE r.title = '☀️ 심사용 데모 루틴'
+  AND u.email = 'youthpd@youthvoice.or.kr'
+ON CONFLICT (routine_id, user_id) DO UPDATE SET status = 'approved';
