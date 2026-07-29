@@ -2402,6 +2402,37 @@ function clearSearch() {
 
 // 루틴 피드
 let currentFeedRoutineId=null;
+// 인증글(사진+소감) 그리드 — 청소년/끗짱 양쪽의 "전체 인증 기록" 화면에서 공용으로 씀
+// (빈 상태 문구는 화면마다 어울리는 톤이 달라서 호출하는 쪽에서 따로 처리)
+function _certFeedGridHtml(certs) {
+  return `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;">
+      ${certs.map(c=>`
+        <div onclick="openCertFeedDetail(${c.id})" style="border-radius:12px;overflow:hidden;border:0.5px solid #e8e8e8;cursor:pointer;background:#fff;">
+          <div style="aspect-ratio:1;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+            ${c.photos&&c.photos[0]?`<img src="${c.photos[0]}" style="width:100%;height:100%;object-fit:cover;">`:`<i class="ti ti-photo" style="font-size:28px;color:rgba(0,0,0,0.15);"></i>`}
+            <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:6px 8px 7px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:white;font-weight:500;">${c.name}</span>
+                <span style="font-size:10px;color:rgba(255,255,255,0.85);">${c.day}</span>
+              </div>
+            </div>
+          </div>
+          <div style="padding:8px 10px;">
+            <div style="font-size:12px;color:#333;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.text}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <div onclick="event.stopPropagation();toggleCertLike(${c.id})" style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;cursor:pointer;">
+                <i class="ti ti-heart${c.liked?'-filled':''}" id="feedHeart_${c.id}" style="font-size:13px;color:${c.liked?'#FF006C':'#ccc'};"></i>
+                <span id="feedLike_${c.id}">${c.likes}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;">
+                <i class="ti ti-message-circle" style="font-size:13px;"></i>${(c.comments||[]).length}
+              </div>
+              <span style="font-size:10px;color:#ccc;margin-left:auto;">${timeAgo(c.ts)}</span>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
 function openRoutineFeed(routineId) {
   currentFeedRoutineId=routineId;
   const r=state.routines.find(x=>x.id===routineId);
@@ -2438,36 +2469,10 @@ function openRoutineFeed(routineId) {
     </div>
     <div style="padding:4px 16px 0;font-size:13px;font-weight:600;color:#111;">📸 그동안의 인증 기록</div>
   ` : '';
-  let html=completeActionsHtml + (certs.length===0
-    ?`<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
-    :`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:12px 16px 16px;">
-        ${certs.map(c=>`
-          <div onclick="openCertFeedDetail(${c.id})" style="border-radius:12px;overflow:hidden;border:0.5px solid #e8e8e8;cursor:pointer;background:#fff;">
-            <div style="aspect-ratio:1;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-              ${c.photos&&c.photos[0]?`<img src="${c.photos[0]}" style="width:100%;height:100%;object-fit:cover;">`:`<i class="ti ti-photo" style="font-size:28px;color:rgba(0,0,0,0.15);"></i>`}
-              <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:6px 8px 7px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;">
-                  <span style="font-size:11px;color:white;font-weight:500;">${c.name}</span>
-                  <span style="font-size:10px;color:rgba(255,255,255,0.85);">${c.day}</span>
-                </div>
-              </div>
-            </div>
-            <div style="padding:8px 10px;">
-              <div style="font-size:12px;color:#333;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.text}</div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-                <div onclick="event.stopPropagation();toggleCertLike(${c.id})" style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;cursor:pointer;">
-                  <i class="ti ti-heart${c.liked?'-filled':''}" id="feedHeart_${c.id}" style="font-size:13px;color:${c.liked?'#FF006C':'#ccc'};"></i>
-                  <span id="feedLike_${c.id}">${c.likes}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;">
-                  <i class="ti ti-message-circle" style="font-size:13px;"></i>${(c.comments||[]).length}
-                </div>
-                <span style="font-size:10px;color:#ccc;margin-left:auto;">${timeAgo(c.ts)}</span>
-              </div>
-            </div>
-          </div>`).join('')}
-      </div>`);
-  document.getElementById('feedOverlayBody').innerHTML=html;
+  const gridHtml = certs.length===0
+    ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
+    : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs)}</div>`;
+  document.getElementById('feedOverlayBody').innerHTML = completeActionsHtml + gridHtml;
   const myR=state.routines.find(x=>x.id===routineId);
   const isMyRoutine = myR.status==='active' && currentUser && (myR.participants||[]).some(p=>p.userId===currentUser.id);
   document.getElementById('certFloatingBtn').style.display=isMyRoutine?'block':'none';
@@ -4183,17 +4188,25 @@ function openKRoutineFeed(routineId) {
   const colors=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
   document.getElementById('rdSub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
+  // 담당 끗짱은 정식 참여자(routine_participants)가 아니어도 자기 루틴에 바로 인증할 수 있어서
+  // 참여자 목록 기준 그리드(위)엔 본인이 안 잡힘 — 아래 "전체 인증 기록"은 실제 certifications을
+  // 그대로 보여줘서 끗짱 본인 인증을 포함한 전체 기간 기록이 빠짐없이 보이게 함
+  const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId);
   document.getElementById('rdBody').innerHTML=`
     ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (총 ${totalDays}일 중 ${certGoal}일 이상)</div><div style="font-size:12px;color:#3B6D11;">${r.participants.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
     </div>`}
-    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">전체 인증글</div>
-    <div class="feed-grid">
+    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">오늘 인증 현황</div>
+    <div class="feed-grid" style="margin-bottom:20px;">
       ${r.participants.map((p,i)=>p.todayDone
         ?`<div class="feed-item" style="background:${colors[i%4]};" onclick="openKCertDetail(${r.id},'${p.name}')"><div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div></div>`
         :`<div class="feed-item" style="background:#e8e8e8;cursor:default;"><i class="ti ti-camera-off" style="font-size:22px;color:rgba(0,0,0,0.3);"></i><div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:2px 6px;font-size:10px;color:white;">미인증</div><div style="position:absolute;bottom:5px;left:5px;right:5px;font-size:10px;color:rgba(0,0,0,0.6);text-align:center;">${p.name}</div><button onclick="sendPoke(${r.id},'${p.userId}','${(p.name||'').replace(/'/g,"\\'")}')" style="position:absolute;top:5px;left:5px;background:rgba(46,51,188,0.85);border:none;border-radius:8px;padding:3px 6px;font-size:10px;color:white;font-weight:600;cursor:pointer;">👋 콕</button></div>`).join('')}
-    </div>`;
+    </div>
+    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">📸 전체 인증 기록 <span style="font-size:11px;color:#aaa;font-weight:400;">(본인 인증 포함)</span></div>
+    ${certs.length===0
+      ? `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;">아직 인증글이 없어요</div>`
+      : _certFeedGridHtml(certs)}`;
   openOverlay('routineDetailOverlay');
 }
 // 미인증 청소년에게 응원 보내기 (하루에 한 명당 한 번, DB unique 제약으로 방지)
