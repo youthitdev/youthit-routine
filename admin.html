@@ -1438,6 +1438,13 @@ async function grantNadaeum() {
   const { error } = await sb.from('profiles').update({ nadaeum: newBalance }).eq('id', userId);
   if (error) { alert('지급 실패: ' + error.message); return; }
   await sb.from('nadaeum_log').insert({ user_id: userId, amount, reason: '관리자 수동 지급: ' + reason });
+  // 알림 발송(send-push는 관리자 JWT로만 발송 가능하도록 이미 검증돼 있어서 알림 보내기
+  // 탭과 동일한 방식 재사용) — 지금까지 수동 지급/차감에 알림이 전혀 안 가고 있었음
+  sb.functions.invoke('send-push', { body: {
+    user_id: userId,
+    title: amount >= 0 ? '✨ 나다움 포인트가 지급됐어요' : '나다움 포인트가 조정됐어요',
+    body: `${amount >= 0 ? '+' : ''}${amount}N — ${reason}`,
+  }}).catch(() => {});
   resultEl.style.color = '#3B6D11';
   resultEl.textContent = `지급 완료 — 현재 잔액 ${newBalance}N`;
   document.getElementById('grantAmount').value = '';

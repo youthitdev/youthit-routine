@@ -602,9 +602,9 @@ select:focus { outline: none; border-color: #2E33BC; }
           </div>
           <div id="myExpiryBanner" style="display:none;background:#FFF3CD;border-radius:12px;padding:10px 14px;font-size:12px;color:#856404;line-height:1.5;"></div>
           <div class="stats-grid-3" style="grid-template-columns:repeat(4,minmax(0,1fr));">
-            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label" style="font-size:10px;">총 인증 수</span></div>
+            <div class="stat-card" onclick="openMyCerts()" style="padding:10px 4px;cursor:pointer;"><span style="font-size:16px;">📸</span><span class="stat-val" id="myCertCount">0</span><span class="stat-label" style="font-size:10px;">총 인증 수</span></div>
             <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">🔥</span><span class="stat-val" id="myStreak">0</span><span class="stat-label" style="font-size:10px;">연속 인증</span></div>
-            <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label" style="font-size:10px;">소통 수</span></div>
+            <div class="stat-card" onclick="openMyComm()" style="padding:10px 4px;cursor:pointer;"><span style="font-size:16px;">💬</span><span class="stat-val" id="myCommCount">0</span><span class="stat-label" style="font-size:10px;">소통 수</span></div>
             <div class="stat-card" style="padding:10px 4px;"><span style="font-size:16px;">🏅</span><span class="stat-val" id="myCompleteCount">0</span><span class="stat-label" style="font-size:10px;">완주한 루틴</span></div>
           </div>
           <div class="section-card">
@@ -963,6 +963,24 @@ select:focus { outline: none; border-color: #2E33BC; }
       <button class="primary-btn" id="letterSubmitBtn" disabled onclick="submitLetter()">편지 보내기 💌</button>
       <button onclick="closeOverlay('letterOverlay')" style="width:100%;padding:12px;background:none;border:none;font-size:14px;color:#aaa;cursor:pointer;">나중에 쓸게요</button>
     </div>
+  </div>
+
+  <!-- 내가 올린 인증글 모아보기 -->
+  <div class="overlay" id="myCertsOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('myCertsOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">📸 내가 올린 인증글</div></div>
+    </div>
+    <div class="overlay-body" id="myCertsBody" style="padding:12px 16px 16px;"></div>
+  </div>
+
+  <!-- 내 소통 내역(내가 쓴 글 + 댓글) -->
+  <div class="overlay" id="myCommOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('myCommOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">💬 내 소통 내역</div></div>
+    </div>
+    <div class="overlay-body" id="myCommBody" style="padding:12px 16px 16px;"></div>
   </div>
 
   <!-- 편지 전체보기 -->
@@ -3578,6 +3596,47 @@ function openPhotoLightbox(url) {
   document.getElementById('photoLightboxImg').src = url;
   openSheet('photoLightboxBg');
 }
+// "총 인증 수"/"소통 수" 클릭 시 내가 올린 인증글·글·댓글을 모아볼 수 있도록(QA 요청)
+function openMyCerts() {
+  if(!currentUser) return;
+  const certs = (state.certFeed||[]).filter(c=>c.userId===currentUser.id);
+  document.getElementById('myCertsBody').innerHTML = certs.length===0
+    ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">아직 올린 인증글이 없어요</div>`
+    : _certFeedGridHtml(certs);
+  openOverlay('myCertsOverlay');
+}
+// 인증(cert)·게시글(post) 댓글이 각각 다른 배열에 중첩돼 있어서, 내가 단 것만 모아
+// 시간순으로 합쳐 보여줌. 클릭하면 그 댓글이 달린 원글로 이동
+function _myComments() {
+  if(!currentUser) return [];
+  const certComments = (state.certFeed||[]).flatMap(c => (c.comments||[])
+    .filter(cm=>cm.userId===currentUser.id)
+    .map(cm=>({ ts:cm.ts, text:cm.text, context:`${c.name}님의 인증글에 남긴 댓글`, onClick:`closeOverlay('myCommOverlay');openCertFeedDetail(${c.id})` })));
+  const postComments = (state.posts||[]).flatMap(p => (p.comments||[])
+    .filter(cm=>cm.userId===currentUser.id)
+    .map(cm=>({ ts:cm.ts, text:cm.text, context:`"${_postDisplayTitle(p)}"에 남긴 댓글`, onClick:`closeOverlay('myCommOverlay');openPostDetail(${p.id})` })));
+  return [...certComments, ...postComments].sort((a,b)=>b.ts-a.ts);
+}
+function openMyComm() {
+  if(!currentUser) return;
+  const myPosts = (state.posts||[]).filter(p=>p.authorId===currentUser.id);
+  const myComments = _myComments();
+  const postsHtml = myPosts.length>0
+    ? `<div style="font-size:13px;font-weight:600;color:#111;margin:4px 0 8px;">내가 쓴 글 (${myPosts.length})</div>
+       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">${myPosts.map(p=>_postCard(p,'togglePostLike')).join('')}</div>`
+    : '';
+  const commentsHtml = myComments.length>0
+    ? `<div style="font-size:13px;font-weight:600;color:#111;margin:4px 0 8px;">내가 단 댓글 (${myComments.length})</div>
+       <div style="display:flex;flex-direction:column;gap:8px;">${myComments.map(cm=>`
+         <div onclick="${cm.onClick}" style="padding:12px 14px;background:#fff;border:0.5px solid #eee;border-radius:12px;cursor:pointer;">
+           <div style="font-size:11px;color:#888;margin-bottom:4px;">${cm.context}</div>
+           <div style="font-size:13px;color:#111;line-height:1.5;">${cm.text}</div>
+         </div>`).join('')}</div>`
+    : '';
+  document.getElementById('myCommBody').innerHTML = (postsHtml + commentsHtml) ||
+    `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">아직 쓴 글이나 댓글이 없어요</div>`;
+  openOverlay('myCommOverlay');
+}
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
@@ -3728,13 +3787,19 @@ async function openNotifHistory() {
   const { data, error } = await sb.from('notifications').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}).limit(30);
   const rows = error ? [] : (data||[]);
   list.innerHTML = rows.length ? rows.map(n=>`
-    <div style="padding:12px 14px;background:${n.read?'#fff':'#f0f1fb'};border:0.5px solid #eee;border-radius:12px;">
+    <div onclick="closeSheet('notifHistoryBg');_goToMyFromNotif()" style="padding:12px 14px;background:${n.read?'#fff':'#f0f1fb'};border:0.5px solid #eee;border-radius:12px;cursor:pointer;">
       <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:2px;">${n.title||''}</div>
       <div style="font-size:12.5px;color:#555;line-height:1.5;">${n.body||''}</div>
       <div style="font-size:10.5px;color:#bbb;margin-top:4px;">${timeAgo(new Date(n.created_at).getTime())}</div>
     </div>`).join('') : '<div style="text-align:center;padding:32px 16px;"><div style="font-size:28px;margin-bottom:8px;">🔔</div><div style="font-size:13px;color:#aaa;">아직 알림이 없어요</div></div>';
   document.getElementById('notifUnreadDot').style.display='none';
   if(rows.some(n=>!n.read)) sb.from('notifications').update({read:true}).eq('user_id',currentUser.id).eq('read',false).then(()=>{});
+}
+// 알림 내역함의 개별 항목은 아직 알림별 세부 대상(어떤 인증글/편지 등)까지는 저장 안 하고
+// 있어서, 실제 푸시와 동일하게 우선 MY탭으로 이동 — 클릭해도 아무 반응 없던 버그 수정
+function _goToMyFromNotif() {
+  if(!currentUser) return;
+  state.currentRole==='youth' ? switchTab('my') : kSwitchTab('my');
 }
 async function refreshNotifUnreadDot() {
   if(!currentUser) return;
@@ -5129,7 +5194,7 @@ function closeLetterSuccess() {
 // 공통 오버레이/시트
 // ════════════════════════════════════════════════════════
 // 3뎁스 오버레이 목록 (탭 숨김)
-const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay'];
+const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay','myCertsOverlay','myCommOverlay'];
 
 // ── 뒤로가기(모바일 스와이프 포함) 내비게이션 스택 ──
 // 오버레이/시트를 열거나 탭을 바꿀 때마다 히스토리를 한 칸 쌓아두고, 실제
@@ -5281,6 +5346,16 @@ if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js')
       .then(reg => console.log('SW 등록 완료:', reg.scope))
       .catch(err => console.log('SW 등록 실패:', err));
+  });
+  // 푸시 알림을 눌렀을 때 앱이 이미 열려있으면, service-worker가 postMessage로 이 탭을
+  // 알려줘서 새로고침 없이 바로 전환함 — Client.navigate()는 iOS Safari 등 일부 환경에서
+  // 안 먹혀서 focus만 되고 "홈"(기본 탭)에 그대로 있는 것처럼 보이던 문제를 우회
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (!e.data || e.data.type !== 'notif-navigate' || !e.data.tab || !currentUser) return;
+    const tab = e.data.tab;
+    const isYouth = state.currentRole === 'youth';
+    const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+    if (validTabs.includes(tab)) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
   });
 }
 </script>

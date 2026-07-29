@@ -49,12 +49,17 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || '/youthit-routine/';
+  const tabMatch = url.match(/[?&]tab=(\w+)/);
+  const tab = tabMatch ? tabMatch[1] : null;
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
         if (c.url.includes('/youthit-routine') && 'focus' in c) {
-          // 앱이 이미 열려있으면 focus만으로는 URL(예: ?tab=my)이 반영 안 되므로 navigate도 같이 시도
-          if ('navigate' in c) { return c.navigate(url).then(nc => (nc || c).focus()).catch(() => c.focus()); }
+          // 앱이 이미 열려있으면 postMessage로 탭 전환을 알려줌 — Client.navigate()는 iOS
+          // Safari 등 일부 환경에서 안정적으로 동작 안 해서(그냥 focus만 되고 탭은 그대로
+          // "홈"에 남아있는 것처럼 보이던 문제), 새로고침 없이 페이지 쪽에서 직접 탭을
+          // 바꾸도록 위임
+          if (tab) c.postMessage({ type: 'notif-navigate', tab });
           return c.focus();
         }
       }
