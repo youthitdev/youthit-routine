@@ -524,6 +524,24 @@ select:focus { outline: none; border-color: #2E33BC; }
       <!-- 루틴 -->
       <div class="tab-page active" id="page-routine">
         <div style="padding:12px 16px 0;">
+          <!-- 지금까지 만든 한끗 (누적 통계) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px;color:#888;margin-bottom:8px;">지금까지 만든 한끗</div>
+            <div style="background:#EAF3DE;border-radius:16px;padding:16px 8px;display:flex;">
+              <div style="flex:1;text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatCertCount">0</div>
+                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">인증수</div>
+              </div>
+              <div style="flex:1;text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatCompleters">0</div>
+                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">완주자</div>
+              </div>
+              <div style="flex:1;text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatComm">0</div>
+                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">소통수</div>
+              </div>
+            </div>
+          </div>
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
           <div id="homeBannerArea" style="display:none;"></div>
           <div id="pushNudgeArea"></div>
@@ -1449,6 +1467,7 @@ async function loadProfileAndEnter() {
     return;
   }
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadLetters(); } catch(e) { console.error('데이터 로드 실패', e); }
+  loadHomeStats();
   enterAs(profile.role);
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
@@ -1903,6 +1922,36 @@ async function loadCertFeed() {
       comments: cComments,
     };
   });
+}
+
+// 청소년 홈 상단 "지금까지 만든 한끗" 통계 — state.certFeed/state.posts는 최근 것만 잘라서
+// 불러오는 캡(limit)이 있어서 그걸로 세면 실제보다 적게 나올 수 있음. 인증수/소통수는
+// 정확한 전체 개수를 직접 COUNT 쿼리로 가져오고, 완주자 수는 routines/routine_participants가
+// 캡 없이 전체를 불러오고 있어서 이미 로드된 state.routines로 계산해도 정확함
+async function loadHomeStats() {
+  try {
+    const [certCountRes, postCommentsRes, certCommentsRes] = await Promise.all([
+      sb.from('certifications').select('id', { count: 'exact', head: true }),
+      sb.from('post_comments').select('id', { count: 'exact', head: true }),
+      sb.from('cert_comments').select('id', { count: 'exact', head: true }),
+    ]);
+    const certCount = certCountRes.count || 0;
+    const commCount = (postCommentsRes.count || 0) + (certCommentsRes.count || 0);
+    const completers = new Set();
+    (state.routines || []).forEach(r => {
+      const { certGoal } = _completionGoal(r);
+      (r.participants || []).forEach(p => {
+        const isDone = r.isFree ? _personalPeriod(r, p).isDone : p.cert >= certGoal;
+        if (isDone) completers.add(p.userId);
+      });
+    });
+    const certEl = document.getElementById('youthStatCertCount');
+    const compEl = document.getElementById('youthStatCompleters');
+    const commEl = document.getElementById('youthStatComm');
+    if (certEl) certEl.textContent = certCount.toLocaleString();
+    if (compEl) compEl.textContent = completers.size.toLocaleString();
+    if (commEl) commEl.textContent = commCount.toLocaleString();
+  } catch (e) { console.error('홈 통계 로드 실패', e); }
 }
 
 // 홈 화면 홍보 배너 (관리자 등록, 루틴 홍보/공지/외부 링크 등 자유롭게)
@@ -5512,6 +5561,7 @@ async function refetchOnResume() {
   try {
     await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners(), loadLetters()]);
   } catch (e) { console.error('재조회 실패', e); return; }
+  loadHomeStats();
   const isYouth = state.currentRole === 'youth';
   const prefix = isYouth ? 'page-' : 'kpage-';
   const activePage = document.querySelector((isYouth ? '#youthTabs' : '#kkutjjangTabs') + ' .tab-page.active');
