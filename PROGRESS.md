@@ -557,6 +557,28 @@ MY탭 프로필 편집 시트에서 닉네임/실명을 더 이상 바꿀 수 �
 - `REVOKE EXECUTE ON FUNCTION notify_push(uuid,text,text) FROM PUBLIC, authenticated, anon;` (마이그레이션 `[2026-07-25r]`)
 - **마이그레이션 `[2026-07-25r]` — 사용자가 Supabase SQL Editor에서 직접 실행 필요**
 
+## 최근 완료 (2026-07-25, 커뮤니티 새 글 하단탭 배지)
+
+QA 신규 6항목 배치 중 3번: "커뮤니티에서 새 글 올라오면 하단탭에 N 알림이 보면 좋겠음". DB 변경 없이 클라이언트 로컬 상태만으로 구현.
+
+- 청소년 하단탭(`nav-comm`)·끗짱 하단탭(`knav-review`) 모두에 배지 span 추가 (`navCommBadge`/`navReviewBadge`), 기존 인증탭 배지(`navCertBadge`)와 동일한 스타일 재사용
+- `loadPosts()`가 만드는 글 객체에 `ts: new Date(p.created_at).getTime()` 추가
+- 사용자별 마지막 열람 시각을 로컬스토리지(`hankkut_comm_lastseen_{userId}`)에 저장 — 기존 `PUSH_NUDGE_KEY` 7일-스누즈 패턴과 동일한 방식
+- `updateCommNavBadge()`: 본인 글 제외, `lastSeen` 이후 올라온 글 수를 세어 두 배지에 동시 반영(9개 초과는 "9+")
+- `markCommSeen()`: 커뮤니티 탭 진입 시 `lastSeen`을 현재 시각으로 갱신하고 배지 즉시 제거 — `switchTab('comm')`과 `kSwitchTab('review')` 양쪽에 연결
+- `loadProfileAndEnter()`/`refetchOnResume()`에서도 배지 갱신하도록 역할 무관하게 호출 (기존엔 청소년만 호출하던 것을 끗짱까지 확장)
+- 검증: 브라우저에 mock `state.posts`/`currentUser` 주입 후 `updateCommNavBadge()`/`markCommSeen()`/`kSwitchTab('review')` 직접 호출 — 본인 글 제외 카운트, 열람 후 배지 사라짐, 콘솔 에러 없음 확인 (청소년/끗짱 양쪽)
+
+## 최근 완료 (2026-07-25, 루틴 수정 실패 시 조용히 "성공" 뜨는 문제 방지)
+
+QA 신규 6항목 배치 중 4번: "상단 고정 체크하고 저장해도 고정이 안 됨" 제보 조사.
+
+- **원인**: 코드 버그 아님 — 제보한 끗짱 테스트 계정이 "루틴 수정 관리자 전용화"(2026-07-25, [b19b59c](https://github.com/youthitdev/youthit-routine/commit/b19b59c9)) 배포 이전의 **캐시된 구버전 페이지**를 보고 있었음. 강력 새로고침 후 재확인하니 비관리자 계정엔 "루틴 수정" 버튼 자체가 정상적으로 안 보임(확인 완료)
+- 다만 조사 과정에서 구조적 문제를 하나 발견: `sb.from('routines').update(payload).eq('id', id)`는 RLS(`routines_update` 정책)에 막혀 **0건 반영돼도 에러를 던지지 않음** — 캐시 지연이든 다른 권한 엣지케이스든, 권한 없는 계정이 어떻게든 저장 버튼을 누르면 "저장 완료" 메시지만 뜨고 실제로는 아무 것도 안 바뀌는 조용한 실패가 가능했음
+- index.html `submitEditRoutine()`, admin.html `submitRoutineAdmin()`(수정 분기)에 `.select('id')`를 붙여 반영된 행 수를 확인하고, 0건이면 "이 루틴을 수정할 권한이 없어요" 에러를 명시적으로 띄우도록 수정
+- DB 변경 없음(클라이언트 코드만 수정)
+- 검증: 브라우저에서 `sb.from('routines').update` 응답을 각각 `data:[]`(권한없음 시뮬레이션)/`data:[{id}]`(정상)로 스텁 — 0건일 때 정직한 에러 알림이 뜨고, 정상일 때는 기존처럼 성공 화면이 뜨는 것 확인 (index.html/admin.html 양쪽)
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토

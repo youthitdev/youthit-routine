@@ -806,14 +806,26 @@ select:focus { outline: none; border-color: #2E33BC; }
         </span>
         <span>인증</span>
       </div>
-      <div class="nav-item" id="nav-comm" onclick="switchTab('comm')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
+      <div class="nav-item" id="nav-comm" onclick="switchTab('comm')">
+        <span style="position:relative;display:inline-flex;">
+          <i class="ti ti-messages"></i>
+          <span id="navCommBadge" style="display:none;position:absolute;top:-4px;right:-8px;min-width:15px;height:15px;border-radius:8px;background:#FF3B30;color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center;padding:0 3px;">0</span>
+        </span>
+        <span>커뮤니티</span>
+      </div>
       <div class="nav-item" id="nav-my" onclick="switchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
     <div id="kkutjjangNav" style="display:none;contents;">
       <div class="nav-item active" id="knav-home" onclick="kSwitchTab('home')"><i class="ti ti-home"></i><span>홈</span></div>
       <div class="nav-item" id="knav-routine" onclick="kSwitchTab('routine')"><i class="ti ti-list-check"></i><span>루틴</span></div>
       <div class="nav-item" id="knav-cert" onclick="kSwitchTab('cert')"><i class="ti ti-camera"></i><span>인증</span></div>
-      <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')"><i class="ti ti-messages"></i><span>커뮤니티</span></div>
+      <div class="nav-item" id="knav-review" onclick="kSwitchTab('review')">
+        <span style="position:relative;display:inline-flex;">
+          <i class="ti ti-messages"></i>
+          <span id="navReviewBadge" style="display:none;position:absolute;top:-4px;right:-8px;min-width:15px;height:15px;border-radius:8px;background:#FF3B30;color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center;padding:0 3px;">0</span>
+        </span>
+        <span>커뮤니티</span>
+      </div>
       <div class="nav-item" id="knav-my" onclick="kSwitchTab('my')"><i class="ti ti-user"></i><span>MY</span></div>
     </div>
   </nav>
@@ -1450,6 +1462,7 @@ async function loadProfileAndEnter() {
   enterAs(profile.role);
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
+  updateCommNavBadge();
   updateHeaderStreakBadge();
   if (pendingRoutineId && state.currentRole === 'youth') {
     const pid = pendingRoutineId; pendingRoutineId = null;
@@ -1850,7 +1863,7 @@ async function loadPosts() {
   state.posts = posts.map(p => ({
     id: p.id, type: p.type || 'review', title: p.title, content: p.content,
     routineId: p.routine_id ?? null, photoUrl: p.photo_url || null,
-    author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at),
+    author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at), ts: new Date(p.created_at).getTime(),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
     comments: comments.filter(cm => cm.post_id === p.id).map(cm => ({
@@ -2089,7 +2102,7 @@ function switchTab(tab) {
   document.getElementById('nav-'+tab).classList.add('active');
   if(tab==='routine') renderRoutine();
   else if(tab==='cert') renderCertTab();
-  else if(tab==='comm') renderComm('all');
+  else if(tab==='comm') { renderComm('all'); markCommSeen(); }
   else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
   _navPushTab(tab, false);
 }
@@ -2207,6 +2220,26 @@ function updateCertNavBadge(count) {
   if(!el) return;
   el.textContent = count>9?'9+':String(count);
   el.style.display = count>0?'flex':'none';
+}
+// 커뮤니티 새 글 배지 — 마지막으로 커뮤니티 탭을 본 시각(로컬 저장) 이후 올라온
+// 남의 글 수를 세어 하단탭에 표시. 탭을 열면 markCommSeen()이 바로 지움
+function _commLastSeenKey() { return currentUser ? 'hankkut_comm_lastseen_'+currentUser.id : null; }
+function updateCommNavBadge() {
+  if(!currentUser) return;
+  const key = _commLastSeenKey();
+  const lastSeen = key ? Number(localStorage.getItem(key) || 0) : 0;
+  const count = (state.posts||[]).filter(p => p.authorId!==currentUser.id && p.ts>lastSeen).length;
+  ['navCommBadge','navReviewBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = count>9?'9+':String(count);
+    el.style.display = count>0?'flex':'none';
+  });
+}
+function markCommSeen() {
+  const key = _commLastSeenKey();
+  if(key) localStorage.setItem(key, String(Date.now()));
+  updateCommNavBadge();
 }
 function toggleLike(id) {
   const p = state.posts.find(x=>x.id===id);
@@ -4078,7 +4111,7 @@ function kSwitchTab(tab) {
   if(tab==='home') kRenderHome();
   else if(tab==='routine') kRenderRoutineTab();
   else if(tab==='cert') kRenderCertTab();
-  else if(tab==='review') { kResetReviewFilter(); kRenderReviewTab('all'); }
+  else if(tab==='review') { kResetReviewFilter(); kRenderReviewTab('all'); markCommSeen(); }
   else if(tab==='my') kRenderMy();
   _navPushTab(tab, true);
 }
@@ -4676,9 +4709,10 @@ async function submitEditRoutine(){
   };
   if(state.loginType==='both') payload.led_by = f.leader;
   const routineId = editRoutineId;
-  const { error } = await sb.from('routines').update(payload).eq('id', routineId);
+  const { data, error } = await sb.from('routines').update(payload).eq('id', routineId).select('id');
   if(btn){btn.disabled=false;btn.textContent='수정 완료';}
   if(error){ alert('수정 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('수정 실패: 이 루틴을 수정할 권한이 없어요.'); return; }
   await loadRoutines();
   document.getElementById('createSuccessTitle').textContent=`${selectedEmoji} ${f.n}`;
   document.getElementById('createSuccessSubtitle').textContent='루틴이 수정됐어요!';
@@ -5331,6 +5365,7 @@ async function refetchOnResume() {
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
   updateHeaderStreakBadge();
+  updateCommNavBadge();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);

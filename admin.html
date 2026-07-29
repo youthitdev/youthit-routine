@@ -864,11 +864,12 @@ async function submitRoutineAdmin() {
 
   const btn = document.getElementById('rtSubmitBtn');
   btn.disabled = true; btn.textContent = editRoutineAdminId ? '저장 중...' : '등록 중...';
-  const { error } = editRoutineAdminId
-    ? await sb.from('routines').update(payload).eq('id', editRoutineAdminId)
+  const { data, error } = editRoutineAdminId
+    ? await sb.from('routines').update(payload).eq('id', editRoutineAdminId).select('id')
     : await sb.from('routines').insert({ ...payload, status: 'recruit', created_by: currentUser.id });
   btn.disabled = false; btn.textContent = editRoutineAdminId ? '수정 완료' : '루틴 등록하기';
   if (error) { alert((editRoutineAdminId ? '수정' : '등록') + ' 실패: ' + error.message); return; }
+  if (editRoutineAdminId && (!data || data.length===0)) { alert('수정 실패: 이 루틴을 수정할 권한이 없어요.'); return; }
   const wasEdit = !!editRoutineAdminId;
   resetRoutineForm();
   await loadData();
