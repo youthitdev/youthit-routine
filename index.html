@@ -1825,6 +1825,7 @@ async function loadRoutines() {
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
       certCount: rCerts.length, avgRate: 0, createdBy: r.created_by, ledBy: r.led_by || null,
+      leaderName: r.led_by ? (nameById[r.led_by] || '미지정') : null,
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
       participants: approved.map(p => ({
@@ -2377,6 +2378,7 @@ function renderRoutineGrid(type, q) {
       <div class="rc-body" style="background:${cardBg};">
         <div style="font-size:13px;font-weight:600;color:${tc};line-height:1.35;margin-bottom:${r.partnerOrg?'3px':'5px'};min-height:17px;">${r.pinned?'📌 ':''}${effDone?'✓ ':''}${hl(r.title)}</div>
         ${r.partnerOrg?`<div style="font-size:11px;color:${effDone?'#bbb':'#2E33BC'};font-weight:600;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🤝 ${hl(r.partnerOrg)}</div>`:''}
+        ${r.leaderName?`<div style="font-size:11px;color:${effDone?'#bbb':'#888'};margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🙋 ${r.leaderName} 끗짱</div>`:''}
         <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
           <span style="font-size:11px;color:${effDone?'#ccc':'#999'};">${r.period}</span>
           ${ddHtml}
@@ -2833,6 +2835,7 @@ function openRoutineDetail(id) {
   let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
+    ${r.leaderName?`<div style="font-size:12px;color:#3B6D11;font-weight:600;background:#EAF3DE;padding:4px 9px;border-radius:12px;">🙋 ${r.leaderName} 끗짱</div>`:''}
     ${isOpenFree?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 상시 모집</div>`:r.status==='recruit'?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${(r.status==='recruit'||isOpenFree)?'진행 '+r.period:r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">👤 ${r.people}/${r.maxPeople}</div>
@@ -4159,12 +4162,35 @@ function kSwitchTab(tab) {
 // ════════════════════════════════════════════════════════
 // 끗짱 홈
 // ════════════════════════════════════════════════════════
+// 시작일 전이라 아직 status가 'recruit'인 담당 루틴 — 진행 전이어도 미리
+// D-day/신청 현황을 볼 수 있도록 홈·인증탭에 별도로 보여주기 위함
+function _kUpcomingRoutines() {
+  return _kMyRoutines().filter(r => !r.isFree && r.status==='recruit');
+}
+function _kUpcomingListHtml(list) {
+  if(!list.length) return '';
+  return `<div style="padding:13px 16px 4px;">
+      <div style="font-size:13px;font-weight:700;color:#888;">🗓 곧 시작해요</div>
+    </div>` + list.map(r=>{
+      const pendingCount=(r.applicants||[]).filter(a=>a.status==='pending').length;
+      const dd=_dday(r.startDate);
+      const ddText = dd>0?`D-${dd}`:dd===0?'오늘 시작':'모집중';
+      return `<div style="padding:13px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;" onclick="openKRoutineDetail(${r.id})">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:14px;font-weight:600;color:#111;">${r.emoji} ${r.title}</span>
+          <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;background:#E6F1FB;color:#185FA5;flex-shrink:0;">${ddText}</span>
+        </div>
+        <div style="font-size:11px;color:#aaa;">${r.people}명 승인${pendingCount>0?` · ⏳ 대기 ${pendingCount}명`:''}</div>
+      </div>`;
+    }).join('');
+}
 function kRenderHome() {
   const now=new Date();
   document.getElementById('kTodayDate').textContent=`${now.getMonth()+1}월 ${now.getDate()}일`;
   document.getElementById('kHomeName').textContent=(state.kkutjjang.name||'끗짱')+'님';
   const myRoutines = _kMyRoutines();
   const active=myRoutines.filter(r=>r.status==='active');
+  const upcoming=_kUpcomingRoutines();
 
   // 오늘 요약 3칸
   const allParts = active.flatMap(r=>r.participants||[]);
@@ -4204,7 +4230,7 @@ function kRenderHome() {
     : '';
 
   // 진행 중 루틴 — 참여자 아바타 + 오늘 인증률 미니바
-  document.getElementById('kActiveRoutineList').innerHTML = active.length>0
+  document.getElementById('kActiveRoutineList').innerHTML = _kUpcomingListHtml(upcoming) + (active.length>0
     ? active.map(r=>{
         const parts=r.participants||[];
         const done=parts.filter(p=>p.todayDone).length;
@@ -4227,11 +4253,11 @@ function kRenderHome() {
           </div>
         </div>`;
       }).join('')
-    : `<div style="padding:26px 16px;text-align:center;">
+    : (upcoming.length>0 ? '' : `<div style="padding:26px 16px;text-align:center;">
         <div style="font-size:28px;margin-bottom:8px;">🌱</div>
         <div style="font-size:13px;color:#888;margin-bottom:12px;">진행 중인 루틴이 없어요</div>
         ${state.loginType==='both'?`<button onclick="openCreateRoutine()" style="padding:9px 20px;background:#FF006C;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">새 루틴 만들기</button>`:''}
-      </div>`;
+      </div>`));
 }
 
 // ════════════════════════════════════════════════════════
@@ -4239,7 +4265,21 @@ function kRenderHome() {
 // ════════════════════════════════════════════════════════
 function kRenderCertTab() {
   const active=_kMyRoutines().filter(r=>r.status==='active');
-  document.getElementById('kMyCertList').innerHTML = active.length>0
+  const upcoming=_kUpcomingRoutines();
+  const upcomingHtml = upcoming.map(r=>{
+    const pendingCount=(r.applicants||[]).filter(a=>a.status==='pending').length;
+    const dd=_dday(r.startDate);
+    const ddText = dd>0?`D-${dd}`:dd===0?'오늘 시작':'모집중';
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:14px;border:0.5px solid #e8e8e8;border-radius:16px;cursor:pointer;background:#fafafa;" onclick="openKRoutineDetail(${r.id})">
+        <div style="width:42px;height:42px;border-radius:12px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:1px;">${r.people}명 승인${pendingCount>0?` · ⏳ 대기 ${pendingCount}명`:''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;background:#E6F1FB;color:#185FA5;flex-shrink:0;">${ddText}</span>
+      </div>`;
+  }).join('');
+  document.getElementById('kMyCertList').innerHTML = upcomingHtml + (active.length>0
     ? active.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:14px;border:0.5px solid ${r.todayCert?'#e8e8e8':'#FF006C'};border-radius:16px;cursor:pointer;background:${r.todayCert?'#fafafa':'#fff'};" onclick="${r.todayCert?'':`selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')`}">
         <div style="width:42px;height:42px;border-radius:12px;background:${r.todayCert?'#eee':'#FBEAF0'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
         <div style="flex:1;min-width:0;">
@@ -4250,7 +4290,7 @@ function kRenderCertTab() {
           ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
           :`<span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#FF006C;color:#fff;flex-shrink:0;">인증하기</span>`}
       </div>`).join('')
-    : `<div style="padding:20px 16px;text-align:center;background:#f5f5f7;border-radius:16px;font-size:12px;color:#aaa;">담당 중인 루틴이 없어요</div>`;
+    : (upcoming.length>0 ? '' : `<div style="padding:20px 16px;text-align:center;background:#f5f5f7;border-radius:16px;font-size:12px;color:#aaa;">담당 중인 루틴이 없어요</div>`));
   const rows=active.flatMap(r=>(r.participants||[]).map(p=>({r,p})));
   rows.sort((a,b)=>(a.p.todayDone?1:0)-(b.p.todayDone?1:0));
   const doneToday=rows.filter(x=>x.p.todayDone).length;
