@@ -2296,9 +2296,10 @@ function renderRoutineGrid(type, q) {
 
   const hl=(text)=>q?text.replace(new RegExp(`(${q})`, 'gi'),'<mark style="background:#FFF176;border-radius:2px;padding:0 1px;">$1</mark>'):text;
 
-  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 모집중, 그 다음 내가 참여 중인 루틴 순으로 상단 고정
-  const isMineActive = (r) => r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-  const _rank = (r) => r.pinned ? -1 : (r.status==='recruit' || _isFreeOpen(r)) ? 0 : isMineActive(r) ? 1 : 2;
+  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 내가 참여 중인 루틴, 그 다음 모집중,
+  // 그 다음 나머지 진행중 루틴 순으로 정렬 (완료는 "전체"에서 애초에 제외됨)
+  const isMine = (r) => currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  const _rank = (r) => r.pinned ? -1 : isMine(r) ? 0 : (r.status==='recruit' || _isFreeOpen(r)) ? 1 : 2;
   const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
   grid.innerHTML = sorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
@@ -4275,15 +4276,15 @@ function kFilterRoutine(type,el) {
   // 루틴탭은 담당 여부와 무관하게 조직 전체 루틴을 둘러보는 화면 — 상태 필터는 상태로만
   // 거르고, 담당 루틴만 보는 홈/인증탭/통계는 계속 _kMyRoutines()로 스코핑
   const base = state.routines;
-  const filtered = type==='all' ? base
+  const filtered = type==='all' ? base.filter(r=>r.status!=='done')
     : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : type==='active' ? base.filter(r=>r.status==='active' && !_isFreeOpen(r))
     : base.filter(r=>r.status===type);
-  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 모집중(자유루틴은 상시 열려있는 동안 포함) 루틴 순으로 상단 고정
-  const kSorted = [...filtered].sort((a,b)=>{
-    const ra=a.pinned?-1:(a.status==='recruit'||_isFreeOpen(a))?0:1, rb=b.pinned?-1:(b.status==='recruit'||_isFreeOpen(b))?0:1;
-    return ra-rb;
-  });
+  // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 내가 담당한 루틴, 그 다음 모집중(자유루틴은
+  // 상시 열려있는 동안 포함), 그 다음 나머지 진행중 루틴 순으로 정렬
+  const isMineK = (r) => r.ledBy===currentUser?.id;
+  const _rankK = (r) => r.pinned ? -1 : isMineK(r) ? 0 : (r.status==='recruit'||_isFreeOpen(r)) ? 1 : 2;
+  const kSorted = [...filtered].sort((a,b) => _rankK(a) - _rankK(b));
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
     const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
     const isOpenFree=_isFreeOpen(r);
