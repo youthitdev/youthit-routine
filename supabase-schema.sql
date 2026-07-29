@@ -2152,3 +2152,22 @@ FROM routines r, auth.users u
 WHERE r.title = '☀️ 심사용 데모 루틴'
   AND u.email = 'youthpd@youthvoice.or.kr'
 ON CONFLICT (routine_id, user_id) DO UPDATE SET status = 'approved';
+
+-- =====================================================
+-- [마이그레이션 2026-07-29d] posts DELETE 정책 누락 수정
+-- 스키마 파일엔 posts_delete 정책이 기록돼 있었는데(과거 어느 시점 작성분),
+-- 실제 DB에는 한 번도 생성된 적이 없었음 — pg_policies로 확인 결과 posts
+-- 테이블엔 insert/update/select 정책만 있고 delete 정책이 없어서, RLS가 걸린
+-- 테이블에 DELETE 정책이 아예 없으면 누구든(관리자 포함) 항상 0건 삭제로
+-- 막힘. 글쓴이 본인 또는 관리자만 삭제 가능하도록 정책 추가.
+-- =====================================================
+DROP POLICY IF EXISTS "posts_delete" ON posts;
+CREATE POLICY "posts_delete" ON posts FOR DELETE USING (auth.uid() = author_id OR is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-29e] 공지 수정 시 "상단 고정" 해제 가능하도록
+-- 지금까지는 끗짱이 쓰는 글(type='notice')이 항상 커뮤니티 목록 맨 위에
+-- 고정됐음. 나중에 고정을 풀고 싶은 공지도 있을 수 있어 pinned 컬럼 추가
+-- (공지 타입은 그대로 유지, 정렬만 이 값으로 결정).
+-- =====================================================
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT true;

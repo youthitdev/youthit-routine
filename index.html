@@ -1098,6 +1098,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
+      <div style="margin-bottom:16px;"><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="kPostPinned" checked style="width:17px;height:17px;flex-shrink:0;">📌 목록 상단에 고정</label></div>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
     </div>
   </div>
@@ -1861,7 +1862,7 @@ async function loadPosts() {
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
-    id: p.id, type: p.type || 'review', title: p.title, content: p.content,
+    id: p.id, type: p.type || 'review', pinned: p.pinned!==false, title: p.title, content: p.content,
     routineId: p.routine_id ?? null, photoUrl: p.photo_url || null,
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at), ts: new Date(p.created_at).getTime(),
     likes: likes.filter(l => l.post_id === p.id).length,
@@ -1874,7 +1875,7 @@ async function loadPosts() {
 // 공지(notice)를 최신순 상단에 고정, 그 아래로 나머지 글도 최신순
 function _pinNotices(list) {
   return [...list].sort((a, b) => {
-    const an = a.type === 'notice', bn = b.type === 'notice';
+    const an = a.type === 'notice' && a.pinned, bn = b.type === 'notice' && b.pinned;
     if (an !== bn) return an ? -1 : 1;
     return 0; // Array.sort는 안정 정렬이라 원래(최신순) 순서가 그룹 내에서 유지됨
   });
@@ -2834,6 +2835,9 @@ function openRoutineDetail(id) {
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
+  // 시작일이 아직 안 돼서 status가 'recruit'인 채로 남아있어도, 이미 승인된
+  // 참여자라면 신청하기 버튼이 아니라 승인 완료 안내가 보여야 함
+  const isApprovedMine = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
   const needsDoc = r.eligibility==='out_of_school' && state.youth.verifyStatus!=='approved';
   const _today = new Date().toISOString().slice(0,10);
   const beforeRecruitStart = r.recruitStartDate && _today < r.recruitStartDate;
@@ -2849,7 +2853,11 @@ function openRoutineDetail(id) {
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
       <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
     </div>
-    ${needsDoc
+    ${isApprovedMine
+      ? `<div style="width:100%;padding:14px;background:#EAF3DE;border-radius:12px;font-size:14px;color:#3B6D11;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <i class="ti ti-check" style="font-size:16px;"></i> 승인됐어요! 시작일부터 인증할 수 있어요
+        </div>`
+      : needsDoc
       ? `<div style="width:100%;padding:14px;background:#FFF8E1;border-radius:12px;font-size:13px;color:#856404;text-align:center;line-height:1.5;">🎓 학교밖청소년 전용 루틴이에요<br>MY 탭에서 확인 서류를 제출하고 승인받으면 신청할 수 있어요</div>`
       : isPending
       ? `<div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:14px;color:#888;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
@@ -3426,6 +3434,7 @@ function editPost(id) {
   } else {
     document.getElementById('kPostTitle').value = p.title;
     document.getElementById('kPostContent').value = p.content;
+    document.getElementById('kPostPinned').checked = p.pinned;
     document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('kWriteSheetBg');
   }
@@ -4773,21 +4782,23 @@ function openKWriteSheet() {
   editingPostId = null;
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
+  document.getElementById('kPostPinned').checked = true;
   document.querySelector('#kWriteSheetBg .primary-btn').textContent = '게시하기';
   openSheet('kWriteSheetBg');
 }
 async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
+  const pinned = document.getElementById('kPostPinned').checked;
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
   if(editingPostId) {
-    const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
+    const { error } = await sb.from('posts').update({ title:t, content:c, pinned }).eq('id', editingPostId);
     if(error){ alert('수정 실패: '+error.message); return; }
     editingPostId = null;
   } else {
     const { error } = await sb.from('posts').insert({
-      type:'notice', title:t, content:c, author_id:currentUser.id,
+      type:'notice', title:t, content:c, author_id:currentUser.id, pinned,
     });
     if(error){ alert('게시 실패: '+error.message); return; }
   }
@@ -4795,8 +4806,8 @@ async function kSubmitPost() {
   closeSheet('kWriteSheetBg');
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
-  kResetReviewFilter();
-  kRenderReviewTab('all');
+  if(state.currentRole==='youth') { renderComm(commFilter); }
+  else { kResetReviewFilter(); kRenderReviewTab('all'); }
 }
 
 // ════════════════════════════════════════════════════════
