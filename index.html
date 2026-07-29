@@ -1768,10 +1768,17 @@ async function loadRoutines() {
     const approved = rParts.filter(p => p.status === 'approved');
     const certOf = uid => rCerts.filter(c => c.user_id === uid).length;
     const doneToday = uid => rCerts.some(c => c.user_id === uid && (c.created_at || '').slice(0, 10) === today);
-    // 종료일이 지난 진행중 루틴은 완주로 간주 (날짜 기반 자동 전환)
-    // 자유루틴은 루틴 레벨 종료일이 없어(개인별 기간이라) 이 자동전환 대상이 아님
-    const effectiveStatus = r.status === 'active' && r.end_date && r.end_date < today ? 'done' : r.status;
-    if (effectiveStatus !== r.status && currentUser && (isAdmin || r.created_by === currentUser.id || r.led_by === currentUser.id)) {
+    // 날짜 기반 자동 전환 — 종료일이 지난 진행중 루틴은 완주로, 진행 시작일이 된 모집중
+    // 루틴은 진행중으로 (예전엔 승인 즉시 active로 바뀌어서 진행 시작일 전에도 "진행 중"이라고
+    // 잘못 표시되던 문제가 있었음 — approveApplicant()에서 즉시 전환하던 로직 제거하고 여기
+    // 날짜 기준으로만 판단하도록 통일). 자유루틴은 루틴 레벨 시작/종료일이 없어(개인별 기간이라)
+    // 이 자동전환 대상이 아님
+    const effectiveStatus = r.status === 'active' && r.end_date && r.end_date < today ? 'done'
+      : r.status === 'recruit' && r.start_date && r.start_date <= today ? 'active'
+      : r.status;
+    // 루틴 수정 권한이 관리자로 축소돼서(2026-07-25), led_by만으로는 이 자동전환 write-back이
+    // 더 이상 안 먹힘 — created_by(항상 관리자)/관리자 세션에서만 실제로 반영됨
+    if (effectiveStatus !== r.status && currentUser && (isAdmin || r.created_by === currentUser.id)) {
       sb.from('routines').update({ status: effectiveStatus }).eq('id', r.id).then(() => {});
     }
     return {
@@ -4309,15 +4316,13 @@ function openKRoutineDetail(routineId) {
 // Supabase가 에러 없이 "0건 반영"으로 조용히 끝내버려서, 권한 문제 등으로 실제로는
 // 안 바뀌었는데 성공한 것처럼 넘어가 재접속하면 그대로였던 것처럼 보이는 문제 방지
 async function approveApplicant(routineId, userId) {
-  const r = state.routines.find(x=>x.id===routineId);
   const { data, error } = await sb.from('routine_participants')
     .update({status:'approved', reject_reason:null, approved_at:new Date().toISOString()}).eq('routine_id',routineId).eq('user_id',userId).select('user_id');
   if(error){ alert('승인 실패: '+error.message); return; }
   if(!data || data.length===0){ alert('승인에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
-  // 모집 중이던 루틴은 첫 승인 시 진행 중으로 전환
-  if(r && r.status==='recruit') {
-    await sb.from('routines').update({status:'active'}).eq('id',routineId);
-  }
+  // 루틴 상태(모집중→진행중)는 승인 즉시가 아니라 실제 진행 시작일이 됐을 때
+  // loadRoutines()의 날짜 기반 자동전환으로만 바뀜(진행 시작 전에 미리 승인해도
+  // "진행 중"으로 잘못 표시되던 문제 수정, 2026-07-25)
   await loadRoutines();
   openKRoutineDetail(routineId);
   kRenderRoutineTab();
