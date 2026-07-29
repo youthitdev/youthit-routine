@@ -2830,7 +2830,7 @@ function openRoutineDetail(id) {
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-  ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}`;
+  ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
@@ -4401,7 +4401,7 @@ function openKRoutineDetail(routineId) {
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
     ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-    ${!r.isFree?`<div style="display:flex;align-items:center;gap:6px;background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}
+    ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
       ${isAdmin?`신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>`:`참여자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${approved.length}명 / 최대 ${r.maxPeople}명)</span>`}
     </div>
