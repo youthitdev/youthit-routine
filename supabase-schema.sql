@@ -2106,3 +2106,13 @@ CREATE POLICY "reward_images_delete_admin" ON storage.objects FOR DELETE USING (
 REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM authenticated;
 REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM anon;
+
+-- =====================================================
+-- [마이그레이션 2026-07-29a] 지원사업 심사용 관리자 계정 추가
+-- 심사위원에게 데모용 관리자 계정(ai@youthvoice.or.kr)을 발급하기 위해
+-- is_admin()에도 이 이메일을 추가. index.html/admin.html의 ADMINS 배열에도
+-- 동일하게 추가해둠(3곳 모두 동일하게 유지해야 화면 권한과 DB 쓰기 권한이 어긋나지 않음).
+-- =====================================================
+CREATE OR REPLACE FUNCTION is_admin() RETURNS boolean AS $$
+  SELECT auth.email() IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr', 'ai@youthvoice.or.kr');
+$$ LANGUAGE sql STABLE;

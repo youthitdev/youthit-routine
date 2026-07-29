@@ -15,7 +15,8 @@
 ## 역할 & 관리자
 
 - 역할: `youth`(청소년), `kkutjjang`(끗짱)
-- **관리자 이메일 (dev@youthvoice.or.kr, yv@youthvoice.or.kr)** — `index.html`의 `ADMINS` 배열, `admin.html`의 `ADMINS` 배열, DB `is_admin()` 함수 **3곳 모두 동일하게 유지해야 함**. 하나라도 다르면 "화면엔 관리자로 보이는데 실제 DB 쓰기는 실패"하는 버그가 생김 (실제로 한 번 발생했었음)
+- **관리자 이메일 (dev@youthvoice.or.kr, yv@youthvoice.or.kr, ai@youthvoice.or.kr)** — `index.html`의 `ADMINS` 배열, `admin.html`의 `ADMINS` 배열, DB `is_admin()` 함수 **3곳 모두 동일하게 유지해야 함**. 하나라도 다르면 "화면엔 관리자로 보이는데 실제 DB 쓰기는 실패"하는 버그가 생김 (실제로 한 번 발생했었음)
+  - `ai@youthvoice.or.kr`은 2026-07-29 지원사업 심사위원 데모용으로 추가한 계정 — 심사 끝나면 3곳(ADMINS×2 + is_admin())에서 함께 제거할 것
 - 관리자는 `state.loginType='both'`로 청소년/끗짱 화면을 전환하며 이용 가능
 
 ## 완료된 주요 기능
