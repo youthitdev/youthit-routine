@@ -549,6 +549,14 @@ MY탭 프로필 편집 시트에서 닉네임/실명을 더 이상 바꿀 수 �
 - 브라우저에서 인증글/글/댓글 각각 본인 것만 필터링되는지, 빈 상태 문구, 콘솔 에러 없음 확인. DB 변경 없음
 - **부수 발견(별도 작업으로 분리)**: `notify_push()` DB 함수에 RPC 호출 권한 제한이 없어서, 이론상 아무 로그인 사용자나 `sb.rpc('notify_push',...)`를 직접 호출해 다른 사용자에게 가짜 알림을 보낼 수 있는 상태 — 오늘 작업 범위 밖이라 별도 작업으로 분리해둠(task_65893303)
 
+## 최근 완료 (2026-07-25, notify_push() 직접 RPC 호출 차단 — 보안 수정)
+
+위에서 분리해둔 부수 발견 건을 별도로 처리. `notify_push()`가 SECURITY DEFINER인데 EXECUTE 권한 제한이 없어서, Supabase가 public 스키마 함수를 PostgREST RPC로 자동 노출하는 특성상 로그인한 사용자 누구나 `sb.rpc('notify_push', {target_user:'<임의 uuid>', ...})`를 브라우저에서 직접 호출해 다른 사용자에게 가짜 알림(푸시+알림함 기록)을 보낼 수 있는 상태였음.
+
+- index.html/admin.html 전체에서 `sb.rpc(` 호출 자체가 한 군데도 없는 것을 확인(전부 트리거 함수 내부의 `PERFORM notify_push(...)`로만 호출됨) — 트리거는 함수 소유자 권한으로 실행되므로 `authenticated`/`anon`/`PUBLIC`의 RPC 실행 권한만 제거해도 기존 알림 기능(승인/거절/댓글/좋아요/편지/포인트 지급 등 전체)엔 전혀 영향 없음
+- `REVOKE EXECUTE ON FUNCTION notify_push(uuid,text,text) FROM PUBLIC, authenticated, anon;` (마이그레이션 `[2026-07-25r]`)
+- **마이그레이션 `[2026-07-25r]` — 사용자가 Supabase SQL Editor에서 직접 실행 필요**
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토

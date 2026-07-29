@@ -2090,3 +2090,19 @@ DROP POLICY IF EXISTS "reward_images_delete_admin" ON storage.objects;
 CREATE POLICY "reward_images_delete_admin" ON storage.objects FOR DELETE USING (
   bucket_id = 'reward-images' AND is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-25r] notify_push() 직접 RPC 호출 차단
+-- notify_push()는 SECURITY DEFINER라 트리거 안에서 PERFORM으로 호출될 땐 문제 없지만,
+-- Supabase가 public 스키마 함수를 PostgREST RPC로 자동 노출하기 때문에 EXECUTE 권한을
+-- 따로 제한하지 않으면 로그인한 사용자 누구나 브라우저에서
+-- sb.rpc('notify_push', {target_user:'<임의 uuid>', ...})를 직접 호출해 다른 사용자에게
+-- 가짜 알림(푸시 + 알림함 기록)을 보낼 수 있었음 — 2026-07-25 QA 세션 중 발견.
+-- 클라이언트(index.html/admin.html) 어디서도 notify_push를 RPC로 직접 호출하지 않는
+-- 것을 확인했고(전부 트리거 함수 내부의 PERFORM 호출), 트리거는 함수 소유자 권한으로
+-- 실행되므로 아래처럼 authenticated/anon의 RPC 호출 권한만 제거해도 기존 알림 기능은
+-- 전혀 영향받지 않음.
+-- =====================================================
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text) FROM anon;
