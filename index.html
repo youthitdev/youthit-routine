@@ -4243,9 +4243,9 @@ function kRenderRoutineTab() {
 }
 function kFilterRoutine(type,el) {
   if(el){document.querySelectorAll('#kRoutineFilterBar .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
-  // "전체"만 둘러보기 용도로 전체 루틴을 보여줌(다른 끗짱 담당분 포함) — 진행중/모집중/완료는
-  // 홈/인증탭/통계와 동일하게 _kMyRoutines()(내 담당 루틴만)로 스코핑
-  const base = type==='all' ? state.routines : _kMyRoutines();
+  // 루틴탭은 담당 여부와 무관하게 조직 전체 루틴을 둘러보는 화면 — 상태 필터는 상태로만
+  // 거르고, 담당 루틴만 보는 홈/인증탭/통계는 계속 _kMyRoutines()로 스코핑
+  const base = state.routines;
   const filtered = type==='all' ? base
     : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : type==='active' ? base.filter(r=>r.status==='active' && !_isFreeOpen(r))
