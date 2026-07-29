@@ -673,12 +673,12 @@ select:focus { outline: none; border-color: #2E33BC; }
                   <div style="font-size:10px;opacity:0.85;margin-top:2px;">오늘 인증</div>
                 </div>
                 <div onclick="kSwitchTab('routine')" style="flex:1;background:rgba(255,255,255,0.14);border-radius:14px;padding:10px 6px;text-align:center;cursor:pointer;">
-                  <div style="font-size:20px;font-weight:700;" id="kStatPending">0</div>
-                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">승인 대기</div>
+                  <div style="font-size:20px;font-weight:700;" id="kStatDay">0</div>
+                  <div style="font-size:10px;opacity:0.85;margin-top:2px;" id="kStatDayLabel">진행 중 루틴</div>
                 </div>
                 <div onclick="kSwitchTab('routine')" style="flex:1;background:rgba(255,255,255,0.14);border-radius:14px;padding:10px 6px;text-align:center;cursor:pointer;">
-                  <div style="font-size:20px;font-weight:700;" id="kStatActive">0</div>
-                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">진행 중 루틴</div>
+                  <div style="font-size:20px;font-weight:700;" id="kStatTotalCert">0</div>
+                  <div style="font-size:10px;opacity:0.85;margin-top:2px;">누적 인증 수</div>
                 </div>
               </div>
             </div>
@@ -4181,8 +4181,18 @@ function kRenderHome() {
   const doneToday = allParts.filter(p=>p.todayDone).length;
   const pendingApps = myRoutines.flatMap(r=>(r.applicants||[]).filter(a=>a.status==='pending').map(a=>({...a, routineId:r.id, routineTitle:r.title})));
   document.getElementById('kStatCert').textContent = `${doneToday}/${allParts.length}`;
-  document.getElementById('kStatPending').textContent = pendingApps.length;
-  document.getElementById('kStatActive').textContent = active.length;
+  // 끗짱은 보통 담당 루틴이 1개라, 그럴 땐 "진행 중 루틴 개수"보다 "그 루틴 며칠차"가
+  // 더 동기부여가 됨. 2개 이상이거나 자유루틴(개인별 기간이라 루틴 단위 날짜가 없음)이면
+  // 기존처럼 개수로 보여줌
+  if(active.length===1 && !active[0].isFree && active[0].startDate){
+    const dayNum=Math.floor((new Date(_todayStr()+'T00:00:00') - new Date(active[0].startDate+'T00:00:00'))/86400000)+1;
+    document.getElementById('kStatDay').textContent = `${dayNum}일차`;
+    document.getElementById('kStatDayLabel').textContent = active[0].title.length>8 ? active[0].title.slice(0,8)+'…' : active[0].title;
+  } else {
+    document.getElementById('kStatDay').textContent = active.length;
+    document.getElementById('kStatDayLabel').textContent = '진행 중 루틴';
+  }
+  document.getElementById('kStatTotalCert').textContent = active.reduce((sum,r)=>sum+(r.certCount||0),0);
 
   // 승인 대기 알림 카드
   // 오늘 온라인 모임(OT/클로징) 배너
@@ -4263,7 +4273,10 @@ function kRenderCertTab() {
             <div class="youth-row" onclick="event.stopPropagation();openKCertDetail(${r.id},'${(p.name||'').replace(/'/g,"\\'")}')" style="padding-left:28px;border-top:0;">
               <div class="youth-avatar" style="${p.todayDone?'':'background:#FBEAF0;color:#FF006C;'}">${p.name[0]}</div>
               <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${p.day}</div></div>
-              <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}" style="margin-left:auto;">${p.todayDone?'인증 완료':'미인증'}</span>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+                ${p.todayDone?'':`<button onclick="event.stopPropagation();sendPoke(${r.id},'${p.userId}','${(p.name||'').replace(/'/g,"\\'")}')" style="background:rgba(46,51,188,0.1);border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#2E33BC;font-weight:600;cursor:pointer;">👋 콕</button>`}
+                <span class="cert-tag ${p.todayDone?'cert-done':'cert-none'}">${p.todayDone?'인증 완료':'미인증'}</span>
+              </div>
             </div>`).join('')}
         </div>`:''}
       </div>`;
@@ -4367,12 +4380,23 @@ function _renderKRoutineFeed(routineId) {
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
     </div>`}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">오늘 인증 현황</div>
-    <div class="feed-grid" style="margin-bottom:20px;">
-      ${r.participants.map((p,i)=>p.todayDone
-        ?`<div class="feed-item" style="background:${colors[i%4]};" onclick="openKCertDetail(${r.id},'${p.name}')"><div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div></div>`
-        :`<div class="feed-item" style="background:#e8e8e8;cursor:default;"><i class="ti ti-camera-off" style="font-size:22px;color:rgba(0,0,0,0.3);"></i><div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:2px 6px;font-size:10px;color:white;">미인증</div><div style="position:absolute;bottom:5px;left:5px;right:5px;font-size:10px;color:rgba(0,0,0,0.6);text-align:center;">${p.name}</div><button onclick="sendPoke(${r.id},'${p.userId}','${(p.name||'').replace(/'/g,"\\'")}')" style="position:absolute;top:5px;left:5px;background:rgba(46,51,188,0.85);border:none;border-radius:8px;padding:3px 6px;font-size:10px;color:white;font-weight:600;cursor:pointer;">👋 콕</button></div>`).join('')}
-      ${extraTodayCerts.map((c,i)=>`<div class="feed-item" style="background:${colors[(r.participants.length+i)%4]};" onclick="openCertFeedDetail(${c.id})"><div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${c.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">담당 끗짱</div></div></div>`).join('')}
-    </div>
+    ${(()=>{
+      const doneParticipants=r.participants.filter(p=>p.todayDone);
+      if(doneParticipants.length===0 && extraTodayCerts.length===0){
+        return `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;margin-bottom:20px;">🐈 지나가던 고양이가<br>오늘의 첫 인증글을 기다리는 중... 🐾</div>`;
+      }
+      return `<div class="feed-grid" style="margin-bottom:20px;">
+        ${doneParticipants.map((p,i)=>{
+          const todayCert=certs.filter(c=>c.userId===p.userId && _isToday(c.ts)).sort((a,b)=>b.ts-a.ts)[0];
+          const photo=todayCert && todayCert.photos && todayCert.photos[0];
+          return `<div class="feed-item" style="background:${photo?'#eee':colors[i%4]};" onclick="openKCertDetail(${r.id},'${p.name}')">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div></div>`;
+        }).join('')}
+        ${extraTodayCerts.map((c,i)=>{
+          const photo=c.photos && c.photos[0];
+          return `<div class="feed-item" style="background:${photo?'#eee':colors[(doneParticipants.length+i)%4]};" onclick="openCertFeedDetail(${c.id})">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${c.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">담당 끗짱</div></div></div>`;
+        }).join('')}
+      </div>`;
+    })()}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">📸 전체 인증 기록 <span style="font-size:11px;color:#aaa;font-weight:400;">(본인 인증 포함)</span></div>
     ${certs.length===0
       ? `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;">아직 인증글이 없어요</div>`
