@@ -2154,13 +2154,14 @@ function _myActiveRoutines() {
     return !_personalPeriod(r, me).isDone;
   });
 }
-// 승인은 됐지만 시작일이 아직 안 돼서 status가 'recruit'인 채로 남아있는 루틴 —
-// 인증은 아직 못 하지만 인증탭에서 "곧 시작해요"로 미리 보여주기 위함
+// 승인 대기 중이거나, 승인은 됐지만 시작일이 아직 안 돼서 status가 'recruit'인
+// 채로 남아있는 루틴 — 인증은 아직 못 하지만 인증탭에서 "곧 시작해요"로
+// 신청 시점부터 바로 보여주기 위함
 function _myUpcomingRoutines() {
   if (!currentUser) return [];
   return state.routines.filter(r => {
     if (r.isFree || r.status !== 'recruit') return false;
-    return (r.participants||[]).some(p=>p.userId===currentUser.id);
+    return (r.applicants||[]).some(a=>a.userId===currentUser.id && (a.status==='pending'||a.status==='approved'));
   });
 }
 // 자유루틴은 루틴 status가 절대 'done'이 안 되므로, 참여자 개인 기간이 끝났는지로 "완주"를 따로 판단
@@ -2990,18 +2991,21 @@ function renderCertTab() {
   // 가드). "인증하기" 버튼만 별도로 눌러야 인증 폼이 열리도록 stopPropagation 분리
   el.innerHTML = (upcoming.length>0 ? `<div style="padding:14px 16px 6px;">
       <div style="font-size:15px;font-weight:700;color:#111;">곧 시작해요</div>
-      <div style="font-size:12px;color:#888;margin-top:2px;">승인됐어요, 시작일부터 인증할 수 있어요</div>
+      <div style="font-size:12px;color:#888;margin-top:2px;">시작일부터 인증할 수 있어요</div>
     </div>` +
     upcoming.map(r=>{
+      const me=(r.applicants||[]).find(a=>a.userId===currentUser.id);
+      const isPending = me && me.status==='pending';
       const dd=_dday(r.startDate);
-      const ddText = dd>0?`D-${dd}`:dd===0?'오늘 시작':'';
+      const ddText = isPending ? '⏳ 승인 대기' : dd>0?`D-${dd}`:dd===0?'오늘 시작':'';
+      const ddBg = isPending?'#FFF3CD':'#E6F1FB', ddColor = isPending?'#856404':'#185FA5';
       return `<div onclick="openRoutineDetail(${r.id})" style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid #e8e8e8;border-radius:16px;cursor:pointer;background:#fafafa;">
       <div style="width:42px;height:42px;border-radius:12px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
         <div style="font-size:11px;color:#aaa;margin-top:2px;">${r.period}</div>
       </div>
-      <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;background:#E6F1FB;color:#185FA5;flex-shrink:0;">${ddText}</span>
+      <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;background:${ddBg};color:${ddColor};flex-shrink:0;white-space:nowrap;">${ddText}</span>
     </div>`;
     }).join('') : '') +
     (active.length>0 ? `<div style="padding:14px 16px 6px;">
