@@ -2068,3 +2068,25 @@ CREATE POLICY "rp_update" ON routine_participants FOR UPDATE USING (
   OR auth.uid() IN (SELECT created_by FROM routines WHERE id = routine_id)
   OR is_admin()
 );
+
+-- =====================================================
+-- [마이그레이션 2026-07-25q] 리워드 이미지 업로드 버킷
+-- 리워드 등록 폼의 "이미지 URL" 직접 입력 필드를 배너/루틴과 동일한
+-- 업로드 버튼 방식으로 교체 — banner-images 버킷과 동일한 패턴.
+-- =====================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('reward-images', 'reward-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "reward_images_insert_admin" ON storage.objects;
+CREATE POLICY "reward_images_insert_admin" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'reward-images' AND is_admin()
+);
+DROP POLICY IF EXISTS "reward_images_select_all" ON storage.objects;
+CREATE POLICY "reward_images_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'reward-images'
+);
+DROP POLICY IF EXISTS "reward_images_delete_admin" ON storage.objects;
+CREATE POLICY "reward_images_delete_admin" ON storage.objects FOR DELETE USING (
+  bucket_id = 'reward-images' AND is_admin()
+);

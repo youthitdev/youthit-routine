@@ -210,6 +210,7 @@
       <option value="recruit">모집 중</option>
       <option value="active">진행 중</option>
       <option value="done">완료</option>
+      <option value="cancelled">폐강</option>
       <option value="archived">보관됨</option>
     </select>
     <span class="count-badge" id="rCount"></span>
@@ -315,7 +316,14 @@
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <input type="text" id="rwDesc" placeholder="설명 (선택)" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
-        <input type="url" id="rwImage" placeholder="이미지 URL (선택)" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+        <input type="hidden" id="rwImage">
+        <input type="file" id="rwImageFile" accept="image/*" style="display:none;" onchange="handleRewardImageUpload(event)">
+        <button type="button" onclick="document.getElementById('rwImageFile').click()" style="padding:9px 14px;background:#fff;color:#2E33BC;border:1px solid #2E33BC;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🖼️ 이미지 업로드 (선택)</button>
+        <div id="rwImagePreviewWrap" style="display:none;">
+          <img id="rwImagePreview" style="max-height:60px;border-radius:8px;display:block;">
+        </div>
       </div>
       <button onclick="submitReward()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
     </div>
@@ -367,9 +375,10 @@
         <input type="text" id="bnTitle" placeholder="제목 (예: 여름방학 루틴 모집 중!)" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <input type="number" id="bnOrder" value="0" placeholder="노출순서" style="width:100px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-        <input type="text" id="bnBody" placeholder="내용 (선택)" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:2px;">
+        <input type="text" id="bnBody" placeholder="내용 (선택)" maxlength="30" oninput="document.getElementById('bnBodyCount').textContent=this.value.length" style="flex:2;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:8px;"><span id="bnBodyCount">0</span>/30자 — 배너가 좁아서 이보다 길면 화면에서 잘려요</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
         <input type="url" id="bnImage" placeholder="이미지 URL (직접 입력 또는 아래에서 업로드)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <input type="file" id="bnImageFile" accept="image/*" style="display:none;" onchange="handleBannerImageUpload(event)">
@@ -622,7 +631,6 @@ function _filteredRoutines() {
     if (q && !r.title.toLowerCase().includes(q)) return false;
     if (status === 'archived' && !r.archived) return false;
     if (status && status !== 'archived' && (r.status !== status || r.archived)) return false;
-    if (!status && r.archived) return false;
     return true;
   });
 }
@@ -1212,6 +1220,19 @@ function renderRedemptionList() {
   }).join('') : `<tr class="empty-row"><td colspan="6">교환 신청이 없어요</td></tr>`;
 }
 
+async function handleRewardImageUpload(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('reward-images').upload(path, file);
+  if (upErr) { alert('이미지 업로드 실패: ' + upErr.message); return; }
+  const url = sb.storage.from('reward-images').getPublicUrl(path).data.publicUrl;
+  document.getElementById('rwImage').value = url;
+  document.getElementById('rwImagePreview').src = url;
+  document.getElementById('rwImagePreviewWrap').style.display = '';
+}
 async function submitReward() {
   const title = document.getElementById('rwTitle').value.trim();
   const cost = parseInt(document.getElementById('rwCost').value);
@@ -1224,6 +1245,7 @@ async function submitReward() {
   const { error } = await sb.from('rewards').insert({ title, cost, stock, description: description || null, image_url: image_url || null });
   if (error) { alert('등록 실패: ' + error.message); return; }
   ['rwTitle', 'rwCost', 'rwStock', 'rwDesc', 'rwImage'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('rwImagePreviewWrap').style.display = 'none';
   await renderRewardView();
 }
 
@@ -1292,7 +1314,10 @@ async function handleBannerImageUpload(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
-  const path = `${Date.now()}_${file.name}`;
+  // 원본 파일명을 그대로 쓰면 한글·공백·특수문자 파일명에서 업로드가 실패하던 문제(루틴
+  // 사진 업로드와 동일한 원인, 2026-07-25 QA) — 확장자만 뽑아 안전한 경로로 구성
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${Date.now()}.${ext}`;
   const { error: upErr } = await sb.storage.from('banner-images').upload(path, file);
   if (upErr) { alert('이미지 업로드 실패: ' + upErr.message); return; }
   const url = sb.storage.from('banner-images').getPublicUrl(path).data.publicUrl;
@@ -1312,6 +1337,7 @@ function startEditBanner(id) {
   editingBannerId = id;
   document.getElementById('bnTitle').value = b.title;
   document.getElementById('bnBody').value = b.body || '';
+  document.getElementById('bnBodyCount').textContent = (b.body || '').length;
   document.getElementById('bnImage').value = b.image_url || '';
   document.getElementById('bnLink').value = b.link_url || '';
   document.getElementById('bnOrder').value = b.sort_order;
@@ -1324,6 +1350,7 @@ function startEditBanner(id) {
 function cancelEditBanner() {
   editingBannerId = null;
   ['bnTitle', 'bnBody', 'bnImage', 'bnLink'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bnBodyCount').textContent = '0';
   document.getElementById('bnOrder').value = '0';
   _showBannerImagePreview(null);
   document.getElementById('bnRoutineImageHint').style.display = 'none';
