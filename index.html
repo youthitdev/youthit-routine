@@ -3111,7 +3111,19 @@ function renderCertTab() {
         <div style="font-size:11px;color:#bbb;margin-top:2px;">${r.period}</div>
       </div>
       <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#f0f0f0;color:#aaa;flex-shrink:0;">🏅 완주</span>
-    </div>`).join('') : '');
+    </div>`).join('') : '') +
+    `<div style="margin:24px 16px 8px;">
+      <div style="font-size:13px;font-weight:700;color:#888;margin-bottom:10px;">💡 인증 팁</div>
+      <div style="background:#f5f5f7;border-radius:16px;padding:4px 16px;">
+        ${[
+          ['📸','선명한 사진으로 찍어주세요'],
+          ['⏰','매일 비슷한 시간에 인증하면 습관 만들기 좋아요'],
+          ['✍️','그날의 기분이나 생각을 솔직하게 담아보세요, 나중에 다시 보면 더 특별해요'],
+          ['💬','다른 친구의 인증글에 댓글로 응원을 남겨보세요'],
+          ['🔥','하루 놓쳐도 괜찮아요, 다시 이어가면 돼요'],
+        ].map(([icon,text],i,arr)=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;${i<arr.length-1?'border-bottom:0.5px solid #e8e8e8;':''}"><span style="font-size:15px;flex-shrink:0;">${icon}</span><span style="font-size:13px;color:#555;line-height:1.5;">${text}</span></div>`).join('')}
+      </div>
+    </div>`;
 }
 function goToRecruitRoutines() {
   switchTab('routine');
