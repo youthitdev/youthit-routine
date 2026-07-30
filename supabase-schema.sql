@@ -2171,3 +2171,13 @@ CREATE POLICY "posts_delete" ON posts FOR DELETE USING (auth.uid() = author_id O
 -- (공지 타입은 그대로 유지, 정렬만 이 값으로 결정).
 -- =====================================================
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT true;
+
+-- =====================================================
+-- [마이그레이션 2026-07-30a] 인증글 수정/삭제 정책 추가
+-- certifications 테이블엔 select/insert 정책만 있고 update/delete 정책이 없어서,
+-- 작성자 본인도 자기 인증글을 수정·삭제할 수 없었음(QA에서 발견). 본인 또는
+-- 관리자만 수정/삭제 가능하도록 정책 추가. cert_likes/cert_comments는 이미
+-- ON DELETE CASCADE라 인증글 삭제 시 같이 정리됨.
+-- =====================================================
+CREATE POLICY "cert_update" ON certifications FOR UPDATE USING (auth.uid() = user_id OR is_admin());
+CREATE POLICY "cert_delete" ON certifications FOR DELETE USING (auth.uid() = user_id OR is_admin());

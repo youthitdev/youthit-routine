@@ -116,7 +116,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .required { color: #FF006C; font-size: 12px; }
 textarea { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; resize: none; line-height: 1.6; }
 textarea:focus { outline: none; border-color: #2E33BC; }
-input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="url"], input[type="tel"] { width: 100%; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; }
+input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="url"], input[type="tel"] { width: 100%; height: 40px; padding: 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; }
 input:focus { outline: none; border-color: #2E33BC; }
 select { width: 100%; padding: 10px 34px 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; }
 select:focus { outline: none; border-color: #2E33BC; }
@@ -264,11 +264,13 @@ select:focus { outline: none; border-color: #2E33BC; }
 @media (max-width: 480px) {
   .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
 }
-/* 휴대폰을 가로로 돌려도 화면 레이아웃이 안 바뀌도록(세로 전용 앱) — 터치 기반
-   기기에서만 감지(hover:none 등)해서, 데스크톱에서 가로로 넓은 창을 쓰는 것까지
-   "회전"으로 오인해 이 안내를 덮어씌우지 않게 함 */
+/* 휴대폰을 가로로 돌려도 화면 레이아웃이 안 바뀌도록(세로 전용 앱) — hover:none/
+   pointer:coarse 조합이 일부 모바일 브라우저에서 안정적으로 안 잡혀서(실기기 QA에서
+   가로 회전해도 안내가 안 뜨는 문제 발견) 화면 높이 기준으로 바꿈. 휴대폰은 가로로
+   돌려도 짧은 변(세로 높이가 됨)이 대체로 500px를 안 넘고, 데스크톱 창은 아무리
+   좁혀도 이만큼 낮게 안 쓰는 경우가 많아 더 안정적으로 감지됨 */
 .rotate-lock-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: #111; color: #fff; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 12px; }
-@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+@media (orientation: landscape) and (max-height: 500px) {
   .rotate-lock-overlay { display: flex; }
 }
 </style>
@@ -527,18 +529,24 @@ select:focus { outline: none; border-color: #2E33BC; }
           <!-- 지금까지 만든 한끗 (누적 통계) -->
           <div style="margin-bottom:14px;">
             <div style="font-size:12px;color:#888;margin-bottom:8px;">지금까지 만든 한끗</div>
-            <div style="background:#EAF3DE;border-radius:16px;padding:16px 8px;display:flex;">
-              <div style="flex:1;text-align:center;">
-                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatCertCount">0</div>
-                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">인증수</div>
+            <div style="background:linear-gradient(135deg,#83CA00 0%,#4FA300 100%);border-radius:20px;padding:18px 8px;display:flex;position:relative;overflow:hidden;">
+              <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
+              <div style="position:absolute;left:-16px;bottom:-30px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+              <div style="position:absolute;right:6px;bottom:6px;font-size:56px;opacity:0.35;transform:rotate(-8deg);line-height:1;">🌱</div>
+              <div style="flex:1;text-align:center;position:relative;">
+                <div style="font-size:18px;margin-bottom:2px;">✨</div>
+                <div style="font-size:20px;font-weight:700;color:#fff;" id="youthStatCertCount">0</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">인증수</div>
               </div>
-              <div style="flex:1;text-align:center;">
-                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatCompleters">0</div>
-                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">완주자</div>
+              <div style="flex:1;text-align:center;position:relative;">
+                <div style="font-size:18px;margin-bottom:2px;">🏅</div>
+                <div style="font-size:20px;font-weight:700;color:#fff;" id="youthStatCompleters">0</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">완주자</div>
               </div>
-              <div style="flex:1;text-align:center;">
-                <div style="font-size:20px;font-weight:700;color:#111;" id="youthStatComm">0</div>
-                <div style="font-size:11px;color:#3B6D11;margin-top:2px;">소통수</div>
+              <div style="flex:1;text-align:center;position:relative;">
+                <div style="font-size:18px;margin-bottom:2px;">💬</div>
+                <div style="font-size:20px;font-weight:700;color:#fff;" id="youthStatComm">0</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">소통수</div>
               </div>
             </div>
           </div>
@@ -775,7 +783,7 @@ select:focus { outline: none; border-color: #2E33BC; }
 
           <div class="stats-grid-4">
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📋</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRoutine">0</span><span style="font-size:11px;color:#888;">운영한 루틴</span></div>
-            <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
+            <div class="stat-card" onclick="kSwitchTab('home')" style="align-items:flex-start;cursor:pointer;"><span style="font-size:18px;">📸</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyCert">0</span><span style="font-size:11px;color:#888;">총 인증 수</span></div>
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🧑</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyYouth">0</span><span style="font-size:11px;color:#888;">함께한 청소년</span></div>
             <div class="stat-card" style="align-items:flex-start;"><span style="font-size:18px;">🏅</span><span style="font-size:22px;font-weight:600;color:#111;" id="kMyRate">0%</span><span style="font-size:11px;color:#888;">평균 완주율</span></div>
           </div>
@@ -2674,7 +2682,13 @@ function renderCertDetail(id) {
       </div>`;
   document.getElementById('rdBody').innerHTML = `
     ${photoHtml}
-    <div style="font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;">${c.text}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      <div style="font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;flex:1;min-width:0;" id="rdCertText_${c.id}">${c.text}</div>
+      ${_canModerate(c.userId)?`<div style="display:flex;gap:10px;flex-shrink:0;padding-top:2px;">
+        <i class="ti ti-pencil" onclick="editCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
+        <i class="ti ti-trash" onclick="deleteCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
+      </div>`:''}
+    </div>
     <div style="font-size:12px;color:#aaa;">${timeAgo(c.ts)}</div>
 
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;">
@@ -2757,6 +2771,29 @@ async function submitCommentFromBar() {
   } finally {
     _submittingComment = false;
   }
+}
+async function editCert(id) {
+  const c = (state.certFeed||[]).find(x=>x.id===id);
+  if(!c) return;
+  const newText = prompt('인증 내용을 수정하세요', c.text);
+  if(newText===null || newText===c.text) return;
+  const { data, error } = await sb.from('certifications').update({ content: newText }).eq('id', id).select('id');
+  if(error){ alert('수정 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('수정 권한이 없어요.'); return; }
+  c.text = newText;
+  const el = document.getElementById(`rdCertText_${id}`);
+  if(el) el.textContent = newText;
+}
+// 인증글 삭제 — 완주 인정 일수·나다움 포인트 계산에 쓰이는 인증 횟수가 바뀌므로
+// 삭제 후 루틴/인증피드를 다시 불러와서 화면 전체를 최신 상태로 맞춤(포인트 회수는
+// 하지 않음 — 이미 지급된 나다움은 그대로 둠, 기존에도 그런 정책이었음)
+async function deleteCert(id) {
+  if(!confirm('이 인증글을 삭제할까요? 인증 기록에서도 사라져요.')) return;
+  const { data, error } = await sb.from('certifications').delete().eq('id', id).select('id');
+  if(error){ alert('삭제 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('삭제 권한이 없거나 이미 삭제된 글이에요.'); return; }
+  await Promise.all([loadRoutines(), loadCertFeed()]);
+  _navBackOrClose('routineDetailOverlay');
 }
 async function deleteCertComment(certId, commentId) {
   if(!confirm('이 댓글을 삭제할까요?')) return;
@@ -2943,6 +2980,8 @@ function openRoutineDetail(id) {
       <div style="font-size:28px;margin-bottom:8px;">🙏</div>
       <div style="font-size:13px;color:#888;line-height:1.6;">최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강됐어요</div>
     </div>`;
+  else if(r.status==='active') body+=`
+    <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;">🗓 이미 시작돼서 모집이 마감됐어요</div>`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     // 완주 직후에만 의미있는 액션들이라 종료일로부터 7일까지만 노출
