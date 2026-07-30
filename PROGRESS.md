@@ -764,6 +764,14 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경: `get_home_stats()` 함수 추가 (사용자가 SQL Editor에서 직접 실행, 완료)
 - 검증: 브라우저에서 `sb.rpc` 응답을 mock 주입 — 반환된 집계값이 그대로 화면에 반영되는 것 확인
 
+## ⚠️ 임시 조치 — 심사 끝나면 반드시 되돌릴 것 (2026-07-30)
+
+지원사업 심사위원 체험용 계정의 실제 데이터가 적어 홈 상단 통계가 휑해 보이는 문제 — **실제 값이 아니라 화면 표시용 고정값**으로 임시 대체함(사용자 명시적 요청, 데모 목적 한정 — 보고서·신청서 등 실제 성과 지표로는 절대 이 숫자를 쓰지 말 것).
+
+- `index.html`의 `DEMO_STATS_OVERRIDE = { certCount: 132, completers: 55, commCount: 350 }` — `loadHomeStats()`가 실제 계산값(`certCount`/`commCount`/`completers.size`) 대신 이 값을 화면에 표시하도록 덮어씀
+- 실제 계산 로직은 그대로 남아있어서, 심사 끝나면 `DEMO_STATS_OVERRIDE.xxx` 참조 3곳을 원래 변수(`certCount`/`completers.size`/`commCount`)로 되돌리기만 하면 됨(코드에 큰 경고 주석으로 표시해둠)
+- 검증: mock RPC 응답/실제 데이터와 무관하게 화면엔 132/55/350이 고정으로 뜨는 것 확인
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토
