@@ -98,7 +98,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .chip.active { background: #2E33BC; color: white; border-color: #2E33BC; }
 .routine-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; padding: 0 16px 16px; }
 .routine-card { background: #fff; border: 0.5px solid #e8e8e8; border-radius: 16px; padding: 0; overflow: hidden; cursor: pointer; }
-.routine-card .rc-cover { position: relative; width: 100%; height: 132px; overflow: hidden; }
+.routine-card .rc-cover { position: relative; width: 100%; aspect-ratio: 4/3; overflow: hidden; }
 .routine-card .rc-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .routine-card .rc-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 34%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.42) 100%); }
 .routine-card .rc-status { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 3px 9px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
@@ -553,7 +553,6 @@ select:focus { outline: none; border-color: #2E33BC; }
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
           <div id="homeBannerArea" style="display:none;"></div>
           <div id="pushNudgeArea"></div>
-          <div id="todayMissionArea"></div>
         </div>
         <div style="display:flex;align-items:center;padding-top:12px;">
           <div class="filter-bar" id="routineFilterBar" style="padding-top:0;flex:1;">
@@ -2257,21 +2256,8 @@ function renderRoutineBanners() {
   meetEl.style.display = banners.length?'flex':'none';
   if(banners.length) { meetEl.style.flexDirection='column'; meetEl.style.gap='10px'; }
 
-  // 오늘의 미션 카드
+  // 오늘 미인증 알림은 인증탭 하단 네비 배지로 이미 보이고 있어서(중복) 홈 배너는 제거함
   const notDone = active.filter(r=>!r.todayCert);
-  const missionEl = document.getElementById('todayMissionArea');
-  if(active.length === 0) {
-    missionEl.innerHTML = '';
-  } else if(notDone.length === 0) {
-    missionEl.innerHTML = '';
-  } else {
-    missionEl.innerHTML = `<div onclick="switchTab('cert')" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#f0f1fb;border-radius:14px;cursor:pointer;">
-      <div style="font-size:20px;flex-shrink:0;">📸</div>
-      <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#111;">오늘 미인증 루틴 ${notDone.length}개 남았어요</div>
-      <div style="flex-shrink:0;font-size:12px;font-weight:600;color:#2E33BC;">인증하러 가기 ›</div>
-    </div>`;
-  }
-
   updateCertNavBadge(notDone.length + banners.length);
   renderPushNudge(); // 알림 미설정자에게 켜기 유도 배너 (비동기)
 }
@@ -2918,7 +2904,7 @@ function openRoutineDetail(id) {
   const isOpenFree=_isFreeOpen(r);
   document.getElementById('rdSub').textContent=r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
-  let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+  let body=`${r.coverImageUrl?`<img src="${r.coverImageUrl}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
     ${r.leaderName?`<div style="font-size:12px;color:#3B6D11;font-weight:600;background:#EAF3DE;padding:4px 9px;border-radius:12px;">🙋 ${r.leaderName} 끗짱</div>`:''}
@@ -2950,9 +2936,6 @@ function openRoutineDetail(id) {
     </div>`:'';
   if(r.status==='recruit' || isOpenFree) body+=`
     ${meetHtml}
-    <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:8px 12px;border-radius:10px;margin-bottom:10px;">
-      <i class="ti ti-camera" style="font-size:13px;"></i>인증 시 사진 첨부 필수예요
-    </div>
     ${isApprovedMine
       ? `<div style="width:100%;padding:14px;background:#EAF3DE;border-radius:12px;font-size:14px;color:#3B6D11;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
           <i class="ti ti-check" style="font-size:16px;"></i> 승인됐어요! 시작일부터 인증할 수 있어요
