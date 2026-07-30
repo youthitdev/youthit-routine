@@ -593,6 +593,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="display:flex;gap:8px;padding:12px 16px 8px;" id="commFilter">
           <div class="chip active" onclick="filterComm('all',this)">전체</div>
           <div class="chip" onclick="filterComm('notice',this)">공지</div>
+          <div class="chip" onclick="filterComm('kpost',this)">소식</div>
           <div class="chip" onclick="filterComm('review',this)">후기</div>
         </div>
         <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="postList"></div>
@@ -741,6 +742,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="padding:12px 16px 8px;display:flex;gap:8px;" id="kReviewFilterBar">
           <div class="chip active" onclick="kFilterReview('all',this)">전체</div>
           <div class="chip" onclick="kFilterReview('notice',this)">공지</div>
+          <div class="chip" onclick="kFilterReview('kpost',this)">소식</div>
           <div class="chip" onclick="kFilterReview('review',this)">후기</div>
         </div>
         <div style="padding:0 16px 80px;display:flex;flex-direction:column;gap:10px;" id="kReviewFeed"></div>
@@ -1112,7 +1114,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
-      <div style="margin-bottom:16px;"><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="kPostPinned" checked style="width:17px;height:17px;flex-shrink:0;">📌 목록 상단에 고정</label></div>
+      <div style="margin-bottom:16px;" id="kPostPinnedRow"><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="kPostPinned" checked style="width:17px;height:17px;flex-shrink:0;">📌 목록 상단에 고정</label></div>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
     </div>
   </div>
@@ -2815,7 +2817,7 @@ function openPostDetail(id) {
   if(!p) return;
   const comments = p.comments||[];
   document.getElementById('rdSub').textContent = p.date;
-  document.getElementById('rdTitle').textContent = p.type==='notice' ? '📢 공지' : '✍️ 후기';
+  document.getElementById('rdTitle').textContent = p.type==='notice' ? '📢 공지' : p.type==='kpost' ? '💬 소식' : '✍️ 후기';
 
   const bar = document.getElementById('rdCommentBar');
   const avatar = document.getElementById('rdCommentAvatar');
@@ -3559,6 +3561,7 @@ function editPost(id) {
     document.getElementById('kPostTitle').value = p.title;
     document.getElementById('kPostContent').value = p.content;
     document.getElementById('kPostPinned').checked = p.pinned;
+    document.getElementById('kPostPinnedRow').style.display = state.loginType==='both' ? '' : 'none';
     document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('kWriteSheetBg');
   }
@@ -4918,9 +4921,7 @@ function kResetReviewFilter() {
 let kReviewFilter='all';
 function kRenderReviewTab(filter) {
   kReviewFilter=filter||'all';
-  const list = _pinNotices(filter==='notice' ? state.posts.filter(p=>p.type==='notice')
-    : filter==='review' ? state.posts.filter(p=>p.type==='review')
-    : state.posts);
+  const list = _pinNotices(filter==='all' ? state.posts : state.posts.filter(p=>p.type===filter));
   const el=document.getElementById('kReviewFeed');
   if(!el) return;
   el.innerHTML = list.length > 0
@@ -4957,22 +4958,25 @@ function openKWriteSheet() {
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
   document.getElementById('kPostPinned').checked = true;
+  document.getElementById('kPostPinnedRow').style.display = state.loginType==='both' ? '' : 'none';
   document.querySelector('#kWriteSheetBg .primary-btn').textContent = '게시하기';
   openSheet('kWriteSheetBg');
 }
 async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
-  const pinned = document.getElementById('kPostPinned').checked;
+  const isAdmin = state.loginType==='both';
+  const pinned = isAdmin ? document.getElementById('kPostPinned').checked : false;
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
   if(editingPostId) {
-    const { error } = await sb.from('posts').update({ title:t, content:c, pinned }).eq('id', editingPostId);
+    const payload = isAdmin ? { title:t, content:c, pinned } : { title:t, content:c };
+    const { error } = await sb.from('posts').update(payload).eq('id', editingPostId);
     if(error){ alert('수정 실패: '+error.message); return; }
     editingPostId = null;
   } else {
     const { error } = await sb.from('posts').insert({
-      type:'notice', title:t, content:c, author_id:currentUser.id, pinned,
+      type: isAdmin ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id, pinned,
     });
     if(error){ alert('게시 실패: '+error.message); return; }
   }
@@ -5140,7 +5144,7 @@ function kRenderMy() {
     ? myPosts.map(p=>`
         <div onclick="openPost(${p.id})" style="padding:12px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${p.type==='notice'?'#FFF0D4':'#EAF3DE'};color:${p.type==='notice'?'#B8600B':'#3B6D11'};">${p.type==='notice'?'공지':'후기'}</span>
+            <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${p.type==='notice'?'#FFF0D4':p.type==='kpost'?'#E6F1FB':'#EAF3DE'};color:${p.type==='notice'?'#B8600B':p.type==='kpost'?'#185FA5':'#3B6D11'};">${p.type==='notice'?'공지':p.type==='kpost'?'소식':'후기'}</span>
             <span style="font-size:11px;color:#aaa;">${p.date}</span>
           </div>
           <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:2px;">${_postDisplayTitle(p)}</div>

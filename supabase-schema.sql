@@ -2201,3 +2201,12 @@ LANGUAGE sql STABLE AS $$
     (SELECT count(*) FROM certifications) AS cert_count,
     (SELECT count(*) FROM post_comments) + (SELECT count(*) FROM cert_comments) AS comm_count;
 $$;
+
+-- =====================================================
+-- [마이그레이션 2026-07-30c] 커뮤니티 "공지"는 관리자만 등록 가능하도록 분리
+-- 일반 끗짱이 커뮤니티에 글을 쓰면 전부 type='notice'(공지)로 등록돼서 상단
+-- 고정/공지 배지가 붙던 문제(QA 발견). 공지는 관리자(유스보이스)만 쓸 수 있게
+-- 하고, 일반 끗짱 글은 새 타입 'kpost'("소식")로 분리.
+-- =====================================================
+ALTER TABLE posts DROP CONSTRAINT IF EXISTS posts_type_check;
+ALTER TABLE posts ADD CONSTRAINT posts_type_check CHECK (type IN ('notice', 'review', 'kpost'));
