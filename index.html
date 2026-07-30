@@ -1937,13 +1937,14 @@ async function loadCertFeed() {
 // 캡 없이 전체를 불러오고 있어서 이미 로드된 state.routines로 계산해도 정확함
 async function loadHomeStats() {
   try {
-    const [certCountRes, postCommentsRes, certCommentsRes] = await Promise.all([
-      sb.from('certifications').select('id', { count: 'exact', head: true }),
-      sb.from('post_comments').select('id', { count: 'exact', head: true }),
-      sb.from('cert_comments').select('id', { count: 'exact', head: true }),
-    ]);
-    const certCount = certCountRes.count || 0;
-    const commCount = (postCommentsRes.count || 0) + (certCommentsRes.count || 0);
+    // certifications/cert_comments는 "그 루틴 참여자만 볼 수 있게" RLS로 막혀 있어서
+    // 클라이언트에서 직접 count(*)를 하면 로그인한 계정마다 다른(자기가 볼 수 있는 것만)
+    // 숫자가 나옴 — RLS를 우회해 항상 같은 진짜 전체 개수를 주는 DB 함수를 통해 가져옴
+    const { data: statsRow, error: statsErr } = await sb.rpc('get_home_stats');
+    if (statsErr) throw statsErr;
+    const s = Array.isArray(statsRow) ? statsRow[0] : statsRow;
+    const certCount = s?.cert_count || 0;
+    const commCount = s?.comm_count || 0;
     const completers = new Set();
     (state.routines || []).forEach(r => {
       const { certGoal } = _completionGoal(r);

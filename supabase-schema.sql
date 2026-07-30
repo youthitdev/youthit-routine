@@ -2181,3 +2181,23 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT true;
 -- =====================================================
 CREATE POLICY "cert_update" ON certifications FOR UPDATE USING (auth.uid() = user_id OR is_admin());
 CREATE POLICY "cert_delete" ON certifications FOR DELETE USING (auth.uid() = user_id OR is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-07-30b] 홈 통계(인증수/소통수)가 계정마다 다르게 보이던 문제 수정
+-- certifications/cert_comments의 SELECT 정책이 "그 루틴 참여자만 볼 수 있게" 제한돼
+-- 있어서(2026-07-25 보안 수정), 클라이언트에서 count(*) 쿼리를 날리면 RLS 때문에
+-- 로그인한 계정이 볼 수 있는 행만 세어짐 — 일반 계정은 자기 루틴 것만, 관리자는
+-- is_admin()으로 전체가 세어져서 같은 통계가 계정마다 다르게 보였음(청소년 홈 상단
+-- "지금까지 만든 한끗"). RLS를 우회해 항상 같은 진짜 전체 개수를 돌려주는
+-- SECURITY DEFINER 함수를 추가 — 개별 인증글/댓글 내용은 노출하지 않고 집계 숫자만
+-- 반환하므로 안전함.
+-- =====================================================
+CREATE OR REPLACE FUNCTION get_home_stats()
+RETURNS TABLE(cert_count bigint, comm_count bigint)
+SECURITY DEFINER
+SET search_path = public, pg_temp
+LANGUAGE sql STABLE AS $$
+  SELECT
+    (SELECT count(*) FROM certifications) AS cert_count,
+    (SELECT count(*) FROM post_comments) + (SELECT count(*) FROM cert_comments) AS comm_count;
+$$;
