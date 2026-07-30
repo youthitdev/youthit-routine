@@ -4426,7 +4426,6 @@ function kFilterRoutine(type,el) {
         ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
         <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
         <span class="rc-people">👤 ${r.people}명</span>
-        ${state.loginType!=='both' && r.ledBy===currentUser?.id?`<span style="position:absolute;bottom:8px;left:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(46,51,188,0.9);color:#fff;">내 담당</span>`:''}
         ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
       <div class="rc-body" style="background:${cardBg};">
@@ -4436,7 +4435,10 @@ function kFilterRoutine(type,el) {
           <span style="font-size:11px;color:${isDone?'#bbb':'#888'};">${r.period}</span>
           ${ddHtml}
         </div>
-        ${pending>0?`<div style="margin-top:7px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;font-weight:700;">신청 ${pending}</span></div>`:''}
+        ${(pending>0 || (state.loginType!=='both' && r.ledBy===currentUser?.id))?`<div style="margin-top:7px;display:flex;align-items:center;justify-content:space-between;gap:5px;">
+          <span>${pending>0?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#FFF3CD;color:#856404;font-weight:700;">신청 ${pending}</span>`:''}</span>
+          ${state.loginType!=='both' && r.ledBy===currentUser?.id?`<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#FFD600;color:#7A5C00;font-weight:700;">MY</span>`:''}
+        </div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -4545,15 +4547,28 @@ function openKRoutineDetail(routineId) {
               ${a.status==='rejected'&&a.rejectReason?`<div style="margin-top:6px;padding:8px 10px;background:#FBEAF0;border-radius:8px;font-size:11px;color:#993556;line-height:1.5;white-space:pre-wrap;">거절 사유: ${a.rejectReason}</div>`:''}
             </div>`).join('')}
         </div>`)
-    : (approved.length===0
-      ? `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 승인된 참여자가 없어요</div>`
-      : `<div style="display:flex;flex-direction:column;gap:8px;">
+    : (approved.length===0 && pending.length===0
+      ? `<div style="padding:20px;text-align:center;font-size:13px;color:#aaa;background:#f5f5f7;border-radius:12px;">아직 신청자가 없어요</div>`
+      : `${pending.length>0?`
+        <div style="font-size:11px;font-weight:500;color:#856404;background:#FFF3CD;padding:4px 10px;border-radius:8px;margin-bottom:8px;display:inline-block;">⏳ 승인 대기 ${pending.length}명</div>`:''}
+        <div style="display:flex;flex-direction:column;gap:8px;">
           ${approved.map(a=>`
             <div style="padding:12px;background:#EAF3DE;border:0.5px solid #83CA00;border-radius:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
                 <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
                 <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${a.name}</div></div>
                 <span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 참여 중</span>
+              </div>
+            </div>`).join('')}
+          ${pending.map(a=>`
+            <div style="padding:12px;background:#fff;border:0.5px solid #e8e8e8;border-radius:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:500;color:#111;">${a.name}</div>
+                  <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
+                </div>
+                <span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#FFF3CD;color:#856404;">⏳ 대기중</span>
               </div>
             </div>`).join('')}
         </div>`);
