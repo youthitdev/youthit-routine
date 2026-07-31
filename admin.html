@@ -538,6 +538,7 @@ async function loadData() {
   routines.forEach(r => {
     const eff = r.status === 'active' && r.end_date && r.end_date < _today ? 'done'
       : r.status === 'recruit' && r.start_date && r.start_date <= _today ? 'active'
+      : r.status === 'active' && r.start_date && r.start_date > _today ? 'recruit'
       : r.status;
     if (eff !== r.status) { sb.from('routines').update({ status: eff }).eq('id', r.id).then(() => {}); r.status = eff; }
   });

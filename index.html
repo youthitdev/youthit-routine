@@ -1826,6 +1826,7 @@ async function loadRoutines() {
     // 이 자동전환 대상이 아님
     const effectiveStatus = r.status === 'active' && r.end_date && r.end_date < today ? 'done'
       : r.status === 'recruit' && r.start_date && r.start_date <= today ? 'active'
+      : r.status === 'active' && r.start_date && r.start_date > today ? 'recruit'
       : r.status;
     // 루틴 수정 권한이 관리자로 축소돼서(2026-07-25), led_by만으로는 이 자동전환 write-back이
     // 더 이상 안 먹힘 — created_by(항상 관리자)/관리자 세션에서만 실제로 반영됨
