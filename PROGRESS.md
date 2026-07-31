@@ -822,6 +822,13 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경 없음
 - 검증: 브라우저에서 `openRoutineFeed`/`openCompleteSuccess`를 스텁으로 바꾸고 카드의 버튼/배지를 각각 클릭 — 의도한 함수가 정확히 호출되는 것 확인
 
+## 최근 완료 (2026-07-31, "다시보기" 눌러도 반응 없다가 뒤로가기 하면 나타나던 문제 수정)
+
+- **버그**: 위 항목에서 "다시보기"를 인증 피드로 연결했는데, `myCompletedOverlay` 안에서 같은 `.overlay`(z-index 200)인 `routineFeedOverlay`를 그냥 열면 먼저 열려있던 `myCompletedOverlay`에 가려서 안 보이고, 뒤로가기로 `myCompletedOverlay`를 닫아야 그제서야 뒤에 있던 인증 피드가 드러났음
+- **수정**: `openMyComm()` 등 기존에 오버레이 간 이동할 때 쓰던 패턴(`closeOverlay(현재);open대상()`)과 동일하게, `_completedRoutineCardHtml()`의 카드 클릭/"다시보기" 버튼 모두 `openRoutineFeed()` 호출 전에 `closeOverlay('myCompletedOverlay')`를 먼저 하도록 수정
+- DB 변경 없음
+- 검증: 브라우저에서 완주 루틴 mock으로 `openMyCompleted()` 연 뒤 "다시보기" 클릭 — `myCompletedOverlay`는 닫히고 `routineFeedOverlay`가 즉시(뒤로가기 없이) 열리는 것, 스크린샷으로 인증 피드 화면이 바로 보이는 것 확인
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토

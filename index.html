@@ -2247,9 +2247,12 @@ function _myCompletedRoutines() {
 function _completedRoutineCardHtml(r) {
   const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
   const shareBtn = daysSinceEnd<=7 ? `<button onclick="event.stopPropagation();openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
-  const replayBtn = `<button onclick="event.stopPropagation();openRoutineFeed(${r.id})" style="padding:5px 10px;background:#FFFBE6;color:#B8860B;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">🎉 다시보기</button>`;
+  // myCompletedOverlay 안에서 같은 z-index의 routineFeedOverlay를 곧바로 열면 먼저 열려있던
+  // myCompletedOverlay에 가려 안 보이다가 뒤로가기(그걸 닫을 때)에야 드러나는 문제가 있어서,
+  // 다른 오버레이로 넘어가는 다른 곳들(openMyComm 등)처럼 먼저 닫고 연다
+  const replayBtn = `<button onclick="event.stopPropagation();closeOverlay('myCompletedOverlay');openRoutineFeed(${r.id})" style="padding:5px 10px;background:#FFFBE6;color:#B8860B;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">🎉 다시보기</button>`;
   const completeBadge = `<span onclick="event.stopPropagation();openCompleteSuccess(${r.id})" style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;cursor:pointer;">완주</span>`;
-  return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${replayBtn}${shareBtn}${completeBadge}</div></div>`;
+  return `<div onclick="closeOverlay('myCompletedOverlay');openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${replayBtn}${shareBtn}${completeBadge}</div></div>`;
 }
 // 완주한 루틴은 계속 쌓이므로, MY 홈엔 최근 몇 개만 미리보기로 보여주고 전체는 별도 화면에서(QA 요청)
 function openMyCompleted() {
