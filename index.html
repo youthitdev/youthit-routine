@@ -662,8 +662,7 @@ select:focus { outline: none; border-color: #2E33BC; }
             <button id="aiReportBtn" style="width:100%;padding:10px;background:white;color:#2E33BC;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;" onclick="openReport()">리포트 받기</button>
           </div>
           <div class="section-card" id="completedSection" style="display:none;">
-            <div class="section-hd" style="cursor:pointer;" onclick="openMyCompleted()"><div class="section-hd-title">완주한 루틴</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
-            <div id="completedList"></div>
+            <div class="section-hd" style="cursor:pointer;" onclick="openMyCompleted()"><div class="section-hd-title">완주한 루틴 <span id="completedCountBadge" style="font-weight:400;color:#888;"></span></div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
           <div class="menu-card">
             <div class="menu-item" onclick="openBadgeSheet()"><div class="menu-left"><div class="menu-icon" style="background:#FFF8E1;"><i class="ti ti-award" style="font-size:15px;color:#B8860B;"></i></div>배지</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
@@ -2232,10 +2231,17 @@ function _myUpcomingRoutines() {
 // 자유루틴은 루틴 status가 절대 'done'이 안 되므로, 참여자 개인 기간이 끝났는지로 "완주"를 따로 판단
 function _myCompletedRoutines() {
   if (!currentUser) return [];
+  // 완주한 날짜(개인별 종료일) 최신순 — 자유루틴은 루틴 레벨 endDate가 없어서 개인 기간으로 계산
   return state.routines.filter(r => {
     const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
     if (!me) return false;
     return r.isFree ? _personalPeriod(r, me).isDone : r.status==='done';
+  }).sort((a, b) => {
+    const aMe = (a.participants||[]).find(p=>p.userId===currentUser.id);
+    const bMe = (b.participants||[]).find(p=>p.userId===currentUser.id);
+    const aEnd = a.isFree ? _personalPeriod(a, aMe).endDate : a.endDate;
+    const bEnd = b.isFree ? _personalPeriod(b, bMe).endDate : b.endDate;
+    return (bEnd || '').localeCompare(aEnd || '');
   });
 }
 function _completedRoutineCardHtml(r) {
@@ -3844,11 +3850,9 @@ function renderMy() {
   document.getElementById('myCommCount').textContent=state.youth.commCount;
   const done=_myCompletedRoutines();
   document.getElementById('myCompleteCount').textContent=done.length;
-  const COMPLETED_PREVIEW_LIMIT = 3;
   if(done.length>0){
     document.getElementById('completedSection').style.display='';
-    document.getElementById('completedList').innerHTML=done.slice(0,COMPLETED_PREVIEW_LIMIT).map(_completedRoutineCardHtml).join('')
-      + (done.length>COMPLETED_PREVIEW_LIMIT ? `<div onclick="openMyCompleted()" style="padding:10px 16px;border-top:0.5px solid #f0f0f0;text-align:center;font-size:12px;color:#888;cursor:pointer;">전체 ${done.length}개 보기</div>` : '');
+    document.getElementById('completedCountBadge').textContent=`(${done.length})`;
   }
   renderCal();
   renderBadges();
