@@ -662,7 +662,7 @@ select:focus { outline: none; border-color: #2E33BC; }
             <button id="aiReportBtn" style="width:100%;padding:10px;background:white;color:#2E33BC;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;" onclick="openReport()">리포트 받기</button>
           </div>
           <div class="section-card" id="completedSection" style="display:none;">
-            <div class="section-hd"><div class="section-hd-title">완주한 루틴</div></div>
+            <div class="section-hd" style="cursor:pointer;" onclick="openMyCompleted()"><div class="section-hd-title">완주한 루틴</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div id="completedList"></div>
           </div>
           <div class="menu-card">
@@ -1002,6 +1002,15 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-body" id="myCertsBody" style="padding:12px 16px 16px;"></div>
   </div>
 
+  <!-- 완주한 루틴 모아보기 -->
+  <div class="overlay" id="myCompletedOverlay">
+    <div class="overlay-hd">
+      <button class="back-btn" onclick="closeOverlay('myCompletedOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
+      <div><div style="font-size:11px;opacity:0.75;">MY</div><div style="font-size:16px;font-weight:600;">🏅 완주한 루틴</div></div>
+    </div>
+    <div class="overlay-body" id="myCompletedBody" style="padding:12px 16px 16px;"></div>
+  </div>
+
   <!-- 내 소통 내역(내가 쓴 글 + 댓글) -->
   <div class="overlay" id="myCommOverlay">
     <div class="overlay-hd">
@@ -1138,10 +1147,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">프로필 편집</div>
       <div style="margin-bottom:14px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">닉네임은 변경할 수 없어요</div></div>
       <div style="margin-bottom:14px;"><div class="field-label">이름(실명)</div><input type="text" id="editRealName" placeholder="이름(실명)" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">실명은 변경할 수 없어요</div></div>
-      <div style="margin-bottom:14px;" class="date-row">
-        <div class="date-item"><label>생년월일</label><input type="date" id="editBirth"></div>
-        <div class="date-item"><label>휴대폰번호</label><input type="tel" id="editPhone" placeholder="'-' 없이 입력"></div>
-      </div>
+      <div style="margin-bottom:14px;"><div class="field-label">생년월일</div><input type="date" id="editBirth"></div>
+      <div style="margin-bottom:14px;"><div class="field-label">휴대폰번호</div><input type="tel" id="editPhone" placeholder="'-' 없이 입력"></div>
       <div style="margin-bottom:14px;"><div class="field-label">지역</div><div style="display:flex;gap:6px;">
         <select id="editSido" style="flex:1;" onfocus="populateSidoSelect('editSido')" onchange="populateSigugunSelect('editSido','editSigugun')"><option value="">시/도 선택</option></select>
         <select id="editSigugun" style="flex:1;"><option value="">시/군/구 선택</option></select>
@@ -2230,6 +2237,21 @@ function _myCompletedRoutines() {
     if (!me) return false;
     return r.isFree ? _personalPeriod(r, me).isDone : r.status==='done';
   });
+}
+function _completedRoutineCardHtml(r) {
+  const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
+  const shareBtn = daysSinceEnd<=7 ? `<button onclick="event.stopPropagation();openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
+  const celebrateBtn = `<button onclick="event.stopPropagation();openCompleteSuccess(${r.id})" style="padding:5px 10px;background:#FFFBE6;color:#B8860B;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">🎉 다시보기</button>`;
+  return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${celebrateBtn}${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
+}
+// 완주한 루틴은 계속 쌓이므로, MY 홈엔 최근 몇 개만 미리보기로 보여주고 전체는 별도 화면에서(QA 요청)
+function openMyCompleted() {
+  if(!currentUser) return;
+  const done = _myCompletedRoutines();
+  document.getElementById('myCompletedBody').innerHTML = done.length===0
+    ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">아직 완주한 루틴이 없어요</div>`
+    : done.map(_completedRoutineCardHtml).join('');
+  openOverlay('myCompletedOverlay');
 }
 function renderRoutineBanners() {
   renderNadaeum();
@@ -3822,14 +3844,11 @@ function renderMy() {
   document.getElementById('myCommCount').textContent=state.youth.commCount;
   const done=_myCompletedRoutines();
   document.getElementById('myCompleteCount').textContent=done.length;
+  const COMPLETED_PREVIEW_LIMIT = 3;
   if(done.length>0){
     document.getElementById('completedSection').style.display='';
-    document.getElementById('completedList').innerHTML=done.map(r=>{
-      const daysSinceEnd = r.endDate ? Math.floor((Date.now() - new Date(r.endDate+'T00:00:00').getTime()) / 86400000) : 0;
-      const shareBtn = daysSinceEnd<=7 ? `<button onclick="event.stopPropagation();openReportCard(${r.id})" style="padding:5px 10px;background:#f0f1fb;color:#2E33BC;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">📤 공유</button>` : '';
-      const celebrateBtn = `<button onclick="event.stopPropagation();openCompleteSuccess(${r.id})" style="padding:5px 10px;background:#FFFBE6;color:#B8860B;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">🎉 다시보기</button>`;
-      return `<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;"><div><div style="font-size:13px;color:#111;">${r.emoji} ${r.title}</div><div style="font-size:11px;color:#888;">${r.period}</div></div><div style="display:flex;align-items:center;gap:6px;">${celebrateBtn}${shareBtn}<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">완주</span></div></div>`;
-    }).join('');
+    document.getElementById('completedList').innerHTML=done.slice(0,COMPLETED_PREVIEW_LIMIT).map(_completedRoutineCardHtml).join('')
+      + (done.length>COMPLETED_PREVIEW_LIMIT ? `<div onclick="openMyCompleted()" style="padding:10px 16px;border-top:0.5px solid #f0f0f0;text-align:center;font-size:12px;color:#888;cursor:pointer;">전체 ${done.length}개 보기</div>` : '');
   }
   renderCal();
   renderBadges();
@@ -5418,7 +5437,7 @@ function closeLetterSuccess() {
 // 공통 오버레이/시트
 // ════════════════════════════════════════════════════════
 // 3뎁스 오버레이 목록 (탭 숨김)
-const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay','myCertsOverlay','myCommOverlay'];
+const DEPTH3_OVERLAYS = ['routineDetailOverlay','certFormOverlay','letterOverlay','letterDetailOverlay','letterAllOverlay','reviewAllOverlay','inquiryOverlay','createRoutineOverlay','myCertsOverlay','myCommOverlay','myCompletedOverlay'];
 
 // ── 뒤로가기(모바일 스와이프 포함) 내비게이션 스택 ──
 // 오버레이/시트를 열거나 탭을 바꿀 때마다 히스토리를 한 칸 쌓아두고, 실제
