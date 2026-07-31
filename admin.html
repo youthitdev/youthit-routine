@@ -659,9 +659,17 @@ function renderTable() {
   else renderRoutineTable();
 }
 const R_STATUS_LABEL = { recruit: '모집 중', active: '진행 중', done: '완료', cancelled: '폐강' };
+const R_STATUS_PRIORITY = { recruit: 0, active: 1, done: 2, cancelled: 3 };
+function _defaultSortRoutines(rows) {
+  return [...rows].sort((a, b) => {
+    const pa = R_STATUS_PRIORITY[a.status] ?? 99, pb = R_STATUS_PRIORITY[b.status] ?? 99;
+    if (pa !== pb) return pa - pb;
+    return (b.startDate || '').localeCompare(a.startDate || '');
+  });
+}
 function renderRoutineTable() {
   document.getElementById('bulkBar').style.display = 'none';
-  let rows = sortRows(_filteredRoutines());
+  let rows = sortKey ? sortRows(_filteredRoutines()) : _defaultSortRoutines(_filteredRoutines());
   document.getElementById('rCount').textContent = `${rows.length}개`;
   document.getElementById('tableHead').innerHTML = `<tr>
     <th onclick="toggleSort('title')">제목</th>
