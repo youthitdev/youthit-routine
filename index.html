@@ -1944,12 +1944,6 @@ async function loadCertFeed() {
 // 불러오는 캡(limit)이 있어서 그걸로 세면 실제보다 적게 나올 수 있음. 인증수/소통수는
 // 정확한 전체 개수를 직접 COUNT 쿼리로 가져오고, 완주자 수는 routines/routine_participants가
 // 캡 없이 전체를 불러오고 있어서 이미 로드된 state.routines로 계산해도 정확함
-// ⚠️ 지원사업 심사 기간 임시 조치 (2026-07-30) ⚠️
-// 심사위원이 테스트 계정으로 체험할 때 실제 데이터가 적어 화면이 휑해 보이지 않도록
-// 세 수치 모두 임시 고정값으로 보여줌. 실제 값 계산 로직은 그대로 두고 화면 표시만
-// 이 값으로 덮어씀 — 심사 끝나면 DEMO_STATS_OVERRIDE 사용을 제거하고 실제 값(certCount/
-// commCount/completers.size)을 다시 쓰도록 되돌릴 것.
-const DEMO_STATS_OVERRIDE = { certCount: 132, completers: 55, commCount: 350 };
 async function loadHomeStats() {
   try {
     // certifications/cert_comments는 "그 루틴 참여자만 볼 수 있게" RLS로 막혀 있어서
@@ -1971,9 +1965,9 @@ async function loadHomeStats() {
     const certEl = document.getElementById('youthStatCertCount');
     const compEl = document.getElementById('youthStatCompleters');
     const commEl = document.getElementById('youthStatComm');
-    if (certEl) certEl.textContent = DEMO_STATS_OVERRIDE.certCount.toLocaleString();
-    if (compEl) compEl.textContent = DEMO_STATS_OVERRIDE.completers.toLocaleString();
-    if (commEl) commEl.textContent = DEMO_STATS_OVERRIDE.commCount.toLocaleString();
+    if (certEl) certEl.textContent = certCount.toLocaleString();
+    if (compEl) compEl.textContent = completers.size.toLocaleString();
+    if (commEl) commEl.textContent = commCount.toLocaleString();
   } catch (e) { console.error('홈 통계 로드 실패', e); }
 }
 
