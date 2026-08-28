@@ -471,8 +471,15 @@ async function doLogout() { await sb.auth.signOut(); location.reload(); }
 
 async function enter() {
   if (!ADMINS.includes(currentUser.email)) {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('noAccess').style.display = 'block';
+    // 한끗루틴 앱(index.html)에 일반 계정으로 로그인해둔 상태로 admin.html에 들어오면
+    // 같은 오리진이라 그 세션을 그대로 물려받아서, 로그인 화면이 아예 안 뜨고 곧장
+    // "권한 없음" 화면으로 막혀 관리자 계정으로 다시 로그인할 방법이 없었음(QA 발견) —
+    // 관리자 권한이 없는 세션은 로그아웃시키고 로그인 화면을 다시 보여줌
+    await sb.auth.signOut();
+    currentUser = null;
+    document.getElementById('loginMsg').textContent = '⚠️ 관리자 권한이 있는 계정으로 로그인해주세요.';
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('noAccess').style.display = 'none';
     return;
   }
   document.getElementById('loginScreen').style.display = 'none';
