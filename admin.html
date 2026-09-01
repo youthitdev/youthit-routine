@@ -7,6 +7,7 @@
 <link rel="icon" href="icon-admin-pink.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background:#f5f5f7; color:#111; }
@@ -119,6 +120,7 @@
     <select id="yRoutine" onchange="renderTable()"><option value="">전체 참여루틴</option></select>
     <span class="count-badge" id="yCount"></span>
     <button class="export-btn" onclick="exportCSV('youth')">📥 CSV 내보내기</button>
+    <button class="export-btn" onclick="downloadVerifyDocs()">🗂 인증서류 일괄 다운로드</button>
   </div>
 
   <div class="filter-bar" id="kkFilters" style="display:none;">
@@ -325,7 +327,8 @@
           <img id="rwImagePreview" style="max-height:60px;border-radius:8px;display:block;">
         </div>
       </div>
-      <button onclick="submitReward()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+      <button onclick="submitReward()" id="rwSubmitBtn" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">등록하기</button>
+      <button onclick="cancelEditReward()" id="rwCancelEditBtn" style="display:none;padding:9px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">수정 취소</button>
     </div>
 
     <div class="chart-card" style="margin-bottom:16px;">
@@ -340,9 +343,13 @@
 
     <div class="chart-card" style="margin-bottom:16px;">
       <h3>교환 신청</h3>
+      <div id="redemptionBulkBar" style="display:none;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:12px;color:#666;" id="redemptionSelectedCount"></span>
+        <button onclick="bulkFulfillRedemptions()" style="padding:6px 12px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">선택 발송완료 처리</button>
+      </div>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>신청자</th><th>연락처</th><th>리워드</th><th>신청일</th><th>상태</th><th></th></tr></thead>
+          <thead><tr><th style="width:24px;"><input type="checkbox" id="redemptionCheckAll" onchange="toggleAllRedemptions(this)"></th><th>신청자</th><th>연락처</th><th>리워드</th><th>신청일</th><th>상태</th><th></th></tr></thead>
           <tbody id="redemptionListBody"></tbody>
         </table>
       </div>
@@ -449,6 +456,7 @@ let currentUser = null;
 let currentTab = 'youth';
 let youthRows = [], kkRows = [], routineRows = [];
 let rewardRows = [], redemptionRows = [];
+let editingRewardId = null;
 let bannerRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
@@ -568,6 +576,7 @@ async function loadData() {
     id: p.id, name: p.name, realName: p.real_name || '', birthDate: p.birth_date || '',
     phone: p.phone || '', sido: p.region_sido || '', sigugun: p.region_sigugun || '',
     schoolStatus: p.school_status || '', verifyStatus: p.verify_status || 'none',
+    verifyDocUrl: p.verify_doc_url || null,
     routines: routinesByUser[p.id] || [], createdAt: p.created_at,
   }));
   kkRows = profiles.filter(p => p.role === 'kkutjjang').map(p => ({
@@ -1221,6 +1230,7 @@ function renderRewardList() {
       <td>${r.stock}</td>
       <td><span class="pill" style="background:${r.active?'#EAF3DE':'#f5f5f5'};color:${r.active?'#3B6D11':'#aaa'};">${r.active?'활성':'비활성'}</span></td>
       <td>
+        <button onclick="startEditReward(${r.id})" style="padding:5px 10px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">수정</button>
         <button onclick="toggleRewardActive(${r.id},${!r.active})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.active?'비활성화':'활성화'}</button>
         <button onclick="deleteReward(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">삭제</button>
       </td>
@@ -1232,15 +1242,32 @@ function renderRedemptionList() {
   document.getElementById('redemptionListBody').innerHTML = sorted.length ? sorted.map(rd => {
     const p = profileById[rd.user_id] || {};
     const rw = rewardRows.find(r => r.id === rd.reward_id);
+    const isPending = rd.status === 'pending';
     return `<tr>
+      <td>${isPending ? `<input type="checkbox" class="redemption-check" data-id="${rd.id}" onchange="renderRedemptionBulkBar()">` : ''}</td>
       <td>${p.name || '-'}${p.realName ? ' (' + p.realName + ')' : ''}</td>
       <td>${p.phone || '-'}</td>
       <td>${rw ? rw.title : '(삭제된 리워드)'}</td>
       <td>${(rd.requested_at || '').slice(0, 10)}</td>
       <td><span class="pill" style="background:${rd.status === 'fulfilled' ? '#EAF3DE' : '#FFF3CD'};color:${rd.status === 'fulfilled' ? '#3B6D11' : '#856404'};">${rd.status === 'fulfilled' ? '발송완료' : '대기'}</span></td>
-      <td>${rd.status === 'pending' ? `<button onclick="fulfillRedemption(${rd.id})" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">발송완료 처리</button>` : '-'}</td>
+      <td>${isPending ? `<button onclick="fulfillRedemption(${rd.id})" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">발송완료 처리</button> <button onclick="cancelRedemption(${rd.id})" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">회수</button>` : '-'}</td>
     </tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="6">교환 신청이 없어요</td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="7">교환 신청이 없어요</td></tr>`;
+  renderRedemptionBulkBar();
+}
+function toggleAllRedemptions(el) {
+  document.querySelectorAll('.redemption-check').forEach(cb => cb.checked = el.checked);
+  renderRedemptionBulkBar();
+}
+function renderRedemptionBulkBar() {
+  const checked = [...document.querySelectorAll('.redemption-check:checked')];
+  const bar = document.getElementById('redemptionBulkBar');
+  if (checked.length > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('redemptionSelectedCount').textContent = `${checked.length}건 선택됨`;
+  } else {
+    bar.style.display = 'none';
+  }
 }
 
 async function handleRewardImageUpload(e) {
@@ -1256,6 +1283,32 @@ async function handleRewardImageUpload(e) {
   document.getElementById('rwImagePreview').src = url;
   document.getElementById('rwImagePreviewWrap').style.display = '';
 }
+function startEditReward(id) {
+  const r = rewardRows.find(x => x.id === id);
+  if (!r) return;
+  editingRewardId = id;
+  document.getElementById('rwTitle').value = r.title;
+  document.getElementById('rwCost').value = r.cost;
+  document.getElementById('rwStock').value = r.stock;
+  document.getElementById('rwDesc').value = r.description || '';
+  document.getElementById('rwImage').value = r.image_url || '';
+  if (r.image_url) {
+    document.getElementById('rwImagePreview').src = r.image_url;
+    document.getElementById('rwImagePreviewWrap').style.display = '';
+  } else {
+    document.getElementById('rwImagePreviewWrap').style.display = 'none';
+  }
+  document.getElementById('rwSubmitBtn').textContent = '수정 완료';
+  document.getElementById('rwCancelEditBtn').style.display = '';
+  document.querySelector('#rewardView .chart-card').scrollIntoView({ behavior: 'smooth' });
+}
+function cancelEditReward() {
+  editingRewardId = null;
+  ['rwTitle', 'rwCost', 'rwStock', 'rwDesc', 'rwImage'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('rwImagePreviewWrap').style.display = 'none';
+  document.getElementById('rwSubmitBtn').textContent = '등록하기';
+  document.getElementById('rwCancelEditBtn').style.display = 'none';
+}
 async function submitReward() {
   const title = document.getElementById('rwTitle').value.trim();
   const cost = parseInt(document.getElementById('rwCost').value);
@@ -1265,10 +1318,12 @@ async function submitReward() {
   if (!title) { alert('리워드 이름을 입력해주세요.'); return; }
   if (!cost || cost < 1) { alert('필요 포인트를 입력해주세요.'); return; }
   if (isNaN(stock) || stock < 0) { alert('재고를 입력해주세요.'); return; }
-  const { error } = await sb.from('rewards').insert({ title, cost, stock, description: description || null, image_url: image_url || null });
-  if (error) { alert('등록 실패: ' + error.message); return; }
-  ['rwTitle', 'rwCost', 'rwStock', 'rwDesc', 'rwImage'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('rwImagePreviewWrap').style.display = 'none';
+  const payload = { title, cost, stock, description: description || null, image_url: image_url || null };
+  const { error } = editingRewardId
+    ? await sb.from('rewards').update(payload).eq('id', editingRewardId)
+    : await sb.from('rewards').insert(payload);
+  if (error) { alert((editingRewardId ? '수정' : '등록') + ' 실패: ' + error.message); return; }
+  cancelEditReward();
   await renderRewardView();
 }
 
@@ -1408,10 +1463,58 @@ async function deleteBanner(id, title) {
   await renderBannerView();
 }
 
+// 리워드 발송완료 처리 시 신청자에게 알림(QA 요청) — reward_redemptions엔 아직
+// 알림 발송 로직이 없었음
+function _notifyRedemptionFulfilled(rd) {
+  const rw = rewardRows.find(r => r.id === rd.reward_id);
+  sb.functions.invoke('send-push', { body: {
+    user_id: rd.user_id,
+    title: '🎁 리워드 발송이 완료되었습니다!',
+    body: rw ? `"${rw.title}" 발송이 완료됐어요.` : '신청하신 리워드 발송이 완료됐어요.',
+  }}).catch(() => {});
+}
 async function fulfillRedemption(id) {
   if (!confirm('발송 완료로 처리할까요?')) return;
   const { error } = await sb.from('reward_redemptions').update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() }).eq('id', id);
   if (error) { alert('처리 실패: ' + error.message); return; }
+  const rd = redemptionRows.find(r => r.id === id);
+  if (rd) _notifyRedemptionFulfilled(rd);
+  await renderRewardView();
+}
+async function bulkFulfillRedemptions() {
+  const ids = [...document.querySelectorAll('.redemption-check:checked')].map(cb => parseInt(cb.dataset.id));
+  if (!ids.length) return;
+  if (!confirm(`선택한 ${ids.length}건을 발송완료로 처리할까요?`)) return;
+  const { error } = await sb.from('reward_redemptions').update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() }).in('id', ids);
+  if (error) { alert('처리 실패: ' + error.message); return; }
+  ids.forEach(id => {
+    const rd = redemptionRows.find(r => r.id === id);
+    if (rd) _notifyRedemptionFulfilled(rd);
+  });
+  await renderRewardView();
+}
+// 참여자가 리워드 교환을 잘못 신청했을 때 관리자가 회수 — 신청 당시 차감된 포인트와
+// 재고를 되돌려주고 신청 기록 자체를 삭제함(QA 요청)
+async function cancelRedemption(id) {
+  const rd = redemptionRows.find(r => r.id === id);
+  if (!rd) return;
+  const rw = rewardRows.find(r => r.id === rd.reward_id);
+  if (!confirm(`이 교환 신청을 회수할까요?\n${rw ? `"${rw.title}" · ` : ''}차감됐던 포인트가 환불되고 재고도 복구돼요.`)) return;
+  if (rw) {
+    const { data: prof, error: profErr } = await sb.from('profiles').select('nadaeum').eq('id', rd.user_id).single();
+    if (profErr) { alert('조회 실패: ' + profErr.message); return; }
+    const { error: refundErr } = await sb.from('profiles').update({ nadaeum: (prof.nadaeum || 0) + rw.cost }).eq('id', rd.user_id);
+    if (refundErr) { alert('환불 실패: ' + refundErr.message); return; }
+    await sb.from('nadaeum_log').insert({ user_id: rd.user_id, amount: rw.cost, reason: `리워드 교환 회수: ${rw.title}` });
+    await sb.from('rewards').update({ stock: rw.stock + 1 }).eq('id', rw.id);
+  }
+  const { error } = await sb.from('reward_redemptions').delete().eq('id', id);
+  if (error) { alert('회수 실패: ' + error.message); return; }
+  sb.functions.invoke('send-push', { body: {
+    user_id: rd.user_id,
+    title: '리워드 교환 신청이 취소됐어요',
+    body: rw ? `"${rw.title}" 교환 신청이 관리자에 의해 취소되고 포인트가 환불됐어요.` : '교환 신청이 취소되고 포인트가 환불됐어요.',
+  }}).catch(() => {});
   await renderRewardView();
 }
 
@@ -1487,6 +1590,7 @@ function renderYouthTable() {
     <th>지역</th>
     <th onclick="toggleSort('schoolStatus')">재학상태</th>
     <th onclick="toggleSort('verifyStatus')">서류상태</th>
+    <th>인증서류</th>
     <th>참여 루틴</th>
     <th onclick="toggleSort('createdAt')">가입일</th>
   </tr>`;
@@ -1500,9 +1604,10 @@ function renderYouthTable() {
       <td>${r.sido ? `${r.sido} ${r.sigugun||''}` : '-'}</td>
       <td>${SCHOOL_LABEL[r.schoolStatus] || '-'}</td>
       <td><span class="pill ${STATUS_CLASS[r.verifyStatus]||'pill-none'}">${STATUS_LABEL[r.verifyStatus]||'미제출'}</span></td>
+      <td>${r.verifyDocUrl ? `<button onclick="viewVerifyDoc('${r.verifyDocUrl}')" style="padding:4px 9px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">서류 보기</button>` : '-'}</td>
       <td><div class="routine-tags">${r.routines.length?r.routines.map(t=>`<span class="routine-tag">${t}</span>`).join(''):'-'}</div></td>
       <td>${(r.createdAt||'').slice(0,10)}</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="10">조건에 맞는 청소년이 없어요</td></tr>`;
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="11">조건에 맞는 청소년이 없어요</td></tr>`;
   renderBulkBar();
 }
 
@@ -1567,6 +1672,17 @@ async function bulkAction(status) {
   payload[reasonField] = status === 'rejected' ? (reason || null) : null;
   const { error } = await sb.from('profiles').update(payload).in('id', ids);
   if (error) { alert('처리 실패: ' + error.message); return; }
+  // 청소년 인증 서류 반려 시 반려 사유를 바로 알 수 있도록 푸시 알림 발송(QA 요청) —
+  // 사유는 앱(MY > 인증)에서도 계속 볼 수 있지만, 그것만으론 반려된 걸 바로 알기 어려웠음
+  if (currentTab === 'youth' && status === 'rejected') {
+    ids.forEach(id => {
+      sb.functions.invoke('send-push', { body: {
+        user_id: id,
+        title: '청소년 인증 서류가 반려되었습니다',
+        body: `다시 제출해주시기 바랍니다. 반려사유: ${reason || '없음'}`,
+      }}).catch(() => {});
+    });
+  }
   selectedIds.clear();
   await loadData();
 }
@@ -1595,6 +1711,35 @@ function exportCSV(tab) {
   _downloadCSV(tab==='youth'?'청소년':'끗짱', headers, lines);
 }
 
+// 학교밖 청소년 인증서류(사진/PDF)는 verify-docs 버킷에 비공개로 저장돼 있어서,
+// signed URL을 받아와야 열람 가능함(공개 URL 아님)
+async function viewVerifyDoc(path) {
+  const { data, error } = await sb.storage.from('verify-docs').createSignedUrl(path, 600);
+  if (error) { alert('서류 불러오기 실패: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+async function downloadVerifyDocs() {
+  const rows = sortRows(_filteredYouth()).filter(r => r.verifyDocUrl);
+  if (!rows.length) { alert('현재 필터에 인증서류가 있는 청소년이 없어요.'); return; }
+  if (!confirm(`${rows.length}명의 인증서류를 압축 파일로 다운로드할까요?`)) return;
+  const zip = new JSZip();
+  for (const r of rows) {
+    const { data, error } = await sb.storage.from('verify-docs').createSignedUrl(r.verifyDocUrl, 600);
+    if (error) continue;
+    const resp = await fetch(data.signedUrl);
+    if (!resp.ok) continue;
+    const blob = await resp.blob();
+    const ext = (r.verifyDocUrl.split('.').pop() || 'jpg').toLowerCase();
+    const safeName = `${r.name}${r.realName ? '_' + r.realName : ''}`.replace(/[\\/:*?"<>|]/g, '_');
+    zip.file(`${safeName}.${ext}`, blob);
+  }
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `한끗루틴_인증서류_${_todayStr()}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 (async function init() {
   const { data: { session } } = await sb.auth.getSession();

@@ -2210,3 +2210,11 @@ $$;
 -- =====================================================
 ALTER TABLE posts DROP CONSTRAINT IF EXISTS posts_type_check;
 ALTER TABLE posts ADD CONSTRAINT posts_type_check CHECK (type IN ('notice', 'review', 'kpost'));
+
+-- =====================================================
+-- [마이그레이션 2026-07-31a] 리워드 교환 신청 회수 기능을 위한 삭제 정책 추가
+-- 참여자가 리워드 교환을 잘못 신청했을 때 관리자가 신청을 회수(포인트/재고 환불 후
+-- 삭제)할 수 있게 하려는데, reward_redemptions에 관리자용 DELETE 정책이 아예
+-- 없었음(SELECT/INSERT/UPDATE만 있었음).
+-- =====================================================
+CREATE POLICY "redemptions_admin_delete" ON reward_redemptions FOR DELETE USING (is_admin());
