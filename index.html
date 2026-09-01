@@ -1145,7 +1145,7 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">프로필 편집</div>
-      <div style="margin-bottom:14px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">닉네임은 변경할 수 없어요</div></div>
+      <div style="margin-bottom:14px;"><div class="field-label">닉네임</div><input type="text" id="editNickname" placeholder="닉네임" maxlength="10" oninput="document.getElementById('editNicknameCount').textContent=this.value.length"><div class="char-end"><span id="editNicknameCount">0</span>/10</div></div>
       <div style="margin-bottom:14px;"><div class="field-label">이름(실명)</div><input type="text" id="editRealName" placeholder="이름(실명)" readonly style="background:#f5f5f7;color:#888;"><div class="char-end" style="color:#bbb;">실명은 변경할 수 없어요</div></div>
       <div style="margin-bottom:14px;"><div class="field-label">생년월일</div><input type="date" id="editBirth"></div>
       <div style="margin-bottom:14px;"><div class="field-label">휴대폰번호</div><input type="tel" id="editPhone" placeholder="'-' 없이 입력"></div>
@@ -2662,7 +2662,6 @@ async function toggleCertLike(id) {
     });
     return;
   }
-  if(wasLiked===false) state.youth.commCount++;
   save();
 }
 function openCertFeedDetail(id) {
@@ -3617,7 +3616,6 @@ async function togglePostLike(id) {
     await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id);
   } else {
     await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
-    state.youth.commCount++;
   }
   await loadPosts();
   save(); renderComm(commFilter);
@@ -3794,6 +3792,9 @@ function openPhotoLightbox(url) {
   openSheet('photoLightboxBg');
 }
 // "총 인증 수"/"소통 수" 클릭 시 내가 올린 인증글·글·댓글을 모아볼 수 있도록(QA 요청)
+// "소통 수"는 글쓰기·댓글만 집계함 — 좋아요는 여기 상세 화면에 안 나오므로
+// commCount에도 포함하지 않음(예전엔 좋아요도 카운트해서 숫자는 있는데 눌러보면
+// 아무것도 안 보이는 버그가 있었음, 게다가 좋아요 취소 시 차감도 안 돼서 계속 부풀었음)
 function openMyCerts() {
   if(!currentUser) return;
   const certs = (state.certFeed||[]).filter(c=>c.userId===currentUser.id);
@@ -3953,6 +3954,7 @@ function openEditProfile() {
   const p = _profileState();
   const isYouth = state.currentRole==='youth';
   document.getElementById('editNickname').value = p.name || '';
+  document.getElementById('editNicknameCount').textContent = (p.name || '').length;
   document.getElementById('editRealName').value = p.realName || '';
   document.getElementById('editBirth').value = p.birthDate || '';
   document.getElementById('editPhone').value = p.phone || '';
@@ -4023,6 +4025,7 @@ async function saveReminderHour() {
   if (error) alert('리마인드 설정 저장 실패: ' + error.message);
 }
 async function saveProfile() {
+  const nickname=document.getElementById('editNickname').value.trim();
   const birth=document.getElementById('editBirth').value;
   const phone=document.getElementById('editPhone').value.trim();
   const sido=document.getElementById('editSido').value;
@@ -4030,11 +4033,12 @@ async function saveProfile() {
   const affiliation=document.getElementById('editAffiliation').value.trim();
   const isYouth = state.currentRole==='youth';
   const schoolStatus = isYouth ? document.getElementById('editSchoolStatus').value : null;
+  if(!nickname){ alert('닉네임을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
   const btn=document.querySelector('#editProfileBg .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   const payload = {
-    birth_date: birth||null, phone: phone||null,
+    name: nickname, birth_date: birth||null, phone: phone||null,
     region_sido: sido||null, region_sigugun: sigugun||null,
     affiliation: affiliation||null,
   };
@@ -4043,7 +4047,7 @@ async function saveProfile() {
   if(btn){btn.disabled=false;btn.textContent='저장하기';}
   if(error){alert('저장 실패: '+error.message);return;}
   const p = _profileState();
-  p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||''; p.affiliation=affiliation||'';
+  p.name=nickname; p.birthDate=birth||null; p.phone=phone||''; p.regionSido=sido||''; p.regionSigugun=sigugun||''; p.affiliation=affiliation||'';
   if(isYouth) p.schoolStatus=schoolStatus||null;
   save();
   closeSheet('editProfileBg');
@@ -5008,7 +5012,7 @@ async function kSubmitPost() {
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
   if(state.currentRole==='youth') { renderComm(commFilter); }
-  else { kResetReviewFilter(); kRenderReviewTab('all'); }
+  else { kResetReviewFilter(); kRenderReviewTab('all'); kRenderMy(); }
 }
 
 // ════════════════════════════════════════════════════════
