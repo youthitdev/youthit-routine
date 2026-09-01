@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="한끗루틴">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
@@ -526,9 +527,9 @@ select:focus { outline: none; border-color: #2E33BC; }
       <!-- 루틴 -->
       <div class="tab-page active" id="page-routine">
         <div style="padding:12px 16px 0;">
-          <!-- 지금까지 만든 한끗 (누적 통계) -->
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px;color:#888;margin-bottom:8px;">지금까지 만든 한끗</div>
+          <!-- 내가 만든 한끗 (누적 통계) -->
+          <div style="margin-bottom:14px;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+            <div style="font-size:12px;color:#888;margin-bottom:8px;">내가 만든 한끗</div>
             <div style="background:linear-gradient(135deg,#83CA00 0%,#4FA300 100%);border-radius:20px;padding:18px 8px;display:flex;position:relative;overflow:hidden;">
               <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
               <div style="position:absolute;left:-16px;bottom:-30px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
@@ -668,7 +669,7 @@ select:focus { outline: none; border-color: #2E33BC; }
             <div class="menu-item" onclick="openBadgeSheet()"><div class="menu-left"><div class="menu-icon" style="background:#FFF8E1;"><i class="ti ti-award" style="font-size:15px;color:#B8860B;"></i></div>배지</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openSheet('accountSheetBg')"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
-            <div class="menu-item"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
+            <div class="menu-item" onclick="window.open('http://pf.kakao.com/_kTGuxj','_blank')"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
           <div id="switchRoleArea"></div>
           <button style="width:100%;padding:13px;background:none;border:0.5px solid #eee;border-radius:12px;color:#aaa;font-size:13px;cursor:pointer;margin-top:4px;" onclick="doLogout()"><i class="ti ti-logout" style="font-size:13px;"></i> 로그아웃</button>
@@ -1089,7 +1090,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="display:flex;justify-content:space-between;padding:12px 16px;font-size:13px;color:#111;">🌲 레벨 4 · 숲<span style="color:#888;">루틴 10개+</span></div>
       </div>
       <div style="background:#f5f5f7;border-radius:12px;padding:14px;"><div style="font-size:13px;font-weight:500;color:#111;margin-bottom:4px;">완주 기준</div><div style="font-size:12px;color:#888;line-height:1.6;">루틴 기간 중 일정 일수 이상 인증하면 완주예요. 각 루틴 상세화면에서 구체적인 기준(예: N일 중 M일)을 확인할 수 있어요. 자유루틴은 완주 기준이 없어요.</div></div>
-      <button class="primary-btn" onclick="alert('카카오톡 채널로 이동해요!')">카카오톡 채널 문의</button>
+      <button class="primary-btn" onclick="window.open('http://pf.kakao.com/_kTGuxj','_blank')">카카오톡 채널 문의</button>
     </div>
   </div>
 
@@ -1940,7 +1941,7 @@ async function loadCertFeed() {
   });
 }
 
-// 청소년 홈 상단 "지금까지 만든 한끗" 통계 — state.certFeed/state.posts는 최근 것만 잘라서
+// 청소년 홈 상단 "내가 만든 한끗" 통계 — state.certFeed/state.posts는 최근 것만 잘라서
 // 불러오는 캡(limit)이 있어서 그걸로 세면 실제보다 적게 나올 수 있음. 인증수/소통수는
 // 정확한 전체 개수를 직접 COUNT 쿼리로 가져오고, 완주자 수는 routines/routine_participants가
 // 캡 없이 전체를 불러오고 있어서 이미 로드된 state.routines로 계산해도 정확함
