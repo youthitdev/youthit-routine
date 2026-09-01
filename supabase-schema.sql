@@ -2218,3 +2218,52 @@ ALTER TABLE posts ADD CONSTRAINT posts_type_check CHECK (type IN ('notice', 'rev
 -- 없었음(SELECT/INSERT/UPDATE만 있었음).
 -- =====================================================
 CREATE POLICY "redemptions_admin_delete" ON reward_redemptions FOR DELETE USING (is_admin());
+
+-- =====================================================
+-- [마이그레이션 2026-09-01a] 관리자 알림 예약 발송 기능
+-- 관리자가 알림을 "지금"이 아니라 나중 시각(예: 주말)에 자동 발송되도록 예약할 수
+-- 있게 함. notify_push()가 이미 net.http_post로 send-push 엣지함수를 호출하는
+-- 패턴을 그대로 재사용 — pg_cron이 5분마다 발송 시각이 지난 예약을 찾아 발송.
+-- =====================================================
+CREATE TABLE scheduled_notifications (
+  id          bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  title       text NOT NULL,
+  body        text,
+  target      text NOT NULL CHECK (target IN ('all', 'routine')),
+  routine_id  bigint REFERENCES routines(id) ON DELETE CASCADE,
+  send_at     timestamptz NOT NULL,
+  sent_at     timestamptz,
+  created_by  uuid REFERENCES auth.users ON DELETE SET NULL,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE scheduled_notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "scheduled_notifications_admin_all" ON scheduled_notifications
+  FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+
+CREATE OR REPLACE FUNCTION send_scheduled_notifications()
+RETURNS void AS $$
+DECLARE
+  n record;
+  sr_key text;
+BEGIN
+  SELECT decrypted_secret INTO sr_key FROM vault.decrypted_secrets WHERE name = 'sr_key_for_push';
+  IF sr_key IS NULL THEN RETURN; END IF;
+  FOR n IN
+    SELECT * FROM scheduled_notifications WHERE sent_at IS NULL AND send_at <= now()
+  LOOP
+    PERFORM net.http_post(
+      url := 'https://ynqvhsffoesjzefitafv.supabase.co/functions/v1/send-push',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || sr_key),
+      body := CASE WHEN n.target = 'all'
+        THEN jsonb_build_object('title', n.title, 'body', n.body, 'target', 'all')
+        ELSE jsonb_build_object('title', n.title, 'body', n.body, 'target', 'routine', 'routine_id', n.routine_id)
+      END
+    );
+    UPDATE scheduled_notifications SET sent_at = now() WHERE id = n.id;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+SELECT cron.unschedule('hankkut-scheduled-notif')
+ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-scheduled-notif');
+SELECT cron.schedule('hankkut-scheduled-notif', '*/5 * * * *', 'SELECT send_scheduled_notifications()');

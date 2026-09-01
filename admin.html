@@ -239,6 +239,10 @@
       <div class="kpi-card"><div class="kpi-label">전체 완주율</div><div class="kpi-val" id="kpiCompletion">0%</div><div class="kpi-sub" id="kpiCompletionSub"></div></div>
       <div class="kpi-card"><div class="kpi-label">탈퇴</div><div class="kpi-val" id="kpiWithdrawal">0명</div><div class="kpi-sub" id="kpiWithdrawalSub"></div></div>
     </div>
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>진행 중인 루틴 현황</h3>
+      <div id="activeRoutineProgressBody"></div>
+    </div>
     <div class="stats-grid">
       <div class="chart-card"><h3>지역별 청소년 분포</h3><div class="chart-box"><canvas id="chartRegion"></canvas><div class="chart-empty" id="chartRegionEmpty" style="display:none;">데이터가 없어요</div></div></div>
       <div class="chart-card"><h3>재학상태 비율</h3><div class="chart-box"><canvas id="chartSchool"></canvas><div class="chart-empty" id="chartSchoolEmpty" style="display:none;">데이터가 없어요</div></div></div>
@@ -298,9 +302,24 @@
         <textarea id="notifyBody" maxlength="200" rows="3" placeholder="알림을 눌렀을 때 보일 짧은 설명" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
       </div>
 
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">발송 시점</div>
+        <select id="notifyWhen" onchange="onNotifyWhenChange()" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          <option value="now">지금 바로 발송</option>
+          <option value="schedule">예약 발송</option>
+        </select>
+        <input type="datetime-local" id="notifyScheduleAt" style="display:none;width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-top:8px;">
+        <div id="notifyScheduleHint" style="display:none;font-size:11px;color:#aaa;margin-top:6px;">예약 시각이 되면 자동으로 발송돼요(최대 5분 지연될 수 있어요)</div>
+      </div>
+
       <button id="notifySendBtn" onclick="sendBroadcast()" style="width:100%;padding:12px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">📨 발송하기</button>
       <button onclick="saveTemplate()" style="width:100%;padding:10px;margin-top:8px;background:#fff;color:#2E33BC;border:1px solid #2E33BC;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">💾 현재 제목·내용을 저장해두기</button>
       <div id="notifyResult" style="font-size:12px;margin-top:10px;line-height:1.6;"></div>
+    </div>
+
+    <div class="chart-card" style="margin-top:16px;">
+      <h3>예약된 알림</h3>
+      <div id="scheduledNotifList" style="font-size:12px;color:#aaa;">불러오는 중...</div>
     </div>
   </div>
 
@@ -343,6 +362,13 @@
 
     <div class="chart-card" style="margin-bottom:16px;">
       <h3>교환 신청</h3>
+      <div style="margin-bottom:10px;">
+        <select id="redemptionStatusFilter" onchange="renderRedemptionList()" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;">
+          <option value="">전체 상태</option>
+          <option value="pending">대기</option>
+          <option value="fulfilled">발송완료</option>
+        </select>
+      </div>
       <div id="redemptionBulkBar" style="display:none;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:12px;color:#666;" id="redemptionSelectedCount"></span>
         <button onclick="bulkFulfillRedemptions()" style="padding:6px 12px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">선택 발송완료 처리</button>
@@ -417,6 +443,16 @@
         </table>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="participantsModalBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)closeRoutineParticipants()">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:15px;" id="participantsModalTitle">참여자 관리</h3>
+      <button onclick="closeRoutineParticipants()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div id="participantsModalBody"></div>
   </div>
 </div>
 
@@ -521,7 +557,7 @@ async function loadData() {
   document.getElementById('tableBody').innerHTML = '<tr class="empty-row"><td colspan="10">불러오는 중...</td></tr>';
   const [profRes, rpRes, routRes, certRes] = await Promise.all([
     sb.from('profiles').select('*'),
-    sb.from('routine_participants').select('routine_id,user_id,status'),
+    sb.from('routine_participants').select('routine_id,user_id,status,application_note'),
     sb.from('routines').select('*'),
     sb.from('certifications').select('routine_id,user_id,created_at'),
   ]);
@@ -543,6 +579,10 @@ async function loadData() {
   rps.filter(p => p.status === 'approved').forEach(p => {
     approvedCountByRoutine[p.routine_id] = (approvedCountByRoutine[p.routine_id] || 0) + 1;
   });
+  const pendingCountByRoutine = {};
+  rps.filter(p => p.status === 'pending').forEach(p => {
+    pendingCountByRoutine[p.routine_id] = (pendingCountByRoutine[p.routine_id] || 0) + 1;
+  });
 
   // 날짜 기반 상태 자동 보정 — DB status 컬럼은 승인 시점에만 바뀌던 예전 로직 때문에
   // 모집 마감일이 지났는데도 "모집 중", 종료일이 지났는데도 "진행 중"으로 남아있을 수 있음.
@@ -561,6 +601,7 @@ async function loadData() {
   routineRows = routines.map(r => ({
     id: r.id, title: r.title, status: r.status, startDate: r.start_date || '', endDate: r.end_date || '',
     maxPeople: r.max_people || 0, minPeople: r.min_people || null, people: approvedCountByRoutine[r.id] || 0,
+    pending: pendingCountByRoutine[r.id] || 0,
     coverImageUrl: r.cover_image_url || null,
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
     ledBy: r.led_by || null, emoji: r.emoji || '🌱', description: r.description || '',
@@ -702,10 +743,11 @@ function renderRoutineTable() {
       <td>${r.pinned?'📌 ':''}${r.title}</td>
       <td><span class="pill" style="background:${r.status==='active'?'#E6F1FB':r.status==='done'?'#f0f0f0':r.status==='cancelled'?'#f0f0f0':'#FFF3CD'};color:${r.status==='active'?'#185FA5':r.status==='cancelled'?'#aaa':r.status==='done'?'#aaa':'#856404'};">${R_STATUS_LABEL[r.status]||r.status}</span>${r.isFree?` <span class="pill" style="background:#FBEAF0;color:#993556;">자유루틴</span>`:''}</td>
       <td>${r.startDate} ~ ${r.endDate}</td>
-      <td>${r.people}/${r.maxPeople}${r.minPeople?` (최소 ${r.minPeople})`:''}</td>
+      <td>${r.people}/${r.maxPeople}${r.minPeople?` (최소 ${r.minPeople})`:''}${r.pending?` <span class="pill" style="background:#FFF3CD;color:#856404;">대기 ${r.pending}</span>`:''}</td>
       <td>${r.leaderName}</td>
       <td>${r.archived?'<span class="pill pill-rejected">보관됨</span>':'-'}</td>
       <td>
+        <button onclick="openRoutineParticipants(${r.id})" style="padding:5px 10px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">참여자 관리</button>
         <button onclick="editRoutineAdmin(${r.id})" style="padding:5px 10px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">수정</button>
         ${(r.status==='recruit'||r.status==='active')&&r.minPeople?`<button onclick="cancelRoutineAdmin(${r.id},'${r.title.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">폐강 처리</button>`:''}
         <button onclick="toggleArchiveRoutine(${r.id},${!r.archived})" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">${r.archived?'복원':'보관'}</button>
@@ -731,6 +773,53 @@ async function deleteRoutineAdmin(id, title) {
   const { error } = await sb.from('routines').delete().eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
   await loadData();
+}
+
+// PC 관리자 페이지에서도 청소년의 루틴 신청을 확인·승인할 수 있게(QA 요청) — 기존엔
+// 끗짱 모바일 앱에서만 가능했음. STATUS_LABEL/STATUS_CLASS(서류상태용)와 라벨이 겹치지
+// 않도록 여기선 직접 라벨링함
+let participantsModalRoutineId = null;
+const RP_STATUS_LABEL = { pending: '대기중', approved: '승인됨', rejected: '거절됨' };
+function openRoutineParticipants(routineId) {
+  participantsModalRoutineId = routineId;
+  renderRoutineParticipants();
+  document.getElementById('participantsModalBg').style.display = 'flex';
+}
+function closeRoutineParticipants() {
+  document.getElementById('participantsModalBg').style.display = 'none';
+  participantsModalRoutineId = null;
+}
+function renderRoutineParticipants() {
+  const r = routineRows.find(x => x.id === participantsModalRoutineId);
+  if (!r) return;
+  document.getElementById('participantsModalTitle').textContent = `참여자 관리 · ${r.title}`;
+  const list = rawParticipants.filter(p => p.routine_id === participantsModalRoutineId)
+    .sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
+  document.getElementById('participantsModalBody').innerHTML = list.length ? list.map(p => {
+    const prof = profileById[p.user_id] || {};
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:0.5px solid #eee;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${prof.name || '-'}${prof.realName ? ' (' + prof.realName + ')' : ''}</div>
+        <div style="font-size:11px;color:#888;">${prof.phone || '연락처 없음'}${p.application_note ? ' · ' + p.application_note : ''}</div>
+      </div>
+      <span class="pill" style="background:${p.status==='approved'?'#EAF3DE':p.status==='rejected'?'#f5f5f5':'#FFF3CD'};color:${p.status==='approved'?'#3B6D11':p.status==='rejected'?'#aaa':'#856404'};">${RP_STATUS_LABEL[p.status]||p.status}</span>
+      ${p.status==='pending' ? `<button onclick="adminApproveApplicant('${p.user_id}')" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">승인</button><button onclick="adminRejectApplicant('${p.user_id}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">거절</button>` : ''}
+    </div>`;
+  }).join('') : `<div style="padding:24px 0;text-align:center;font-size:12px;color:#aaa;">신청자가 없어요</div>`;
+}
+async function adminApproveApplicant(userId) {
+  const { error } = await sb.from('routine_participants').update({ status: 'approved' }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId);
+  if (error) { alert('승인 실패: ' + error.message); return; }
+  await loadData();
+  renderRoutineParticipants();
+}
+async function adminRejectApplicant(userId) {
+  const reason = prompt('거절 사유를 입력해주세요 (신청자에게 안내돼요, 비워두면 사유 없이 거절돼요):', '');
+  if (reason === null) return;
+  const { error } = await sb.from('routine_participants').update({ status: 'rejected', reject_reason: reason || null }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId);
+  if (error) { alert('거절 실패: ' + error.message); return; }
+  await loadData();
+  renderRoutineParticipants();
 }
 
 // ── 루틴 등록/수정 (index.html 청소년/끗짱 앱의 "루틴 만들기"와 동일한 필드·검증) ──
@@ -1032,7 +1121,29 @@ function renderStatsView() {
   renderSchoolChart();
   renderRoutineStatusChart();
   renderCompletionTable(completion);
+  renderActiveRoutineProgress(activeRoutines);
   renderWithdrawalKpi();
+}
+
+// 완주율(참여자가 인증 기준을 채웠는지)과는 별개로, 루틴 기간 자체가 얼마나
+// 지났는지를 한눈에 보여줌(QA 요청: "OO루틴: 진행 현황 50%") — 자유루틴은
+// 루틴 레벨 시작/종료일이 없어(개인별 기간) 대상에서 제외
+function renderActiveRoutineProgress(activeRoutines) {
+  const el = document.getElementById('activeRoutineProgressBody');
+  const today = _todayStr();
+  const rows = activeRoutines.filter(r => r.startDate && r.endDate).map(r => {
+    const start = new Date(r.startDate + 'T00:00:00'), end = new Date(r.endDate + 'T00:00:00'), now = new Date(today + 'T00:00:00');
+    const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+    const elapsedDays = Math.min(totalDays, Math.max(0, Math.round((now - start) / 86400000) + 1));
+    const pct = Math.round(elapsedDays / totalDays * 100);
+    return { title: r.title, pct, elapsedDays, totalDays };
+  }).sort((a, b) => b.pct - a.pct);
+  el.innerHTML = rows.length ? rows.map(r => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
+      <div style="width:120px;flex-shrink:0;font-size:12px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
+      <div style="flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:#2E33BC;"></div></div>
+      <div style="width:90px;flex-shrink:0;text-align:right;font-size:12px;color:#666;">${r.pct}% (${r.elapsedDays}/${r.totalDays}일)</div>
+    </div>`).join('') : `<div style="padding:16px 0;text-align:center;font-size:12px;color:#aaa;">진행 중인 루틴이 없어요</div>`;
 }
 
 async function renderWithdrawalKpi() {
@@ -1118,8 +1229,40 @@ function renderNotifyView() {
     ? notArchived.map(r => `<option value="${r.id}">${r.title} (참여 ${r.people}명)</option>`).join('')
     : '<option value="">루틴이 없어요</option>';
   onNotifyTargetChange();
+  document.getElementById('notifyWhen').value = 'now';
+  onNotifyWhenChange();
   document.getElementById('notifyResult').textContent = '';
   loadTemplates();
+  loadScheduledNotifs();
+}
+function onNotifyWhenChange() {
+  const scheduled = document.getElementById('notifyWhen').value === 'schedule';
+  document.getElementById('notifyScheduleAt').style.display = scheduled ? '' : 'none';
+  document.getElementById('notifyScheduleHint').style.display = scheduled ? '' : 'none';
+  document.getElementById('notifySendBtn').textContent = scheduled ? '⏰ 예약하기' : '📨 발송하기';
+}
+async function loadScheduledNotifs() {
+  const el = document.getElementById('scheduledNotifList');
+  const { data, error } = await sb.from('scheduled_notifications').select('*').is('sent_at', null).order('send_at', { ascending: true });
+  if (error) { el.innerHTML = '마이그레이션 전이라 예약 목록을 불러올 수 없어요.'; return; }
+  const rows = data || [];
+  el.innerHTML = rows.length ? rows.map(n => {
+    const rw = n.target === 'routine' ? routineRows.find(r => r.id === n.routine_id) : null;
+    const targetLabel = n.target === 'all' ? '전체 구독자' : (rw ? rw.title + ' 참여자' : '(삭제된 루틴)');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:0.5px solid #eee;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:#111;">${n.title}</div>
+        <div style="font-size:11px;color:#888;">${new Date(n.send_at).toLocaleString('ko-KR')} · ${targetLabel}</div>
+      </div>
+      <button onclick="cancelScheduledNotif(${n.id})" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">취소</button>
+    </div>`;
+  }).join('') : `<div style="font-size:12px;color:#aaa;">예약된 알림이 없어요</div>`;
+}
+async function cancelScheduledNotif(id) {
+  if (!confirm('이 예약을 취소할까요?')) return;
+  const { error } = await sb.from('scheduled_notifications').delete().eq('id', id);
+  if (error) { alert('취소 실패: ' + error.message); return; }
+  await loadScheduledNotifs();
 }
 async function loadTemplates() {
   const { data, error } = await sb.from('notify_templates').select('id,title,body').order('created_at', { ascending: false });
@@ -1173,23 +1316,40 @@ async function sendBroadcast() {
   const title = document.getElementById('notifyTitle').value.trim();
   const body = document.getElementById('notifyBody').value.trim();
   const resultEl = document.getElementById('notifyResult');
+  const isScheduled = document.getElementById('notifyWhen').value === 'schedule';
   if (!title) { alert('제목을 입력해주세요.'); return; }
 
   const payload = { title, body };
-  let confirmMsg;
+  let routineId = null, targetLabel;
   if (target === 'all') {
     payload.target = 'all';
-    confirmMsg = '전체 구독자에게 알림을 보낼까요?';
+    targetLabel = '전체 구독자';
   } else {
-    const routineId = document.getElementById('notifyRoutine').value;
+    routineId = document.getElementById('notifyRoutine').value;
     if (!routineId) { alert('루틴을 선택해주세요.'); return; }
     payload.target = 'routine';
     payload.routine_id = Number(routineId);
     const r = routineRows.find(x => x.id === Number(routineId));
-    confirmMsg = `"${r ? r.title : ''}" 참여자에게 알림을 보낼까요?`;
+    targetLabel = `"${r ? r.title : ''}" 참여자`;
   }
-  if (!confirm(confirmMsg)) return;
 
+  if (isScheduled) {
+    const sendAt = document.getElementById('notifyScheduleAt').value;
+    if (!sendAt) { alert('예약 시각을 선택해주세요.'); return; }
+    if (new Date(sendAt) <= new Date()) { alert('예약 시각은 미래여야 해요.'); return; }
+    if (!confirm(`${targetLabel}에게 ${new Date(sendAt).toLocaleString('ko-KR')}에 알림이 발송되도록 예약할까요?`)) return;
+    const { error } = await sb.from('scheduled_notifications').insert({
+      title, body: body || null, target, routine_id: routineId ? Number(routineId) : null,
+      send_at: new Date(sendAt).toISOString(), created_by: currentUser.id,
+    });
+    if (error) { resultEl.style.color = '#c00'; resultEl.textContent = '예약 실패: ' + error.message; return; }
+    resultEl.style.color = '#3B6D11';
+    resultEl.textContent = '예약 완료 — 아래 "예약된 알림" 목록에서 확인할 수 있어요.';
+    await loadScheduledNotifs();
+    return;
+  }
+
+  if (!confirm(`${targetLabel}에게 알림을 보낼까요?`)) return;
   const btn = document.getElementById('notifySendBtn');
   btn.disabled = true; btn.textContent = '발송 중...';
   resultEl.style.color = '#888';
@@ -1238,7 +1398,9 @@ function renderRewardList() {
 }
 
 function renderRedemptionList() {
-  const sorted = [...redemptionRows].sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
+  const statusFilter = document.getElementById('redemptionStatusFilter').value;
+  const filtered = statusFilter ? redemptionRows.filter(rd => rd.status === statusFilter) : redemptionRows;
+  const sorted = [...filtered].sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
   document.getElementById('redemptionListBody').innerHTML = sorted.length ? sorted.map(rd => {
     const p = profileById[rd.user_id] || {};
     const rw = rewardRows.find(r => r.id === rd.reward_id);
