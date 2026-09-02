@@ -2267,3 +2267,60 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 SELECT cron.unschedule('hankkut-scheduled-notif')
  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-scheduled-notif');
 SELECT cron.schedule('hankkut-scheduled-notif', '*/5 * * * *', 'SELECT send_scheduled_notifications()');
+
+-- =====================================================
+-- [마이그레이션 2026-09-02a] 유스보이스 팝업 행사일 끗짱 가입 자동승인
+-- 2026-09-21(한국시간) 하루 동안 팝업 부스에서 끗짱으로 가입하는 사람은 현장에서
+-- 바로 앱을 체험할 수 있도록, 관리자 승인 대기 없이 즉시 승인 처리. 날짜를
+-- 하드코딩해서 그날이 지나면 자동으로 원래(승인 대기) 방식으로 돌아옴 — 토글을
+-- 껐다 켜는 걸 깜빡할 위험이 없음. 이메일/카카오 가입 모두 이 트리거를 거치므로
+-- 둘 다 적용됨.
+-- =====================================================
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status, privacy_agreed_at, marketing_agreed)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'full_name', '익명'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'youth'),
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    NEW.raw_user_meta_data->>'school_status',
+    CASE
+      WHEN COALESCE(NEW.raw_user_meta_data->>'role','youth') <> 'kkutjjang' THEN 'none'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN (now() AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-09-21' THEN 'approved'
+      ELSE 'pending'
+    END,
+    CASE WHEN NULLIF(NEW.raw_user_meta_data->>'birth_date','') IS NOT NULL THEN now() ELSE NULL END,
+    COALESCE((NEW.raw_user_meta_data->>'marketing_agreed')::boolean, false)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-09-02b] 카카오 가입 경로도 팝업 행사일 자동승인 적용
+-- 카카오로 가입하면 이름만 받고 auth.users가 먼저 생성된 뒤, "추가정보 입력"
+-- 화면(submitCompleteProfile)에서 role='kkutjjang'과 함께 profiles를 UPDATE함 —
+-- INSERT 트리거(handle_new_user)가 아니라 UPDATE라서 위 마이그레이션의 날짜
+-- 조건이 적용 안 됐고, guard_kkutjjang_status가 관리자 아니면 무조건 'pending'만
+-- 허용하도록 막고 있어서 카카오 가입 끗짱은 행사일에도 계속 승인 대기로 남던 버그
+-- (실기기 테스트 계정으로 재현 확인).
+-- =====================================================
+CREATE OR REPLACE FUNCTION guard_kkutjjang_status() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.kkutjjang_status IS DISTINCT FROM OLD.kkutjjang_status THEN
+    IF NOT is_admin()
+       AND NEW.kkutjjang_status <> 'pending'
+       AND NOT (NEW.kkutjjang_status = 'approved' AND (now() AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-09-21') THEN
+      RAISE EXCEPTION '끗짱 승인 상태는 관리자만 변경할 수 있어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

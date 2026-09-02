@@ -1685,7 +1685,7 @@ async function submitCompleteProfile() {
   };
   // 2026-09-21 유스보이스 팝업 행사일엔 카카오로 가입한 끗짱도 바로 승인
   // (email 가입 폴백과 동일한 예외 — 서버 guard_kkutjjang_status 트리거에도 동일 조건 있음)
-  if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-02') ? 'approved' : 'pending'; // TEMP TEST — 실제로는 2026-09-21
+  if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending';
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if (error) return msg('⚠️ 저장 실패: ' + error.message);
   document.getElementById('completeProfileScreen').style.display = 'none';
