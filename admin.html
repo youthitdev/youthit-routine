@@ -100,27 +100,27 @@
     <button class="tab-btn" id="tabBannerBtn" onclick="switchTab('banner')">📢 배너</button>
   </div>
 
-  <div class="filter-bar" id="youthFilters">
-    <input type="text" id="ySearch" placeholder="닉네임·실명·휴대폰 검색" oninput="renderTable()">
-    <select id="ySido" onchange="onSidoChange()"><option value="">전체 지역(시/도)</option></select>
-    <select id="ySigugun" onchange="renderTable()"><option value="">전체 시/군/구</option></select>
-    <select id="ySchoolStatus" onchange="renderTable()">
+  <div class="filter-bar" id="youthFilters" style="flex-wrap:nowrap;overflow-x:auto;">
+    <input type="text" id="ySearch" placeholder="닉네임·실명·휴대폰 검색" style="flex-shrink:0;" oninput="renderTable()">
+    <select id="ySido" style="flex-shrink:0;" onchange="onSidoChange()"><option value="">전체 지역(시/도)</option></select>
+    <select id="ySigugun" style="flex-shrink:0;" onchange="renderTable()"><option value="">전체 시/군/구</option></select>
+    <select id="ySchoolStatus" style="flex-shrink:0;" onchange="renderTable()">
       <option value="">전체 재학상태</option>
       <option value="out_of_school">학교 밖 청소년</option>
       <option value="enrolled">재학 중</option>
       <option value="alternative">대안학교</option>
     </select>
-    <select id="yVerify" onchange="renderTable()">
+    <select id="yVerify" style="flex-shrink:0;" onchange="renderTable()">
       <option value="">전체 서류상태</option>
       <option value="approved">승인됨</option>
       <option value="pending">대기중</option>
       <option value="rejected">반려됨</option>
       <option value="none">미제출</option>
     </select>
-    <select id="yRoutine" onchange="renderTable()"><option value="">전체 참여루틴</option></select>
-    <span class="count-badge" id="yCount"></span>
-    <button class="export-btn" onclick="exportCSV('youth')">📥 CSV 내보내기</button>
-    <button class="export-btn" onclick="downloadVerifyDocs()">🗂 인증서류 일괄 다운로드</button>
+    <select id="yRoutine" style="flex-shrink:0;" onchange="renderTable()"><option value="">전체 참여루틴</option></select>
+    <span class="count-badge" id="yCount" style="flex-shrink:0;"></span>
+    <button class="export-btn" style="flex-shrink:0;" onclick="exportCSV('youth')">📥 CSV 내보내기</button>
+    <button class="export-btn" style="flex-shrink:0;" onclick="downloadVerifyDocs()">🗂 인증서류 일괄 다운로드</button>
   </div>
 
   <div class="filter-bar" id="kkFilters" style="display:none;">
