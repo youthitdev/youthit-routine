@@ -1436,7 +1436,9 @@ async function loadProfileAndEnter() {
       region_sido: meta.region_sido || null,
       region_sigugun: meta.region_sigugun || null,
       school_status: meta.school_status || null,
-      kkutjjang_status: (meta.role || 'youth') !== 'kkutjjang' ? 'none' : (ADMINS.includes(currentUser.email) ? 'approved' : 'pending'),
+      // 2026-09-21 유스보이스 팝업 행사일엔 현장 가입 끗짱도 바로 승인(서버 트리거
+      // handle_new_user()의 로직과 동일 — 이건 트리거가 안 돌았을 때만 쓰이는 폴백)
+      kkutjjang_status: (meta.role || 'youth') !== 'kkutjjang' ? 'none' : (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending',
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
     profile = created;
@@ -1681,7 +1683,9 @@ async function submitCompleteProfile() {
     privacy_agreed_at: new Date().toISOString(),
     marketing_agreed: agreeMarketing,
   };
-  if (cpRole === 'kkutjjang') payload.kkutjjang_status = 'pending';
+  // 2026-09-21 유스보이스 팝업 행사일엔 카카오로 가입한 끗짱도 바로 승인
+  // (email 가입 폴백과 동일한 예외 — 서버 guard_kkutjjang_status 트리거에도 동일 조건 있음)
+  if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-02') ? 'approved' : 'pending'; // TEMP TEST — 실제로는 2026-09-21
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if (error) return msg('⚠️ 저장 실패: ' + error.message);
   document.getElementById('completeProfileScreen').style.display = 'none';
