@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
@@ -530,7 +531,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div style="padding:12px 16px 0;">
           <!-- 내가 만든 한끗 (누적 통계) -->
           <div style="margin-bottom:14px;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-            <div style="font-size:12px;color:#888;margin-bottom:8px;">내가 만든 한끗</div>
+            <div style="font-family:'Jua',sans-serif;font-size:14px;color:#4FA300;margin-bottom:8px;">🌱 내가 만든 한끗</div>
             <div style="background:linear-gradient(135deg,#83CA00 0%,#4FA300 100%);border-radius:20px;padding:18px 8px;display:flex;position:relative;overflow:hidden;">
               <div style="position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
               <div style="position:absolute;left:-16px;bottom:-30px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
@@ -543,7 +544,7 @@ select:focus { outline: none; border-color: #2E33BC; }
               <div style="flex:1;text-align:center;position:relative;">
                 <div style="font-size:18px;margin-bottom:2px;">🏅</div>
                 <div style="font-size:20px;font-weight:700;color:#fff;" id="youthStatCompleters">0</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">완주자</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">완주 루틴</div>
               </div>
               <div style="flex:1;text-align:center;position:relative;">
                 <div style="font-size:18px;margin-bottom:2px;">💬</div>
@@ -1950,31 +1951,17 @@ async function loadCertFeed() {
 // 불러오는 캡(limit)이 있어서 그걸로 세면 실제보다 적게 나올 수 있음. 인증수/소통수는
 // 정확한 전체 개수를 직접 COUNT 쿼리로 가져오고, 완주자 수는 routines/routine_participants가
 // 캡 없이 전체를 불러오고 있어서 이미 로드된 state.routines로 계산해도 정확함
-async function loadHomeStats() {
-  try {
-    // certifications/cert_comments는 "그 루틴 참여자만 볼 수 있게" RLS로 막혀 있어서
-    // 클라이언트에서 직접 count(*)를 하면 로그인한 계정마다 다른(자기가 볼 수 있는 것만)
-    // 숫자가 나옴 — RLS를 우회해 항상 같은 진짜 전체 개수를 주는 DB 함수를 통해 가져옴
-    const { data: statsRow, error: statsErr } = await sb.rpc('get_home_stats');
-    if (statsErr) throw statsErr;
-    const s = Array.isArray(statsRow) ? statsRow[0] : statsRow;
-    const certCount = s?.cert_count || 0;
-    const commCount = s?.comm_count || 0;
-    const completers = new Set();
-    (state.routines || []).forEach(r => {
-      const { certGoal } = _completionGoal(r);
-      (r.participants || []).forEach(p => {
-        const isDone = r.isFree ? _personalPeriod(r, p).isDone : p.cert >= certGoal;
-        if (isDone) completers.add(p.userId);
-      });
-    });
-    const certEl = document.getElementById('youthStatCertCount');
-    const compEl = document.getElementById('youthStatCompleters');
-    const commEl = document.getElementById('youthStatComm');
-    if (certEl) certEl.textContent = certCount.toLocaleString();
-    if (compEl) compEl.textContent = completers.size.toLocaleString();
-    if (commEl) commEl.textContent = commCount.toLocaleString();
-  } catch (e) { console.error('홈 통계 로드 실패', e); }
+// "지금까지 만든 한끗"(전체 참여자 통계)이 내 통계인지 전체 통계인지 헷갈린다는
+// 피드백 — "내가 만든 한끗"으로 바꾸면서 실제로도 내 개인 통계(인증수/완주
+// 루틴수/소통수)를 보여주도록 함. 전부 이미 로드돼있는 내 프로필/참여 데이터라
+// RLS 우회용 RPC 호출이 더 이상 필요 없음
+function loadHomeStats() {
+  const certEl = document.getElementById('youthStatCertCount');
+  const compEl = document.getElementById('youthStatCompleters');
+  const commEl = document.getElementById('youthStatComm');
+  if (certEl) certEl.textContent = (state.youth.certCount || 0).toLocaleString();
+  if (compEl) compEl.textContent = _myCompletedRoutines().length.toLocaleString();
+  if (commEl) commEl.textContent = (state.youth.commCount || 0).toLocaleString();
 }
 
 // 홈 화면 홍보 배너 (관리자 등록, 루틴 홍보/공지/외부 링크 등 자유롭게)
