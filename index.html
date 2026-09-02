@@ -121,8 +121,8 @@ input[type="text"], input[type="number"], input[type="date"], input[type="dateti
 input:focus { outline: none; border-color: #2E33BC; }
 select { width: 100%; padding: 10px 34px 10px 12px; border: 0.5px solid #ddd; border-radius: 10px; font-size: 14px; font-family: inherit; color: #111; background: #fff; -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; }
 select:focus { outline: none; border-color: #2E33BC; }
-.auth-input[type="text"], .auth-input[type="date"], .auth-input[type="number"] { background: rgba(255,255,255,0.1); color: white; height: 48px; padding: 0 16px; border-radius: 12px; font-size: 15px; border: 1.5px solid rgba(255,255,255,0.22); box-sizing: border-box; }
-.auth-input[type="text"]:focus, .auth-input[type="date"]:focus, .auth-input[type="number"]:focus { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); }
+.auth-input[type="text"], .auth-input[type="date"], .auth-input[type="number"], .auth-input[type="tel"] { background: rgba(255,255,255,0.1); color: white; height: 48px; padding: 0 16px; border-radius: 12px; font-size: 15px; border: 1.5px solid rgba(255,255,255,0.22); box-sizing: border-box; }
+.auth-input[type="text"]:focus, .auth-input[type="date"]:focus, .auth-input[type="number"]:focus, .auth-input[type="tel"]:focus { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.55); }
 .count-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .count-ok { font-size: 11px; color: #3B6D11; }
 .count-not { font-size: 11px; color: #888; }
@@ -331,6 +331,7 @@ select:focus { outline: none; border-color: #2E33BC; }
 
   <!-- 로그인 -->
   <div class="splash" id="splashScreen">
+    <button class="back-btn" onclick="backToOnboarding()" style="position:absolute;top:20px;left:20px;"><i class="ti ti-arrow-left" style="font-size:22px;"></i></button>
     <div class="splash-logo">한끗루틴</div>
     <div class="splash-sub">오늘 하루도 한끗씩 ✦</div>
     <div class="auth-tabs">
@@ -5624,6 +5625,16 @@ function obFinish() {
   localStorage.setItem('hankkut_onboarding_done', '1');
   document.getElementById('onboardingScreen').classList.add('hide');
 }
+// 로그인/가입 화면에서 뒤로 갈 곳이 없어 막힌 느낌이 든다는 QA 피드백 — 온보딩
+// 화면으로 돌아갈 수 있는 버튼 추가
+function backToOnboarding() {
+  obIdx = 0;
+  document.getElementById('obSlides').style.transform = 'translateX(0%)';
+  for(let i=0;i<OB_TOTAL;i++) document.getElementById('obDot'+i).classList.toggle('active', i===0);
+  document.getElementById('obNextBtn').textContent = '다음';
+  document.getElementById('obSkip').style.visibility = '';
+  document.getElementById('onboardingScreen').classList.remove('hide');
+}
 
 // 스플래시 — 항상 표시, 2초 후 자동 제거
 setTimeout(() => {
@@ -5639,6 +5650,12 @@ if(localStorage.getItem('hankkut_onboarding_done')) {
 // ════════════════════════════════════════════════════════
 // 초기화
 // ════════════════════════════════════════════════════════
+// 생년월일 date input에 min/max가 없으면 iOS에서 "일" 열이 빠진 채(연/월만) 피커가
+// 뜨는 버그가 있어서(QA 발견), 범위를 명시해 항상 연/월/일 3열이 다 보이게 함
+['signupBirth', 'cpBirth', 'editBirth'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) { el.min = '1920-01-01'; el.max = _todayStr(); }
+});
 populateSidoSelect();
 initAuth();
 
