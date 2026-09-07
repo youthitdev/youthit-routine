@@ -813,20 +813,36 @@ function renderRoutineParticipants() {
       </div>
       <span class="pill" style="background:${p.status==='approved'?'#EAF3DE':p.status==='rejected'?'#f5f5f5':'#FFF3CD'};color:${p.status==='approved'?'#3B6D11':p.status==='rejected'?'#aaa':'#856404'};">${RP_STATUS_LABEL[p.status]||p.status}</span>
       ${p.status==='pending' ? `<button onclick="adminApproveApplicant('${p.user_id}')" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">승인</button><button onclick="adminRejectApplicant('${p.user_id}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">거절</button>` : ''}
+      ${p.status==='approved' ? `<button onclick="adminCancelParticipant('${p.user_id}')" style="padding:5px 10px;background:#fff;color:#c00;border:1px solid #f0c0c0;border-radius:8px;font-size:11px;cursor:pointer;">취소</button>` : ''}
     </div>`;
   }).join('') : `<div style="padding:24px 0;text-align:center;font-size:12px;color:#aaa;">신청자가 없어요</div>`;
 }
 async function adminApproveApplicant(userId) {
-  const { error } = await sb.from('routine_participants').update({ status: 'approved' }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId);
+  const { data, error } = await sb.from('routine_participants').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId).select('user_id');
   if (error) { alert('승인 실패: ' + error.message); return; }
+  if (!data || data.length === 0) { alert('승인에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   await loadData();
   renderRoutineParticipants();
 }
 async function adminRejectApplicant(userId) {
   const reason = prompt('거절 사유를 입력해주세요 (신청자에게 안내돼요, 비워두면 사유 없이 거절돼요):', '');
   if (reason === null) return;
-  const { error } = await sb.from('routine_participants').update({ status: 'rejected', reject_reason: reason || null }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId);
+  const { data, error } = await sb.from('routine_participants').update({ status: 'rejected', reject_reason: reason || null }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId).select('user_id');
   if (error) { alert('거절 실패: ' + error.message); return; }
+  if (!data || data.length === 0) { alert('거절에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
+  await loadData();
+  renderRoutineParticipants();
+}
+// 참여자가 루틴을 잘못 신청해서 승인까지 됐을 때, 관리자가 참여를 취소할 수 있게(QA
+// 요청) — status CHECK 제약이 pending/approved/rejected뿐이라 새 상태를 만들지 않고
+// "거절"로 전환. 이미 지급된 나다움 포인트는 nadaeum_log에 routine_id가 없어 이
+// 루틴에서 받은 금액만 정확히 역산할 방법이 없어서 자동 환수는 하지 않음 — 필요하면
+// "수동 포인트 지급"에서 음수로 직접 조정
+async function adminCancelParticipant(userId) {
+  if (!confirm('이 참여자의 참여를 취소할까요?\n대기 상태가 아닌 "거절됨"으로 바뀌고 본인에게 안내 알림이 가요.\n이미 지급된 나다움 포인트가 있다면 "수동 포인트 지급"에서 별도로 조정해주세요.')) return;
+  const { data, error } = await sb.from('routine_participants').update({ status: 'rejected', reject_reason: '관리자가 참여를 취소했어요' }).eq('routine_id', participantsModalRoutineId).eq('user_id', userId).select('user_id');
+  if (error) { alert('취소 실패: ' + error.message); return; }
+  if (!data || data.length === 0) { alert('취소에 실패했어요. 새로고침 후 다시 시도해주세요.'); return; }
   await loadData();
   renderRoutineParticipants();
 }
