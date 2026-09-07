@@ -467,6 +467,15 @@ function _todayStr(d) {
   d = d || new Date();
   return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 }
+// DB에서 온 kickoff_at/closing_at(UTC ISO 문자열)을 <input type="datetime-local">에
+// 채울 땐 로컬 시각으로 변환해야 하는데, 그냥 .slice(0,16)만 하면 UTC 시각이 그대로
+// 들어가버려서(예: 한국시간 11:00 → 화면엔 02:00) 수정 화면을 열었다 그냥 저장만
+// 해도 매번 9시간씩 밀리는 버그가 있었음(QA 발견)
+function _dtLocalStr(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
 
 const REGION_DATA = {
   '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
@@ -909,8 +918,8 @@ function editRoutineAdmin(id) {
   document.getElementById('rtEnd').value = r.endDate || '';
   document.getElementById('rtMaxPeople').value = r.maxPeople || 10;
   document.getElementById('rtMinPeople').value = r.minPeople || '';
-  document.getElementById('rtKickoff').value = r.kickoffAt ? r.kickoffAt.slice(0,16) : '';
-  document.getElementById('rtClosing').value = r.closingAt ? r.closingAt.slice(0,16) : '';
+  document.getElementById('rtKickoff').value = _dtLocalStr(r.kickoffAt);
+  document.getElementById('rtClosing').value = _dtLocalStr(r.closingAt);
   document.getElementById('rtMeetingLink').value = r.meetingLink || '';
   document.getElementById('rtDesc').value = r.description || '';
   document.getElementById('rtCertGuide').value = r.certGuide || '';
@@ -1881,9 +1890,10 @@ async function viewVerifyDoc(path) {
   window.open(data.signedUrl, '_blank');
 }
 async function downloadVerifyDocs() {
-  const rows = sortRows(_filteredYouth()).filter(r => r.verifyDocUrl);
-  if (!rows.length) { alert('현재 필터에 인증서류가 있는 청소년이 없어요.'); return; }
-  if (!confirm(`${rows.length}명의 인증서류를 압축 파일로 다운로드할까요?`)) return;
+  if (selectedIds.size === 0) { alert('다운로드할 청소년을 먼저 선택해주세요. (표 머리글 체크박스로 전체 선택도 가능해요)'); return; }
+  const rows = youthRows.filter(r => selectedIds.has(r.id) && r.verifyDocUrl);
+  if (!rows.length) { alert('선택한 청소년 중 인증서류가 있는 사람이 없어요.'); return; }
+  if (!confirm(`선택한 ${rows.length}명의 인증서류를 압축 파일로 다운로드할까요?`)) return;
   const zip = new JSZip();
   for (const r of rows) {
     const { data, error } = await sb.storage.from('verify-docs').createSignedUrl(r.verifyDocUrl, 600);
