@@ -2580,6 +2580,19 @@ function clearSearch() {
 
 // 루틴 피드
 let currentFeedRoutineId=null;
+// "오늘 인증하기/완료" 플로팅 버튼 — 여러 화면이 같은 오버레이(routineDetailOverlay)를
+// 재사용하면서 내용만 바꿔치기하다 보니, 이 버튼을 껐다 켜는 화면이 아닌 다른 화면(커뮤니티
+// 글, 끗짱 인증 상세 등)으로 넘어가도 이전 상태가 그대로 남아있던 문제(QA 발견) — 관련
+// 없는 화면을 열 때는 반드시 hide로, 관련 있는 화면은 이 함수로만 상태를 정하도록 통일
+function _setCertFloatingBtn(r) {
+  const show = r && r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  document.getElementById('certFloatingBtn').style.display = show ? 'block' : 'none';
+  if (show) {
+    currentFeedRoutineId = r.id;
+    document.getElementById('certFloatingAction').style.display = r.todayCert ? 'none' : 'flex';
+    document.getElementById('certFloatingDone').style.display = r.todayCert ? 'block' : 'none';
+  }
+}
 // 인증글(사진+소감) 그리드 — 청소년/끗짱 양쪽의 "전체 인증 기록" 화면에서 공용으로 씀
 // (빈 상태 문구는 화면마다 어울리는 톤이 달라서 호출하는 쪽에서 따로 처리)
 function _certFeedGridHtml(certs) {
@@ -2652,10 +2665,7 @@ function openRoutineFeed(routineId) {
     : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs)}</div>`;
   document.getElementById('feedOverlayBody').innerHTML = completeActionsHtml + gridHtml;
   const myR=state.routines.find(x=>x.id===routineId);
-  const isMyRoutine = myR.status==='active' && currentUser && (myR.participants||[]).some(p=>p.userId===currentUser.id);
-  document.getElementById('certFloatingBtn').style.display=isMyRoutine?'block':'none';
-  document.getElementById('certFloatingAction').style.display=myR.todayCert?'none':'flex';
-  document.getElementById('certFloatingDone').style.display=myR.todayCert?'block':'none';
+  _setCertFloatingBtn(myR);
   openOverlay('routineFeedOverlay');
 }
 function openCertFromFeed() {
@@ -2694,15 +2704,12 @@ function openCertFeedDetail(id) {
   const c = (state.certFeed||[]).find(x=>x.id===id);
   const r = state.routines.find(x=>x.id===c.routineId);
   _openInRoutineDetail(() => {
-    currentFeedRoutineId = r.id;
     document.getElementById('rdSub').textContent = r.title+' · '+c.day;
     document.getElementById('rdTitle').textContent = c.name;
     renderCertDetail(id);
-    // 다른 경로(홈/커뮤니티 등)로 들어와도 내 루틴이고 아직 오늘 인증 전이면 인증 버튼 노출
-    const isMyRoutine = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-    document.getElementById('certFloatingBtn').style.display = isMyRoutine ? 'block' : 'none';
-    document.getElementById('certFloatingAction').style.display = r.todayCert ? 'none' : 'flex';
-    document.getElementById('certFloatingDone').style.display = r.todayCert ? 'block' : 'none';
+    // 다른 경로(홈/커뮤니티 등)로 들어와도 내 루틴이고 진행중이고 아직 오늘 인증 전이면
+    // 인증 버튼 노출 — 종료/모집중인 루틴엔 안 뜨게 _setCertFloatingBtn의 active 체크를 씀
+    _setCertFloatingBtn(r);
   });
 }
 
@@ -2868,6 +2875,7 @@ function openPostDetail(id) {
   currentCertDetailId = null;
   const p = state.posts.find(x=>x.id===id);
   if(!p) return;
+  _setCertFloatingBtn(null); // 커뮤니티 글 상세라 "오늘 인증" 버튼과 무관 — 이전 화면 상태가 남지 않게 끔
   const comments = p.comments||[];
   document.getElementById('rdSub').textContent = p.date;
   document.getElementById('rdTitle').textContent = p.type==='notice' ? '📢 공지' : p.type==='kpost' ? '💬 소식' : '✍️ 후기';
@@ -2963,6 +2971,7 @@ async function deletePostComment(postId, commentId) {
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
+  _setCertFloatingBtn(null); // 루틴 소개/신청 화면이라 "오늘 인증" 버튼과 무관 — 내 진행중 루틴은 openRoutineFeed로 감
   const isOpenFree=_isFreeOpen(r);
   document.getElementById('rdSub').textContent=r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
@@ -4504,6 +4513,7 @@ function openKRoutineFeed(routineId) {
 }
 function _renderKRoutineFeed(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
+  _setCertFloatingBtn(null); // 끗짱 루틴 상세는 청소년의 "오늘 인증" 버튼과 무관
   const {totalDays, certGoal}=_completionGoal(r);
   const achievers=r.participants.filter(p=>p.cert>=certGoal).length;
   const rate=r.participants.length?Math.round(achievers/r.participants.length*100):0;
@@ -4563,6 +4573,7 @@ async function sendPoke(routineId, toUserId, name) {
 }
 function openKRoutineDetail(routineId) {
   const r=state.routines.find(x=>x.id===routineId);
+  _setCertFloatingBtn(null); // 끗짱 루틴 관리 화면이라 청소년의 "오늘 인증" 버튼과 무관
   const isOpenFree=_isFreeOpen(r);
   document.getElementById('rdSub').textContent = isOpenFree
     ? `상시 모집 · 진행 ${r.period}`
@@ -4701,6 +4712,7 @@ function openKCertDetail(rid,name) {
   if(!p||!p.todayDone) return;
   const cert=(state.certFeed||[]).filter(c=>c.routineId===rid && c.userId===p.userId).sort((a,b)=>b.ts-a.ts)[0];
   _openInRoutineDetail(() => {
+    _setCertFloatingBtn(null); // 끗짱이 보는 참여자 인증 상세라 청소년의 "오늘 인증" 버튼과 무관
     document.getElementById('rdSub').textContent=r.title+' · '+p.day;
     document.getElementById('rdTitle').textContent=p.name;
     if(cert) {

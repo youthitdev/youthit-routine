@@ -971,6 +971,14 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경 없음
 - 검증: 브라우저에서 User-Agent를 iPhone/Android/Mac으로 바꿔가며 각각 iOS 안내·안드로이드 설치 버튼(이벤트 있음)·안드로이드 대체 안내(이벤트 없음)·데스크톱 스킵이 정확히 분기되는 것, 설치 버튼 클릭 시 캡처해둔 이벤트의 `prompt()`가 호출되고 화면이 닫히는 것, "나중에 할게요"로 닫히는 것 확인. 실제 iOS/안드로이드 실기기에서의 최종 UI 확인은 별도 권장
 
+## 최근 완료 (2026-09-02, "오늘 인증 완료" 플로팅 배너가 다른 글에도 계속 남아있던 버그)
+
+- **버그**: 인증글 상세를 본 뒤 커뮤니티 글이나 끗짱 쪽 화면 등 다른 내용으로 넘어가도 "✅ 오늘 인증 완료!" 플로팅 배너가 화면 맨 위(z-index 250, 모든 오버레이보다 위)에 그대로 남아있던 문제. 원인은 이 배너가 `openRoutineFeed`/`openCertFeedDetail` 딱 두 곳에서만 켜지고, 같은 오버레이(`routineDetailOverlay`)를 재사용하는 다른 화면들(`openPostDetail`, `openKCertDetail`, `_renderKRoutineFeed`, `openRoutineDetail`, `openKRoutineDetail`)은 이 배너를 아예 건드리지 않아서, 오버레이를 완전히 닫을 때(`closeOverlay`)를 빼면 이전 상태가 그대로 이어졌던 것. 뒤로가기(서브뷰 복원) 경로도 이전 렌더 함수를 그대로 재실행할 뿐이라 같은 문제가 있었음
+- 추가로 `openCertFeedDetail`은 `openRoutineFeed`와 달리 `status==='active'` 체크가 빠져있어서, 완료되거나 모집중인 루틴의 인증글에서도 배너가 뜨던 부수적 버그도 있었음
+- **수정**: 배너 상태를 한 곳(`_setCertFloatingBtn(routine)`)에서만 정하도록 통일 — 관련 있는 화면(`openRoutineFeed`, `openCertFeedDetail`)은 이 함수로 올바른 루틴을 넘겨서 켜고, 무관한 화면(`openPostDetail`, `openKCertDetail`, `_renderKRoutineFeed`, `openRoutineDetail`, `openKRoutineDetail`)은 전부 `_setCertFloatingBtn(null)`로 명시적으로 끔 — 이제 화면을 그릴 때마다 매번 스스로 올바른 상태를 선언하므로, 뒤로가기 경로를 포함해 어떤 경로로 들어와도 이전 상태가 남지 않음
+- DB 변경 없음
+- 검증: 브라우저에서 내 활성 루틴 인증 피드 → 그 안의 인증글 상세(배너 유지 기대) → 커뮤니티 글 상세(배너 사라짐 기대) 순으로 이동해 정확히 그렇게 동작하는 것 확인, 완료된 루틴의 인증글에서는 배너가 안 뜨는 것도 확인
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토
