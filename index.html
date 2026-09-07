@@ -2903,9 +2903,9 @@ function openPostDetail(id) {
     ${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}
     <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;">${p.content}</div>
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:12px;">
-      <div onclick="${likeFn}(${p.id})" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:22px;color:${p.liked?'#FF006C':'#ccc'};"></i>
-        <span style="font-size:14px;color:#666;">${p.likes}</span>
+      <div onclick="${likeFn}(${p.id})" data-post-like="${p.id}" data-pl-style="detail" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <i class="ti ti-heart${p.liked?'-filled':''} plHeart" style="font-size:22px;color:${p.liked?'#FF006C':'#ccc'};"></i>
+        <span class="plCount" style="font-size:14px;color:#666;">${p.likes}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <i class="ti ti-message-circle" style="font-size:22px;color:#aaa;"></i>
@@ -3582,8 +3582,8 @@ function _postCard(p, likeFn) {
       ${p.photoUrl?`<img src="${p.photoUrl}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;">`:''}
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
-      <span onclick="event.stopPropagation();${likeFn}(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
-        <i class="ti ti-heart${p.liked?'-filled':''}" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i>${p.likes>0?p.likes:'공감'}
+      <span onclick="event.stopPropagation();${likeFn}(${p.id})" data-post-like="${p.id}" data-pl-style="card" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
+        <i class="ti ti-heart${p.liked?'-filled':''} plHeart" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i><span class="plCount">${p.likes>0?p.likes:'공감'}</span>
       </span>
       <span onclick="event.stopPropagation();openPostDetail(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:#f5f5f7;cursor:pointer;font-size:12px;font-weight:600;color:#888;user-select:none;">
         <i class="ti ti-message-circle" style="font-size:14px;color:#aaa;"></i>${(p.comments&&p.comments.length>0)?p.comments.length:'댓글'}
@@ -3643,17 +3643,34 @@ function filterComm(t,el) {
   document.querySelectorAll('#commFilter .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active'); renderComm(t);
 }
+// 커뮤니티 글 좋아요를 눌렀을 때, 목록(피드)에서는 바로 반영되는데 게시글 상세
+// 화면에서는 안 바뀌던 문제(QA 발견) — 예전엔 매번 loadPosts()로 전체를 다시
+// 불러온 뒤 목록 컨테이너만 다시 그려서, 상세 화면이 열려있으면 그 아래 숨어있는
+// 목록만 갱신되고 화면엔 아무 변화가 없었음. 인증글 좋아요(toggleCertLike)처럼
+// 상태를 그 자리에서 바꾸고, 이 글이 보이는 모든 곳(data-post-like 속성으로 표시된
+// 곳 전부 — 목록 카드/상세 화면/내 소통 내역 등)을 한 번에 갱신하도록 통일
+function _updatePostLikeUI(p) {
+  document.querySelectorAll(`[data-post-like="${p.id}"]`).forEach(el => {
+    const heart = el.querySelector('.plHeart');
+    const count = el.querySelector('.plCount');
+    const isCard = el.dataset.plStyle === 'card';
+    if (heart) { heart.className = 'ti ti-heart' + (p.liked?'-filled':'') + ' plHeart'; heart.style.color = p.liked ? '#FF006C' : (isCard?'#aaa':'#ccc'); }
+    if (count) count.textContent = isCard ? (p.likes>0?p.likes:'공감') : p.likes;
+    if (isCard) { el.style.background = p.liked?'#FBEAF0':'#f5f5f7'; el.style.color = p.liked?'#FF006C':'#888'; }
+  });
+}
 async function togglePostLike(id) {
   if(!currentUser) return;
   const p=state.posts.find(x=>x.id===id);
   if(!p) return;
-  if(p.liked){
-    await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id);
-  } else {
-    await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
-  }
-  await loadPosts();
-  save(); renderComm(commFilter);
+  const wasLiked = p.liked;
+  p.liked = !wasLiked; p.likes += p.liked ? 1 : -1;
+  _updatePostLikeUI(p);
+  const { error } = wasLiked
+    ? await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id)
+    : await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
+  if (error) { p.liked = wasLiked; p.likes += wasLiked ? 1 : -1; _updatePostLikeUI(p); return; }
+  save();
 }
 let currentReviewRoutineId = null;
 let reviewPhotoFile = null, reviewExistingPhotoUrl = null;
@@ -5006,13 +5023,13 @@ async function toggleKPostLike(id) {
   if(!currentUser) return;
   const p=state.posts.find(x=>x.id===id);
   if(!p) return;
-  if(p.liked){
-    await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id);
-  } else {
-    await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
-  }
-  await loadPosts();
-  kRenderReviewTab(kReviewFilter);
+  const wasLiked = p.liked;
+  p.liked = !wasLiked; p.likes += p.liked ? 1 : -1;
+  _updatePostLikeUI(p);
+  const { error } = wasLiked
+    ? await sb.from('post_likes').delete().eq('post_id',id).eq('user_id',currentUser.id)
+    : await sb.from('post_likes').insert({post_id:id,user_id:currentUser.id});
+  if (error) { p.liked = wasLiked; p.likes += wasLiked ? 1 : -1; _updatePostLikeUI(p); }
 }
 
 // ════════════════════════════════════════════════════════
