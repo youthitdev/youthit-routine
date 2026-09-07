@@ -504,6 +504,20 @@ select:focus { outline: none; border-color: #2E33BC; }
     <button class="splash-btn splash-btn-primary" style="width:auto;padding:12px 36px;" onclick="submitNewPassword()">비밀번호 변경</button>
   </div>
 
+  <!-- 가입 직후 1회, 홈 화면 추가 안내 (iOS/안드로이드 분기) -->
+  <div class="splash" id="installPromptScreen" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;">
+    <div style="font-size:52px;margin-bottom:18px;">🌱</div>
+    <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:8px;">홈 화면에 추가해두세요</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:24px;">앱처럼 바로 열어서 매일 인증할 수 있어요.</div>
+    <div id="installPromptIOS" style="display:none;background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:20px;max-width:320px;">
+      <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:14px;margin-bottom:12px;"><span style="font-size:20px;">1️⃣</span> 하단 공유 버튼(📤)을 눌러요</div>
+      <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:14px;"><span style="font-size:20px;">2️⃣</span> "홈 화면에 추가"를 선택해요</div>
+    </div>
+    <button id="installPromptAndroidBtn" onclick="triggerAndroidInstall()" style="display:none;width:100%;max-width:320px;padding:14px;border:none;border-radius:14px;background:#fff;color:#2E33BC;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">📲 지금 설치하기</button>
+    <div id="installPromptAndroidFallback" style="display:none;background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:20px;max-width:320px;color:#fff;font-size:14px;text-align:left;">브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 눌러주세요.</div>
+    <button onclick="closeInstallPrompt()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:13px;text-decoration:underline;cursor:pointer;">나중에 할게요</button>
+  </div>
+
   <!-- 헤더 -->
   <div class="header" id="mainHeader" style="display:none;">
     <div class="header-row">
@@ -1325,6 +1339,50 @@ var currentUser = null;
 let signupRole = 'youth';
 const ADMINS = ['dev@youthvoice.or.kr', 'yv@youthvoice.or.kr'];
 
+// ════════════════════════════════════════════════════════
+// 가입 직후 홈 화면 추가 안내 (iOS/안드로이드)
+// ════════════════════════════════════════════════════════
+// 안드로이드(크롬)의 설치 배너는 브라우저가 미리 준비해두는 이벤트를 우리가 가로채서
+// 원하는 시점(가입 직후)에 직접 띄우는 방식 — 페이지 로드 즉시 등록해둬야 이벤트를
+// 놓치지 않음
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+});
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function _isAndroid() {
+  return /Android/.test(navigator.userAgent);
+}
+function _isStandalone() {
+  return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+}
+// 이메일 가입(doSignup)/카카오 최초 가입(submitCompleteProfile) 성공 시점에 플래그를
+// 세워두고, 실제로 앱에 들어간 직후(loadProfileAndEnter) 한 번만 보여줌 — 이미 홈
+// 화면에 설치돼서 실행 중이면(스탠드얼론) 보여줄 필요 없음
+function maybeShowInstallPrompt() {
+  if (sessionStorage.getItem('hankkut_just_signed_up') !== '1') return;
+  sessionStorage.removeItem('hankkut_just_signed_up');
+  if (_isStandalone()) return;
+  if (!_isIOS() && !_isAndroid()) return;
+  document.getElementById('installPromptIOS').style.display = _isIOS() ? 'block' : 'none';
+  document.getElementById('installPromptAndroidBtn').style.display = (_isAndroid() && _deferredInstallPrompt) ? 'block' : 'none';
+  document.getElementById('installPromptAndroidFallback').style.display = (_isAndroid() && !_deferredInstallPrompt) ? 'block' : 'none';
+  document.getElementById('installPromptScreen').style.display = 'flex';
+}
+async function triggerAndroidInstall() {
+  if (!_deferredInstallPrompt) return;
+  _deferredInstallPrompt.prompt();
+  await _deferredInstallPrompt.userChoice;
+  _deferredInstallPrompt = null;
+  closeInstallPrompt();
+}
+function closeInstallPrompt() {
+  document.getElementById('installPromptScreen').style.display = 'none';
+}
+
 const REGION_DATA = {
   '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
   '부산광역시': ['중구','서구','동구','영도구','부산진구','동래구','남구','북구','해운대구','사하구','금정구','강서구','연제구','수영구','사상구','기장군'],
@@ -1462,6 +1520,7 @@ async function loadProfileAndEnter() {
   }
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadLetters(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
+  maybeShowInstallPrompt();
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
   updateCommNavBadge();
@@ -1571,7 +1630,7 @@ async function doSignup() {
     } }
   });
   if (error) showAuthMsg('⚠️ ' + error.message);
-  else showAuthMsg('✅ 가입 완료! 자동 로그인 중...');
+  else { sessionStorage.setItem('hankkut_just_signed_up', '1'); showAuthMsg('✅ 가입 완료! 자동 로그인 중...'); }
 }
 
 function showAuthTab(tab) {
@@ -1663,6 +1722,7 @@ async function submitCompleteProfile() {
   if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending';
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if (error) return msg('⚠️ 저장 실패: ' + error.message);
+  sessionStorage.setItem('hankkut_just_signed_up', '1');
   document.getElementById('completeProfileScreen').style.display = 'none';
   await loadProfileAndEnter();
 }
