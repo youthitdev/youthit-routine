@@ -2840,6 +2840,18 @@ async function _uploadCommentPhoto(file) {
   if(error) { alert('사진 업로드 실패: ' + error.message); return false; }
   return sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
 }
+function _escHtml(s) {
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _certTextRowHtml(c) {
+  return `
+    <div style="font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;flex:1;min-width:0;" id="rdCertText_${c.id}">${c.text}</div>
+    ${_canModerate(c.userId)?`<div style="display:flex;gap:10px;flex-shrink:0;padding-top:2px;">
+      <i class="ti ti-pencil" onclick="editCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
+      <i class="ti ti-trash" onclick="deleteCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
+    </div>`:''}
+  `;
+}
 function renderCertDetail(id) {
   currentCertDetailId = id;
   const c = (state.certFeed||[]).find(x=>x.id===id);
@@ -2861,12 +2873,8 @@ function renderCertDetail(id) {
       </div>`;
   document.getElementById('rdBody').innerHTML = `
     ${photoHtml}
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-      <div style="font-size:14px;color:#111;line-height:1.7;white-space:pre-wrap;flex:1;min-width:0;" id="rdCertText_${c.id}">${c.text}</div>
-      ${_canModerate(c.userId)?`<div style="display:flex;gap:10px;flex-shrink:0;padding-top:2px;">
-        <i class="ti ti-pencil" onclick="editCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
-        <i class="ti ti-trash" onclick="deleteCert(${c.id})" style="font-size:15px;color:#ccc;cursor:pointer;"></i>
-      </div>`:''}
+    <div id="rdCertRow_${c.id}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      ${_certTextRowHtml(c)}
     </div>
     <div style="font-size:12px;color:#aaa;">${timeAgo(c.ts)}</div>
 
@@ -2923,17 +2931,40 @@ async function submitCommentFromBar() {
     _submittingComment = false;
   }
 }
-async function editCert(id) {
+// 인증 내용 수정 — 예전엔 브라우저 기본 prompt() 창으로 텍스트만 따로 입력받아서
+// 올린 사진·기존 글이 안 보이는 채로 뜨는 게 불편하다는 피드백(QA) — 상세 화면
+// 그대로(사진 포함) 두고 텍스트 영역만 그 자리에서 편집 모드로 바꾸는 방식으로 변경
+function editCert(id) {
+  const c = (state.certFeed||[]).find(x=>x.id===id);
+  const row = document.getElementById(`rdCertRow_${id}`);
+  if(!c || !row) return;
+  row.innerHTML = `
+    <div style="flex:1;min-width:0;">
+      <textarea id="rdCertEditInput_${id}" rows="4" maxlength="200" style="width:100%;font-size:14px;">${_escHtml(c.text)}</textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+        <button onclick="_cancelEditCert(${id})" style="padding:6px 14px;border-radius:20px;border:0.5px solid #ddd;background:#fff;color:#666;font-size:12px;font-weight:600;cursor:pointer;">취소</button>
+        <button onclick="_saveEditCert(${id})" style="padding:6px 14px;border-radius:20px;border:none;background:#2E33BC;color:#fff;font-size:12px;font-weight:600;cursor:pointer;">저장</button>
+      </div>
+    </div>`;
+  document.getElementById(`rdCertEditInput_${id}`).focus();
+}
+function _cancelEditCert(id) {
+  const c = (state.certFeed||[]).find(x=>x.id===id);
+  const row = document.getElementById(`rdCertRow_${id}`);
+  if(c && row) row.innerHTML = _certTextRowHtml(c);
+}
+async function _saveEditCert(id) {
   const c = (state.certFeed||[]).find(x=>x.id===id);
   if(!c) return;
-  const newText = prompt('인증 내용을 수정하세요', c.text);
-  if(newText===null || newText===c.text) return;
+  const input = document.getElementById(`rdCertEditInput_${id}`);
+  const newText = input.value.trim();
+  if(!newText){ alert('내용을 입력해주세요.'); return; }
+  if(newText===c.text){ _cancelEditCert(id); return; }
   const { data, error } = await sb.from('certifications').update({ content: newText }).eq('id', id).select('id');
   if(error){ alert('수정 실패: '+error.message); return; }
   if(!data || data.length===0){ alert('수정 권한이 없어요.'); return; }
   c.text = newText;
-  const el = document.getElementById(`rdCertText_${id}`);
-  if(el) el.textContent = newText;
+  _cancelEditCert(id);
 }
 // 인증글 삭제 — 완주 인정 일수·나다움 포인트 계산에 쓰이는 인증 횟수가 바뀌므로
 // 삭제 후 루틴/인증피드를 다시 불러와서 화면 전체를 최신 상태로 맞춤(포인트 회수는
