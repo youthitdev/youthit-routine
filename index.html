@@ -264,15 +264,6 @@ select:focus { outline: none; border-color: #2E33BC; }
 @media (max-width: 480px) {
   .app, .nav, .overlay, .sheet, .success-scr, .complete-scr { max-width: 100%; }
 }
-/* 휴대폰을 가로로 돌려도 화면 레이아웃이 안 바뀌도록(세로 전용 앱) — hover:none/
-   pointer:coarse 조합이 일부 모바일 브라우저에서 안정적으로 안 잡혀서(실기기 QA에서
-   가로 회전해도 안내가 안 뜨는 문제 발견) 화면 높이 기준으로 바꿈. 휴대폰은 가로로
-   돌려도 짧은 변(세로 높이가 됨)이 대체로 500px를 안 넘고, 데스크톱 창은 아무리
-   좁혀도 이만큼 낮게 안 쓰는 경우가 많아 더 안정적으로 감지됨 */
-.rotate-lock-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: #111; color: #fff; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 12px; }
-@media (orientation: landscape) and (max-height: 500px) {
-  .rotate-lock-overlay { display: flex; }
-}
 </style>
 </head>
 <body>
@@ -5733,11 +5724,6 @@ async function refetchOnResume() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refetchOnResume(); });
 window.addEventListener('focus', refetchOnResume);
 </script>
-<div class="rotate-lock-overlay">
-  <div style="font-size:44px;">📱</div>
-  <div style="font-size:16px;font-weight:600;">세로 모드로 사용해주세요</div>
-  <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.6;">한끗루틴은 세로 화면에 최적화돼 있어요.<br>휴대폰을 세로로 돌려주세요.</div>
-</div>
 <script>
 if('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
