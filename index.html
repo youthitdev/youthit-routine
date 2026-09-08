@@ -1416,6 +1416,9 @@ var isRecoveryFlow = /type=recovery/.test(location.hash);
 var pendingRoutineId = (function(){ const m = location.search.match(/routine=(\d+)/); return m ? parseInt(m[1]) : null; })();
 // 푸시 알림 클릭(?tab=my 등)으로 들어온 경우 로그인 후 해당 탭으로 바로 이동하기 위해 기억해둠
 var pendingTab = (function(){ const m = location.search.match(/tab=(\w+)/); return m ? m[1] : null; })();
+// 알림 클릭(?post=ID, ?cert=ID)으로 들어온 경우 로그인 후 그 글/인증글을 바로 열기 위해 기억해둠
+var pendingPostId = (function(){ const m = location.search.match(/[?&]post=(\d+)/); return m ? parseInt(m[1]) : null; })();
+var pendingCertId = (function(){ const m = location.search.match(/[?&]cert=(\d+)/); return m ? parseInt(m[1]) : null; })();
 async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
@@ -1520,6 +1523,16 @@ async function loadProfileAndEnter() {
     const pid = pendingRoutineId; pendingRoutineId = null;
     history.replaceState(null, '', location.pathname);
     if (state.routines.some(r => r.id === pid)) openRoutineDetail(pid);
+  }
+  if (pendingPostId) {
+    const ppid = pendingPostId; pendingPostId = null;
+    history.replaceState(null, '', location.pathname);
+    if ((state.posts||[]).some(p => p.id === ppid)) openPostDetail(ppid);
+  }
+  if (pendingCertId) {
+    const pcid = pendingCertId; pendingCertId = null;
+    history.replaceState(null, '', location.pathname);
+    if ((state.certFeed||[]).some(c => c.id === pcid)) openCertFeedDetail(pcid);
   }
   if (pendingTab) {
     const pt = pendingTab; pendingTab = null;
@@ -4024,8 +4037,9 @@ async function openNotifHistory() {
   openSheet('notifHistoryBg');
   const { data, error } = await sb.from('notifications').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}).limit(30);
   const rows = error ? [] : (data||[]);
+  _notifHistoryRows = rows;
   list.innerHTML = rows.length ? rows.map(n=>`
-    <div onclick="closeSheet('notifHistoryBg');_goToMyFromNotif()" style="padding:12px 14px;background:${n.read?'#fff':'#f0f1fb'};border:0.5px solid #eee;border-radius:12px;cursor:pointer;">
+    <div onclick="closeSheet('notifHistoryBg');_openNotifRow(${n.id})" style="padding:12px 14px;background:${n.read?'#fff':'#f0f1fb'};border:0.5px solid #eee;border-radius:12px;cursor:pointer;">
       <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:2px;">${n.title||''}</div>
       <div style="font-size:12.5px;color:#555;line-height:1.5;">${n.body||''}</div>
       <div style="font-size:10.5px;color:#bbb;margin-top:4px;">${timeAgo(new Date(n.created_at).getTime())}</div>
@@ -4033,10 +4047,19 @@ async function openNotifHistory() {
   document.getElementById('notifUnreadDot').style.display='none';
   if(rows.some(n=>!n.read)) sb.from('notifications').update({read:true}).eq('user_id',currentUser.id).eq('read',false).then(()=>{});
 }
-// 알림 내역함의 개별 항목은 아직 알림별 세부 대상(어떤 인증글/편지 등)까지는 저장 안 하고
-// 있어서, 실제 푸시와 동일하게 우선 MY탭으로 이동 — 클릭해도 아무 반응 없던 버그 수정
-function _goToMyFromNotif() {
+// 알림 내역함에서도 푸시와 동일한 목적지로 이동(빈도 높은 4종 — 루틴/인증/게시글) —
+// link가 없는(아직 확장 안 된) 알림 종류는 예전처럼 MY탭으로 보냄
+let _notifHistoryRows = [];
+function _openNotifRow(id) {
   if(!currentUser) return;
+  const n = _notifHistoryRows.find(x=>x.id===id);
+  const link = n && n.link;
+  const routineMatch = link && link.match(/[?&]routine=(\d+)/);
+  const postMatch = link && link.match(/[?&]post=(\d+)/);
+  const certMatch = link && link.match(/[?&]cert=(\d+)/);
+  if (routineMatch && state.routines.some(r=>r.id===parseInt(routineMatch[1]))) { openRoutineDetail(parseInt(routineMatch[1])); return; }
+  if (postMatch && (state.posts||[]).some(p=>p.id===parseInt(postMatch[1]))) { openPostDetail(parseInt(postMatch[1])); return; }
+  if (certMatch && (state.certFeed||[]).some(c=>c.id===parseInt(certMatch[1]))) { openCertFeedDetail(parseInt(certMatch[1])); return; }
   state.currentRole==='youth' ? switchTab('my') : kSwitchTab('my');
 }
 async function refreshNotifUnreadDot() {
@@ -5731,15 +5754,30 @@ if('serviceWorker' in navigator) {
       .then(reg => console.log('SW 등록 완료:', reg.scope))
       .catch(err => console.log('SW 등록 실패:', err));
   });
-  // 푸시 알림을 눌렀을 때 앱이 이미 열려있으면, service-worker가 postMessage로 이 탭을
-  // 알려줘서 새로고침 없이 바로 전환함 — Client.navigate()는 iOS Safari 등 일부 환경에서
-  // 안 먹혀서 focus만 되고 "홈"(기본 탭)에 그대로 있는 것처럼 보이던 문제를 우회
+  // 푸시 알림을 눌렀을 때 앱이 이미 열려있으면, service-worker가 postMessage로 어디로
+  // 가야 할지 알려줘서 새로고침 없이 바로 전환함 — Client.navigate()는 iOS Safari 등
+  // 일부 환경에서 안 먹혀서 focus만 되고 "홈"(기본 탭)에 그대로 있는 것처럼 보이던
+  // 문제를 우회. tab만 오던 것에서 routine/post/cert(빈도 높은 알림 4종)까지 확장
   navigator.serviceWorker.addEventListener('message', (e) => {
-    if (!e.data || e.data.type !== 'notif-navigate' || !e.data.tab || !currentUser) return;
-    const tab = e.data.tab;
-    const isYouth = state.currentRole === 'youth';
-    const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
-    if (validTabs.includes(tab)) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
+    if (!e.data || e.data.type !== 'notif-navigate' || !currentUser) return;
+    if (e.data.routine && state.routines.some(r => r.id === parseInt(e.data.routine))) {
+      openRoutineDetail(parseInt(e.data.routine));
+      return;
+    }
+    if (e.data.post && (state.posts||[]).some(p => p.id === parseInt(e.data.post))) {
+      openPostDetail(parseInt(e.data.post));
+      return;
+    }
+    if (e.data.cert && (state.certFeed||[]).some(c => c.id === parseInt(e.data.cert))) {
+      openCertFeedDetail(parseInt(e.data.cert));
+      return;
+    }
+    if (e.data.tab) {
+      const tab = e.data.tab;
+      const isYouth = state.currentRole === 'youth';
+      const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+      if (validTabs.includes(tab)) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
+    }
   });
 }
 </script>

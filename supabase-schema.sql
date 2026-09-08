@@ -2324,3 +2324,113 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-09-08a] 알림 클릭 시 해당 화면으로 이동 (1차 — 빈도 높은 알림만)
+-- QA: 알림을 눌러도 항상 MY탭으로만 가고 실제로 무슨 일이 있었는지(어떤 루틴/글/
+-- 인증글) 화면에서 바로 확인할 수 없다는 피드백. notifications 테이블에도, 푸시
+-- 페이로드에도 "무엇에 대한 알림인지"가 전혀 저장/전달되고 있지 않아서(제목/본문
+-- 문구뿐) 생긴 문제 — notify_push()에 목적지 URL을 받는 4번째 인자를 추가하고,
+-- 우선 빈도가 높은 4가지 알림(루틴 참여 승인/거절, 인증 좋아요, 인증 댓글, 게시글
+-- 댓글)만 실제 대상으로 연결함. 나머지 알림 종류(편지/포키/배지/서류 등)는 당분간
+-- 그대로 MY탭으로 감 — 같은 방식으로 나중에 확장 가능.
+-- 기존 3-인자 notify_push()는 관리자 외 호출을 막아둔 보안 조치가 있었는데(2026-07-25r),
+-- 그냥 새 4-인자 오버로드를 추가하면 그 잠금이 새 시그니처엔 안 걸려서 재현해야 함 —
+-- 대신 기존 함수를 지우고 4번째 인자에 기본값(NULL)을 준 버전으로 교체해서, 기존
+-- 3-인자 호출부(트리거 18곳)는 코드 수정 없이 그대로 동작하면서 잠금도 새 시그니처에
+-- 그대로 다시 걸어둠.
+-- =====================================================
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link text;
+
+DROP FUNCTION IF EXISTS notify_push(uuid, text, text);
+CREATE OR REPLACE FUNCTION notify_push(target_user uuid, push_title text, push_body text, push_url text DEFAULT NULL)
+RETURNS void AS $$
+DECLARE
+  sr_key text;
+BEGIN
+  INSERT INTO notifications(user_id, title, body, link) VALUES (target_user, push_title, push_body, push_url);
+  SELECT decrypted_secret INTO sr_key FROM vault.decrypted_secrets WHERE name = 'sr_key_for_push';
+  IF sr_key IS NULL THEN RETURN; END IF;
+  PERFORM net.http_post(
+    url := 'https://ynqvhsffoesjzefitafv.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || sr_key),
+    body := jsonb_build_object('user_id', target_user, 'title', push_title, 'body', push_body, 'url', coalesce(push_url, '/youthit-routine/?tab=my'))
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text, text) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION notify_push(uuid, text, text, text) FROM anon;
+
+-- 루틴 참여 승인/거절 → 그 루틴 상세로
+CREATE OR REPLACE FUNCTION on_participant_status_change()
+RETURNS TRIGGER AS $$
+DECLARE r_title text;
+BEGIN
+  IF NEW.status IS NOT DISTINCT FROM OLD.status OR NEW.status NOT IN ('approved','rejected') THEN
+    RETURN NEW;
+  END IF;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  IF NEW.status = 'approved' THEN
+    PERFORM notify_push(NEW.user_id, '루틴 참여가 승인됐어요! 🎉', '"' || coalesce(r_title,'루틴') || '" 이제 함께 시작해요!', '/youthit-routine/?routine=' || NEW.routine_id);
+  ELSE
+    PERFORM notify_push(NEW.user_id, '루틴 참여 안내', '"' || coalesce(r_title,'루틴') || '" 참여가 이번엔 어려워요. 다른 루틴도 둘러봐요.', '/youthit-routine/?routine=' || NEW.routine_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 인증 좋아요 → 그 인증글로
+CREATE OR REPLACE FUNCTION on_cert_like_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  cert_owner uuid;
+  liker_name text;
+BEGIN
+  SELECT user_id INTO cert_owner FROM certifications WHERE id = NEW.cert_id;
+  IF cert_owner IS NULL OR cert_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO liker_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(cert_owner, '❤️ 응원이 도착했어요', coalesce(liker_name,'누군가') || '님이 내 인증을 응원해요!', '/youthit-routine/?cert=' || NEW.cert_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 인증 댓글 → 그 인증글로
+CREATE OR REPLACE FUNCTION on_cert_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  cert_owner uuid;
+  commenter_name text;
+BEGIN
+  SELECT user_id INTO cert_owner FROM certifications WHERE id = NEW.cert_id;
+  IF cert_owner IS NULL OR cert_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(
+    cert_owner,
+    '💬 댓글이 달렸어요',
+    coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END,
+    '/youthit-routine/?cert=' || NEW.cert_id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 게시글 댓글 → 그 게시글로
+CREATE OR REPLACE FUNCTION on_post_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  post_owner uuid;
+  commenter_name text;
+BEGIN
+  SELECT author_id INTO post_owner FROM posts WHERE id = NEW.post_id;
+  IF post_owner IS NULL OR post_owner = NEW.user_id THEN RETURN NEW; END IF;
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  PERFORM notify_push(
+    post_owner,
+    '💬 내 글에 댓글이 달렸어요',
+    coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END,
+    '/youthit-routine/?post=' || NEW.post_id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
