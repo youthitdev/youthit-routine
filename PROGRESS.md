@@ -1013,6 +1013,13 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경: `notifications.link` 컬럼 추가, `notify_push()` 재정의(4번째 인자 추가), 위 4개 트리거 함수 재정의 — `supabase-schema.sql` [마이그레이션 2026-09-08a]
 - 검증: node로 URL 파싱 정규식이 post/cert/routine ID를 정확히 뽑아내는 것 확인, 브라우저에서 알림 내역함의 4가지 링크 타입이 각각 정확한 화면 열기 함수를 호출하는 것과 링크 없는 알림은 MY탭 폴백으로 빠지는 것 확인, index.html/service-worker.js 문법 오류 없음 확인. 실제 푸시 알림 클릭 동작은 마이그레이션 실행 후 실사용으로 확인 필요
 
+## 최근 완료 (2026-09-08, 알림 클릭 이동 2차 — 인증 리마인더/마일스톤 추가)
+
+- **요청**: 매일 오는 "🔔 오늘의 한끗, 잊지 않으셨죠?" 리마인더를 클릭해도 MY탭으로 간다는 후속 피드백 — 1차에서 빠졌던, 실제로도 매우 빈도 높은 알림이라 바로 추가
+- **구현**: `send_cert_reminders()`(리마인더 — 특정 루틴을 안 짚어주므로 `?tab=cert` 인증 탭으로)와 `on_cert_milestone()`(마일스톤 — 해당 루틴이 있으니 `?routine=ID`로)에 `notify_push()`의 4번째 인자를 채워줌. 둘 다 1차에서 이미 만들어둔 tab/routine 처리 경로를 그대로 타서 index.html/service-worker.js는 손댈 필요 없이 DB만 수정
+- DB 변경: `send_cert_reminders()`, `on_cert_milestone()` 재정의 — `supabase-schema.sql` [마이그레이션 2026-09-08b]
+- 검증: 코드 리뷰로 두 함수 모두 기존 tab/routine 파싱 로직이 이미 처리 가능한 URL 형태(`?tab=cert`, `?routine=ID`)를 사용하는 것 확인. 실제 리마인더는 사용자가 설정한 시간(pg_cron)에 발송되므로 클릭 시 이동은 다음 발송 때 실사용으로 확인 필요
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토

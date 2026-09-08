@@ -2434,3 +2434,57 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-09-08b] 알림 클릭 이동 2차 — 인증 리마인더/마일스톤 추가
+-- QA: "오늘의 한끗 잊지 않으셨죠?" 리마인더를 눌러도 MY탭으로 감 — 이것도 매일
+-- 오는 만큼 빈도 높은 알림이라 추가 연결. 리마인더는 특정 루틴을 안 짚어주므로
+-- 인증 탭(?tab=cert)으로, 마일스톤은 그 루틴이 있으니 루틴 상세(?routine=ID)로.
+-- 둘 다 기존에 이미 있는 tab/routine 처리 경로를 그대로 타서 클라이언트 코드
+-- 변경은 필요 없음(notify_push 4번째 인자만 채워주면 됨).
+-- =====================================================
+CREATE OR REPLACE FUNCTION send_cert_reminders()
+RETURNS void AS $$
+DECLARE
+  u record;
+BEGIN
+  FOR u IN
+    SELECT p.id FROM profiles p
+    WHERE p.reminder_hour = EXTRACT(hour FROM now() AT TIME ZONE 'Asia/Seoul')::int
+      AND EXISTS (
+        SELECT 1 FROM routine_participants rp
+        JOIN routines r ON r.id = rp.routine_id
+        WHERE rp.user_id = p.id AND rp.status = 'approved'
+          AND r.status = 'active' AND coalesce(r.archived, false) = false
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM certifications c
+        WHERE c.user_id = p.id
+          AND (c.created_at AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date
+      )
+  LOOP
+    PERFORM notify_push(u.id, '🔔 오늘의 한끗, 잊지 않으셨죠?', '아직 오늘 인증 전이에요. 지금 한 끗 남겨봐요!', '/youthit-routine/?tab=cert');
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION on_cert_milestone()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_title text;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications
+   WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  IF cnt IN (5, 10, 15, 20) THEN
+    SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 ' || cnt || '번째 인증 달성!',
+      '"' || coalesce(r_title, '루틴') || '" 꾸준함이 빛나고 있어요. 계속 가봐요!',
+      '/youthit-routine/?routine=' || NEW.routine_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
