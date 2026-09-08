@@ -2707,9 +2707,10 @@ function openCertFeedDetail(id) {
     document.getElementById('rdSub').textContent = r.title+' · '+c.day;
     document.getElementById('rdTitle').textContent = c.name;
     renderCertDetail(id);
-    // 다른 경로(홈/커뮤니티 등)로 들어와도 내 루틴이고 진행중이고 아직 오늘 인증 전이면
-    // 인증 버튼 노출 — 종료/모집중인 루틴엔 안 뜨게 _setCertFloatingBtn의 active 체크를 씀
-    _setCertFloatingBtn(r);
+    // 인증글 상세(남의 하루 기록을 보는 화면)에 "오늘 인증하기" 버튼이 뜨면 맥락에
+    // 안 맞고 화면을 가린다는 피드백 — 이 액션은 루틴 피드(openRoutineFeed) 목록에서만
+    // 노출하고, 개별 게시글 상세에서는 항상 숨김
+    _setCertFloatingBtn(null);
   });
 }
 
