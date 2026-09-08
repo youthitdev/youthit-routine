@@ -2468,6 +2468,73 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- =====================================================
+-- [마이그레이션 2026-09-08c] 댓글에 사진 첨부 + 답글(1단계) 기능
+-- QA: 인증글 댓글에 사진을 올릴 수 있으면 좋겠다 / 댓글에 답글을 달 수 있으면
+-- 좋겠다는 요청 — 인증글 댓글(cert_comments)뿐 아니라 커뮤니티 게시글 댓글
+-- (post_comments)에도 동일하게 적용. 답글은 인스타그램처럼 1단계만(답글에 또
+-- 답글을 달아도 같은 부모 밑에 나란히 쌓임 — 클라이언트에서 UI로만 제한하고
+-- DB 제약으로 깊이를 강제하진 않음).
+-- =====================================================
+ALTER TABLE cert_comments ADD COLUMN IF NOT EXISTS photo_url text;
+ALTER TABLE cert_comments ADD COLUMN IF NOT EXISTS parent_comment_id bigint REFERENCES cert_comments(id) ON DELETE CASCADE;
+ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS photo_url text;
+ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS parent_comment_id bigint REFERENCES post_comments(id) ON DELETE CASCADE;
+
+-- 인증 댓글 알림 — 답글이면 부모 댓글 작성자에게, 아니면 기존처럼 인증 작성자에게
+CREATE OR REPLACE FUNCTION on_cert_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  cert_owner uuid;
+  commenter_name text;
+  parent_author uuid;
+  msg text;
+BEGIN
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  msg := coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END;
+
+  IF NEW.parent_comment_id IS NOT NULL THEN
+    SELECT user_id INTO parent_author FROM cert_comments WHERE id = NEW.parent_comment_id;
+    IF parent_author IS NOT NULL AND parent_author <> NEW.user_id THEN
+      PERFORM notify_push(parent_author, '💬 답글이 달렸어요', msg, '/youthit-routine/?cert=' || NEW.cert_id);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  SELECT user_id INTO cert_owner FROM certifications WHERE id = NEW.cert_id;
+  IF cert_owner IS NULL OR cert_owner = NEW.user_id THEN RETURN NEW; END IF;
+  PERFORM notify_push(cert_owner, '💬 댓글이 달렸어요', msg, '/youthit-routine/?cert=' || NEW.cert_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 게시글 댓글 알림 — 답글이면 부모 댓글 작성자에게, 아니면 기존처럼 글 작성자에게
+CREATE OR REPLACE FUNCTION on_post_comment_push()
+RETURNS TRIGGER AS $$
+DECLARE
+  post_owner uuid;
+  commenter_name text;
+  parent_author uuid;
+  msg text;
+BEGIN
+  SELECT name INTO commenter_name FROM profiles WHERE id = NEW.user_id;
+  msg := coalesce(commenter_name,'누군가') || ': ' || left(coalesce(NEW.content,''), 40) || CASE WHEN length(coalesce(NEW.content,'')) > 40 THEN '…' ELSE '' END;
+
+  IF NEW.parent_comment_id IS NOT NULL THEN
+    SELECT user_id INTO parent_author FROM post_comments WHERE id = NEW.parent_comment_id;
+    IF parent_author IS NOT NULL AND parent_author <> NEW.user_id THEN
+      PERFORM notify_push(parent_author, '💬 답글이 달렸어요', msg, '/youthit-routine/?post=' || NEW.post_id);
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  SELECT author_id INTO post_owner FROM posts WHERE id = NEW.post_id;
+  IF post_owner IS NULL OR post_owner = NEW.user_id THEN RETURN NEW; END IF;
+  PERFORM notify_push(post_owner, '💬 내 글에 댓글이 달렸어요', msg, '/youthit-routine/?post=' || NEW.post_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE OR REPLACE FUNCTION on_cert_milestone()
 RETURNS TRIGGER AS $$
 DECLARE

@@ -847,13 +847,27 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:80px;" id="rdBody"></div>
     <!-- 댓글 입력창 고정 -->
     <div id="rdCommentBar" style="display:none;position:sticky;bottom:0;background:#fff;border-top:0.5px solid #f0f0f0;padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom));">
+      <div id="rdCommentReplyBanner" style="display:none;align-items:center;justify-content:space-between;padding:0 4px 6px 38px;">
+        <span id="rdCommentReplyLabel" style="font-size:11px;color:#2E33BC;font-weight:600;"></span>
+        <span onclick="_cancelReply()" style="font-size:11px;color:#aaa;cursor:pointer;">✕ 취소</span>
+      </div>
+      <div id="rdCommentPhotoPreview" style="display:none;padding:0 0 8px 38px;">
+        <div style="position:relative;display:inline-block;">
+          <img id="rdCommentPhotoPreviewImg" style="width:52px;height:52px;object-fit:cover;border-radius:8px;display:block;">
+          <div onclick="_clearCommentPhoto()" style="position:absolute;top:-6px;right:-6px;width:17px;height:17px;border-radius:50%;background:#111;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;">✕</div>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <div id="rdCommentAvatar" style="width:30px;height:30px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;flex-shrink:0;"></div>
         <div style="flex:1;display:flex;gap:6px;align-items:center;background:#f5f5f7;border-radius:24px;padding:8px 14px;">
+          <label for="rdCommentPhotoInput" style="cursor:pointer;display:flex;align-items:center;flex-shrink:0;">
+            <i class="ti ti-camera" style="font-size:17px;color:#888;"></i>
+          </label>
+          <input type="file" id="rdCommentPhotoInput" accept="image/*" style="display:none;" onchange="_handleCommentPhoto(event)">
           <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요..." maxlength="100"
-            style="flex:1;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
+            style="flex:1;min-width:0;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
             onkeydown="if(event.key==='Enter' && !event.isComposing)submitCommentFromBar()">
-          <button onclick="submitCommentFromBar()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;">
+          <button onclick="submitCommentFromBar()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;flex-shrink:0;">
             <i class="ti ti-send" style="font-size:18px;color:#2E33BC;"></i>
           </button>
         </div>
@@ -1927,7 +1941,7 @@ async function loadPosts() {
     sb.from('posts').select('*').order('created_at', { ascending: false }),
     sb.from('post_likes').select('post_id,user_id'),
     sb.from('profiles').select('id,name'),
-    sb.from('post_comments').select('id,post_id,user_id,content,created_at').order('created_at', { ascending: true }),
+    sb.from('post_comments').select('id,post_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
   ]);
   const posts = postRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
   const nameById = {};
@@ -1940,6 +1954,7 @@ async function loadPosts() {
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
     comments: comments.filter(cm => cm.post_id === p.id).map(cm => ({
       id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+      photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
     })),
   }));
 }
@@ -1956,7 +1971,7 @@ async function loadCertFeed() {
   const [certRes, likeRes, commentRes, profRes] = await Promise.all([
     sb.from('certifications').select('id,routine_id,user_id,content,photo_url,photo_urls,created_at').order('created_at', { ascending: false }).limit(500),
     sb.from('cert_likes').select('cert_id,user_id'),
-    sb.from('cert_comments').select('id,cert_id,user_id,content,created_at').order('created_at', { ascending: true }),
+    sb.from('cert_comments').select('id,cert_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
     sb.from('profiles').select('id,name'),
   ]);
   const certs = certRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
@@ -1967,6 +1982,7 @@ async function loadCertFeed() {
     const cLikes = likes.filter(l => l.cert_id === c.id);
     const cComments = comments.filter(cm => cm.cert_id === c.id).map(cm => ({
       id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+      photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
     }));
     const photos = (c.photo_urls && c.photo_urls.length) ? c.photo_urls : (c.photo_url ? [c.photo_url] : []);
     return {
@@ -2722,6 +2738,108 @@ let currentCertDetailId = null;
 let currentPostDetailId = null;
 let editingPostId = null; // null이면 새 글 작성, 값이 있으면 해당 게시글 수정 모드
 
+// 댓글 목록 렌더링 — 인증글/게시글 댓글 둘 다 공용으로 씀. 답글(1단계, parentId 있는
+// 댓글)은 부모 댓글 밑에 들여쓰기해서 붙이고, 답글에는 "답글달기"를 안 보여줘서 더
+// 깊은 중첩을 UI에서부터 막음(요청: 1단계까지만)
+function _commentListHtml(comments, kind, entityId) {
+  const top = comments.filter(cm=>!cm.parentId);
+  const repliesByParent = {};
+  comments.filter(cm=>cm.parentId).forEach(cm=>{ (repliesByParent[cm.parentId]=repliesByParent[cm.parentId]||[]).push(cm); });
+  if(!top.length) return '<div style="text-align:center;padding:20px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요! 💬</div>';
+  return top.map(cm=>_commentRowHtml(cm, repliesByParent[cm.id]||[], kind, entityId)).join('');
+}
+function _commentRowHtml(cm, replies, kind, entityId) {
+  const deleteFn = kind==='cert' ? 'deleteCertComment' : 'deletePostComment';
+  const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
+  const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:150px;max-height:150px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
+  return `<div style="display:flex;gap:8px;" id="${idPrefix}${cm.id}">
+      <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
+            ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+          </div>
+          ${cm.text?`<div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
+          ${photoHtml}
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin:3px 0 0 4px;">
+          <span style="font-size:10px;color:#aaa;">${timeAgo(cm.ts)}</span>
+          <span onclick="_startReply(${cm.id},'${(cm.author||'').replace(/'/g,"\\'")}')" style="font-size:11px;color:#888;font-weight:600;cursor:pointer;">답글달기</span>
+        </div>
+        ${replies.length?`<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">${replies.map(r=>_replyRowHtml(r,kind,entityId)).join('')}</div>`:''}
+      </div>
+    </div>`;
+}
+function _replyRowHtml(cm, kind, entityId) {
+  const deleteFn = kind==='cert' ? 'deleteCertComment' : 'deletePostComment';
+  const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
+  const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:130px;max-height:130px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
+  return `<div style="display:flex;gap:6px;margin-left:10px;" id="${idPrefix}${cm.id}">
+      <div style="width:22px;height:22px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+      <div style="flex:1;min-width:0;background:#eef0f5;border-radius:10px;padding:6px 10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="font-size:11px;font-weight:600;color:#111;">${cm.author}</div>
+          ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:12px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+        </div>
+        ${cm.text?`<div style="font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
+        ${photoHtml}
+        <div style="font-size:9px;color:#aaa;margin-top:3px;">${timeAgo(cm.ts)}</div>
+      </div>
+    </div>`;
+}
+function _renderCertComments(c) {
+  const list = document.getElementById('commentList_'+c.id);
+  if(list) list.innerHTML = _commentListHtml(c.comments||[], 'cert', c.id);
+  const label = document.getElementById('rdCommentCountLabel_'+c.id);
+  if(label) label.textContent = (c.comments||[]).length;
+  const count = document.getElementById('rdCommentCount_'+c.id);
+  if(count) count.textContent = (c.comments||[]).length;
+}
+function _renderPostComments(p) {
+  const list = document.getElementById('postCommentList_'+p.id);
+  if(list) list.innerHTML = _commentListHtml(p.comments||[], 'post', p.id);
+  const label = document.getElementById('postCommentCountLabel_'+p.id);
+  if(label) label.textContent = (p.comments||[]).length;
+}
+// 댓글 사진 첨부 + 답글 대상 상태 — 인증글/게시글 상세 화면이 같은 입력바(#rdCommentBar)를
+// 공용으로 쓰므로 여기서 같이 관리
+let _commentPhotoFile = null;
+let _replyToCommentId = null;
+function _handleCommentPhoto(e) {
+  const f = e.target.files[0]; if(!f) return;
+  _commentPhotoFile = f;
+  const r = new FileReader();
+  r.onload = ev => {
+    document.getElementById('rdCommentPhotoPreviewImg').src = ev.target.result;
+    document.getElementById('rdCommentPhotoPreview').style.display = 'block';
+  };
+  r.readAsDataURL(f);
+}
+function _clearCommentPhoto() {
+  _commentPhotoFile = null;
+  const input = document.getElementById('rdCommentPhotoInput');
+  if(input) input.value = '';
+  document.getElementById('rdCommentPhotoPreview').style.display = 'none';
+}
+function _startReply(commentId, author) {
+  _replyToCommentId = commentId;
+  document.getElementById('rdCommentReplyLabel').textContent = `${author}님에게 답글 다는 중`;
+  document.getElementById('rdCommentReplyBanner').style.display = 'flex';
+  const input = document.getElementById('rdCommentInput');
+  if(input) input.focus();
+}
+function _cancelReply() {
+  _replyToCommentId = null;
+  document.getElementById('rdCommentReplyBanner').style.display = 'none';
+}
+async function _uploadCommentPhoto(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${currentUser.id}/comment_${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('cert-photos').upload(path, file, { contentType: file.type });
+  if(error) { alert('사진 업로드 실패: ' + error.message); return false; }
+  return sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
+}
 function renderCertDetail(id) {
   currentCertDetailId = id;
   const c = (state.certFeed||[]).find(x=>x.id===id);
@@ -2734,6 +2852,7 @@ function renderCertDetail(id) {
   if(bar) { bar.style.display=''; }
   if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
   if(input) input.value='';
+  _clearCommentPhoto(); _cancelReply();
 
   const photoHtml = (c.photos && c.photos.length)
     ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
@@ -2765,19 +2884,7 @@ function renderCertDetail(id) {
     <div style="font-size:13px;font-weight:600;color:#111;">댓글 <span id="rdCommentCountLabel_${c.id}">${comments.length}</span>개</div>
 
     <div id="commentList_${c.id}" style="display:flex;flex-direction:column;gap:10px;">
-      ${comments.map(cm=>`
-        <div style="display:flex;gap:8px;" id="commentRow_${cm.id}">
-          <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
-          <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
-              ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deleteCertComment(${c.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
-            </div>
-            <div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>
-            <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
-          </div>
-        </div>`).join('')}
-      ${comments.length===0?'<div style="text-align:center;padding:20px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요! 💬</div>':''}
+      ${_commentListHtml(comments, 'cert', c.id)}
     </div>`;
 }
 
@@ -2786,7 +2893,7 @@ async function submitCommentFromBar() {
   if(!currentUser || _submittingComment) return;
   const input = document.getElementById('rdCommentInput');
   const text = input.value.trim();
-  if(!text) return;
+  if(!text && !_commentPhotoFile) return;
   // 한글 IME 조합 중 Enter가 keydown을 두 번 발생시키는 브라우저가 있어서(윈도우 PC에서
   // "댓글이 2개씩 달림" 버그로 접수됨) — onkeydown에서 isComposing으로 1차 방어하고,
   // 여기서도 진행 중 플래그로 이중 제출을 막음(마우스로 전송 버튼 연타하는 경우도 방어)
@@ -2794,40 +2901,24 @@ async function submitCommentFromBar() {
   try {
     if(currentPostDetailId){ await _submitPostComment(text, input); return; }
     if(!currentCertDetailId) return;
-  const c = (state.certFeed||[]).find(x=>x.id===currentCertDetailId);
-  if(!c) return;
-  const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
-  const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text }).select().single();
-  if(error){ alert('댓글 등록 실패: '+error.message); return; }
-  if(!c.comments) c.comments=[];
-  c.comments.push({id:data.id, author:authorName, text, ts:new Date(data.created_at).getTime()});
-  if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
-  save();
-  input.value='';
-  // 댓글 목록 업데이트
-  const list = document.getElementById('commentList_'+currentCertDetailId);
-  const newComment = document.createElement('div');
-  newComment.style.cssText='display:flex;gap:8px;';
-  newComment.innerHTML=`
-    <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${authorName[0]}</div>
-    <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${authorName}</div>
-      <div style="font-size:13px;color:#333;line-height:1.5;">${text}</div>
-      <div style="font-size:10px;color:#aaa;margin-top:4px;">방금</div>
-    </div>`;
-  // 빈 댓글 메시지 제거
-  const empty = list.querySelector('div[style*="text-align:center"]');
-  if(empty) empty.remove();
-  list.appendChild(newComment);
-  // 카운트 업데이트
-  const cnt = c.comments.length;
-  ['rdCommentCount_','rdCommentCountLabel_'].forEach(pre=>{
-    const el=document.getElementById(pre+currentCertDetailId);
-    if(el) el.textContent=cnt;
-  });
-  // 피드 카운트도 업데이트
-  const feedEl=document.getElementById('feedComment_'+currentCertDetailId);
-  if(feedEl) feedEl.textContent=cnt;
+    const c = (state.certFeed||[]).find(x=>x.id===currentCertDetailId);
+    if(!c) return;
+    const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+    let photoUrl = null;
+    if(_commentPhotoFile) {
+      photoUrl = await _uploadCommentPhoto(_commentPhotoFile);
+      if(photoUrl===false) return;
+    }
+    const parentId = _replyToCommentId;
+    const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
+    if(error){ alert('댓글 등록 실패: '+error.message); return; }
+    if(!c.comments) c.comments=[];
+    c.comments.push({id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId});
+    if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
+    save();
+    input.value='';
+    _clearCommentPhoto(); _cancelReply();
+    _renderCertComments(c);
   } finally {
     _submittingComment = false;
   }
@@ -2860,16 +2951,9 @@ async function deleteCertComment(certId, commentId) {
   const { error } = await sb.from('cert_comments').delete().eq('id', commentId);
   if(error){ alert('삭제 실패: '+error.message); return; }
   const c = (state.certFeed||[]).find(x=>x.id===certId);
-  if(c) c.comments = (c.comments||[]).filter(cm=>cm.id!==commentId);
-  const row = document.getElementById('commentRow_'+commentId);
-  if(row) row.remove();
-  const cnt = c ? c.comments.length : 0;
-  ['rdCommentCount_','rdCommentCountLabel_'].forEach(pre=>{
-    const el=document.getElementById(pre+certId);
-    if(el) el.textContent=cnt;
-  });
-  const feedEl=document.getElementById('feedComment_'+certId);
-  if(feedEl) feedEl.textContent=cnt;
+  // 부모 댓글을 지우면 DB에서 답글도 CASCADE로 같이 삭제되므로, 로컬 상태에서도 같이 걷어냄
+  if(c) c.comments = (c.comments||[]).filter(cm=>cm.id!==commentId && cm.parentId!==commentId);
+  if(c) _renderCertComments(c);
 }
 
 // ════════════════════════════════════════════════════════
@@ -2891,6 +2975,7 @@ function openPostDetail(id) {
   if(bar) bar.style.display='';
   if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
   if(input) input.value='';
+  _clearCommentPhoto(); _cancelReply();
 
   const canDelete = _canModerate(p.authorId);
   const likeFn = state.currentRole==='youth' ? 'togglePostLike' : 'toggleKPostLike';
@@ -2919,19 +3004,7 @@ function openPostDetail(id) {
     </div>
     <div style="font-size:13px;font-weight:600;color:#111;">댓글 <span id="postCommentCountLabel_${p.id}">${comments.length}</span>개</div>
     <div id="postCommentList_${p.id}" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
-      ${comments.map(cm=>`
-        <div style="display:flex;gap:8px;" id="postCommentRow_${cm.id}">
-          <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
-          <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
-              ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="deletePostComment(${p.id},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
-            </div>
-            <div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>
-            <div style="font-size:10px;color:#aaa;margin-top:4px;">${timeAgo(cm.ts)}</div>
-          </div>
-        </div>`).join('')}
-      ${comments.length===0?'<div style="text-align:center;padding:20px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요! 💬</div>':''}
+      ${_commentListHtml(comments, 'post', p.id)}
     </div>`;
   openOverlay('routineDetailOverlay');
 }
@@ -2939,40 +3012,30 @@ async function _submitPostComment(text, input) {
   const p = state.posts.find(x=>x.id===currentPostDetailId);
   if(!p) return;
   const authorName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
-  const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text }).select().single();
+  let photoUrl = null;
+  if(_commentPhotoFile) {
+    photoUrl = await _uploadCommentPhoto(_commentPhotoFile);
+    if(photoUrl===false) return;
+  }
+  const parentId = _replyToCommentId;
+  const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
   if(error){ alert('댓글 등록 실패: '+error.message); return; }
   if(!p.comments) p.comments=[];
-  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime() });
+  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId });
   if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
   save();
   input.value='';
-  const list = document.getElementById('postCommentList_'+currentPostDetailId);
-  const empty = list.querySelector('div[style*="text-align:center"]');
-  if(empty) empty.remove();
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:8px;';
-  row.id = 'postCommentRow_'+data.id;
-  row.innerHTML = `
-    <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${authorName[0]}</div>
-    <div style="flex:1;background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-      <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${authorName}</div>
-      <div style="font-size:13px;color:#333;line-height:1.5;">${text}</div>
-      <div style="font-size:10px;color:#aaa;margin-top:4px;">방금</div>
-    </div>`;
-  list.appendChild(row);
-  const label = document.getElementById('postCommentCountLabel_'+currentPostDetailId);
-  if(label) label.textContent = p.comments.length;
+  _clearCommentPhoto(); _cancelReply();
+  _renderPostComments(p);
 }
 async function deletePostComment(postId, commentId) {
   if(!confirm('이 댓글을 삭제할까요?')) return;
   const { error } = await sb.from('post_comments').delete().eq('id', commentId);
   if(error){ alert('삭제 실패: '+error.message); return; }
   const p = state.posts.find(x=>x.id===postId);
-  if(p) p.comments = (p.comments||[]).filter(cm=>cm.id!==commentId);
-  const row = document.getElementById('postCommentRow_'+commentId);
-  if(row) row.remove();
-  const label = document.getElementById('postCommentCountLabel_'+postId);
-  if(label) label.textContent = p ? p.comments.length : 0;
+  // 부모 댓글을 지우면 DB에서 답글도 CASCADE로 같이 삭제되므로, 로컬 상태에서도 같이 걷어냄
+  if(p) p.comments = (p.comments||[]).filter(cm=>cm.id!==commentId && cm.parentId!==commentId);
+  if(p) _renderPostComments(p);
 }
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);

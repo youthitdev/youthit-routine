@@ -1020,6 +1020,21 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경: `send_cert_reminders()`, `on_cert_milestone()` 재정의 — `supabase-schema.sql` [마이그레이션 2026-09-08b]
 - 검증: 코드 리뷰로 두 함수 모두 기존 tab/routine 파싱 로직이 이미 처리 가능한 URL 형태(`?tab=cert`, `?routine=ID`)를 사용하는 것 확인. 실제 리마인더는 사용자가 설정한 시간(pg_cron)에 발송되므로 클릭 시 이동은 다음 발송 때 실사용으로 확인 필요
 
+## 최근 완료 (2026-09-08, 댓글에 사진 첨부 + 답글(1단계) 기능 추가)
+
+- **요청**: QA 스프레드시트로 접수된 "댓글에 사진을 올릴 수 있으면 좋겠어요" / "댓글에 댓글을 달수있었으면 좋겠어요" 두 건. 확인 결과 사진 첨부는 인증글 댓글뿐 아니라 커뮤니티 게시글 댓글까지 함께 적용, 답글은 인스타그램처럼 1단계(답글에 또 답글 불가)로 결정
+- **구현**:
+  - `cert_comments`/`post_comments`에 각각 `photo_url`, `parent_comment_id`(자기 테이블 FK, `ON DELETE CASCADE`) 컬럼 추가
+  - 댓글 입력 바(`#rdCommentBar`, 인증글·게시글 상세 공용)에 카메라 아이콘(사진 선택 시 미리보기+제거 버튼)과 답글 대상 배너("OO님에게 답글 다는 중" + 취소) 추가
+  - 댓글 목록 렌더링을 `_commentListHtml`/`_commentRowHtml`/`_replyRowHtml` 공용 함수로 통일 — 최상위 댓글 아래 그 댓글에 달린 답글만 들여쓰기로 표시, "답글달기" 클릭 시 그 댓글을 대상으로 지정
+  - 댓글 등록(`submitCommentFromBar`/`_submitPostComment`)이 사진 업로드(`cert-photos` 버킷, `유저ID/comment_타임스탬프.확장자` 경로) 후 `photo_url`/`parent_comment_id`를 함께 저장하도록 수정, 등록 후 전체 재렌더 대신 `_renderCertComments`/`_renderPostComments`로 해당 댓글 목록만 갱신
+  - 댓글 삭제(`deleteCertComment`/`deletePostComment`)가 그 댓글에 달린 답글도 로컬 상태에서 함께 제거하도록 수정(DB는 FK CASCADE로 이미 함께 삭제됨)
+  - 답글 알림(`on_cert_comment_push`/`on_post_comment_push`)을 원글 작성자가 아닌 답글 대상 댓글 작성자에게 가도록 분기 추가(본인에게 단 답글은 알림 안 감)
+  - nadaeum 포인트(댓글당 +1, 일 5회 제한)는 답글에도 기존 트리거가 그대로 적용되어 별도 처리 없음
+- DB 변경: `cert_comments`/`post_comments`에 `photo_url`/`parent_comment_id` 컬럼 추가, `on_cert_comment_push()`/`on_post_comment_push()` 재정의(답글 여부에 따른 알림 대상 분기) — `supabase-schema.sql` [마이그레이션 2026-09-08c]
+  - **마이그레이션 실행 필요**: 위 파일의 [마이그레이션 2026-09-08c] 블록을 Supabase SQL Editor에서 직접 실행해주세요
+- 검증: `node -e`로 index.html 스크립트 블록 문법 오류 없음 확인. 브라우저에서 인증글(id:100)에 최상위 댓글 1개+답글 1개를 mock으로 렌더링해 답글이 들여쓰기로 올바르게 표시되는 것, "답글달기" 클릭 시 배너가 뜨고 정확한 대상으로 지정되는 것, 답글 등록 시 DB insert 페이로드에 `parent_comment_id`가 정확히 담기는 것, 사진 선택 시 미리보기가 뜨고 업로드 시 `cert-photos/유저ID/comment_*.png` 경로로 올라가는 것, 최상위 댓글 삭제 시 그 댓글과 답글이 함께 로컬 상태에서 사라지는 것 확인
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토
