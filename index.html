@@ -2243,11 +2243,17 @@ function _greeting() {
   if(h < 18) return '오늘 하루도 한끗씩 ✦';
   return '하루 마무리 잘 하고 있나요 🌙';
 }
+// 자유루틴은 루틴 레벨 시작일이 없어(개인별 기간) loadRoutines()의 날짜 기반 자동전환
+// 대상이 아니라서 status가 'recruit'에서 절대 안 바뀜(_isFreeOpen 참고) — status==='active'로만
+// 걸러내면 자유루틴 참여자는 실제로 한창 인증 중이어도 "진행중인 루틴"에 영원히 안 뜨는
+// 버그가 있었음(QA 발견: "하늘 바라보기(기획루틴)만 뜨고 한끗루틴(자유루틴)이 안 떠요").
+// 자유루틴은 status 대신 개인 기간(_personalPeriod)이 끝났는지로 판단
 function _myActiveRoutines() {
   return state.routines.filter(r => {
-    if (r.status!=='active' || !currentUser) return false;
+    if (!currentUser || ['done','cancelled'].includes(r.status)) return false;
     const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
     if (!me) return false;
+    if (!r.isFree && r.status!=='active') return false;
     return !_personalPeriod(r, me).isDone;
   });
 }
@@ -2397,7 +2403,7 @@ function renderRoutineGrid(type, q) {
   // '전체' 기본 필터에선 완료된 루틴은 빼서 "지금 뭘 시작할 수 있나" 탐색에 집중되게 함
   // (완료 루틴은 "완료" 칩으로 여전히 볼 수 있고, MY탭·인증탭에도 별도 진입점이 있음)
   const base = type==='all' ? state.routines.filter(r=>r.status!=='done')
-    : type==='active' ? state.routines.filter(r=>r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id))
+    : type==='active' ? _myActiveRoutines()
     : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : state.routines.filter(r=>r.status===type);
   let filtered = base;
