@@ -1534,7 +1534,7 @@ async function loadProfileAndEnter() {
   if (pendingRoutineId && state.currentRole === 'youth') {
     const pid = pendingRoutineId; pendingRoutineId = null;
     history.replaceState(null, '', location.pathname);
-    if (state.routines.some(r => r.id === pid)) openRoutineDetail(pid);
+    if (state.routines.some(r => r.id === pid)) _openRoutineSmart(pid);
   }
   if (pendingPostId) {
     const ppid = pendingPostId; pendingPostId = null;
@@ -2481,7 +2481,7 @@ function renderRoutineGrid(type, q) {
     const coverInner = r.coverImageUrl
       ? `<img src="${r.coverImageUrl}" style="${effDone?'filter:grayscale(0.6);opacity:0.8;':''}">`
       : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#dfe3ff 0%,#f5d9ec 100%);display:flex;align-items:center;justify-content:center;font-size:46px;${effDone?'filter:grayscale(0.6);opacity:0.8;':''}">${r.emoji}</div>`;
-    return `<div class="routine-card" onclick="${(isActive||isDone)&&isMine?`openRoutineFeed(${r.id})`:`openRoutineDetail(${r.id})`}" style="border:${bw} solid ${cardBorder};opacity:${effDone?'0.8':'1'};">
+    return `<div class="routine-card" onclick="_openRoutineSmart(${r.id})" style="border:${bw} solid ${cardBorder};opacity:${effDone?'0.8':'1'};">
       <div class="rc-cover">
         ${coverInner}
         <div class="rc-scrim"></div>
@@ -3134,6 +3134,22 @@ async function deletePostComment(postId, commentId) {
   if(p) p.comments = (p.comments||[]).filter(cm=>cm.id!==commentId && cm.parentId!==commentId);
   if(p) _renderPostComments(p);
 }
+// 알림 클릭/루틴 카드 탭 등 "이 루틴으로 가줘" 요청이 인증 피드(오늘 인증하기 버튼이
+// 있는 화면)로 가야 할지, 아직 소개/신청 화면으로 가야 할지 판단 — _myActiveRoutines()와
+// 같은 기준(자유루틴은 status가 절대 'active'가 안 되므로 별도 처리)으로 통일해야, 승인된
+// 자유루틴 참여자가 알림을 눌렀을 때 인증 버튼도 없는 "루틴 소개" 화면에 갇히지 않음
+// (QA: "루틴 페이지에서도 인증글 작성 버튼이 있으면 좋겠다" — 실제 원인은 버튼 부재가
+// 아니라 인증 버튼이 있는 화면으로 아예 연결이 안 되고 있던 것)
+function _shouldOpenFeed(r) {
+  if (!r || !currentUser || r.status === 'cancelled') return false;
+  const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
+  if (!me) return false;
+  return r.isFree || r.status === 'active' || r.status === 'done';
+}
+function _openRoutineSmart(id) {
+  const r = state.routines.find(x=>x.id===id);
+  _shouldOpenFeed(r) ? openRoutineFeed(id) : openRoutineDetail(id);
+}
 function openRoutineDetail(id) {
   const r=state.routines.find(x=>x.id===id);
   _setCertFloatingBtn(null); // 루틴 소개/신청 화면이라 "오늘 인증" 버튼과 무관 — 내 진행중 루틴은 openRoutineFeed로 감
@@ -3153,7 +3169,7 @@ function openRoutineDetail(id) {
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-  ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}`;
+  ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)</div>`:''}`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
@@ -3389,8 +3405,14 @@ function handleCertPhotos(e) {
   const r = state.routines.find(x=>x.id===currentCertId);
   if(r && r.cameraOnly){ e.target.value=''; alert('이 루틴은 실시간 촬영만 가능해요. "📸 지금 찍기"로 올려주세요.'); return; }
   const files = Array.from(e.target.files);
+  // accept="image/*"는 강제가 아니라 힌트일 뿐이라 일부 갤러리 앱에서는 영상도 골라질 수
+  // 있음 — 영상이 들어가면 미리보기가 깨지고 업로드 단계에서 base64 변환이 크게 무거워져
+  // 조용히 멈추던 문제(QA: "첨부는 되나 업로드가 안 됨") — 사진이 아니면 여기서 바로 거름
+  const nonImage = files.filter(f => !f.type.startsWith('image/'));
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  if(nonImage.length) alert('사진 파일만 첨부할 수 있어요.');
   const remaining = 5 - certPhotos.length;
-  const toAdd = files.slice(0, remaining);
+  const toAdd = imageFiles.slice(0, remaining);
   toAdd.forEach(file => {
     const r = new FileReader();
     r.onload = ev => {
@@ -3443,9 +3465,13 @@ function handleCertCameraPhoto(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file || certPhotos.length >= 5) return;
+  if (!file.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); return; }
   const r = new FileReader();
   r.onload = ev => {
     const img = new Image();
+    // 사진이 아닌 파일이 여기까지 들어오면 onload가 영원히 안 불려서 아무 반응 없이
+    // 멈춘 것처럼 보이던 문제 — 위에서 이미 걸렀지만 이중 안전장치로 명확히 실패 알림
+    img.onerror = () => alert('사진을 불러오지 못했어요. 다른 사진으로 시도해주세요.');
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width; canvas.height = img.height;
@@ -4842,7 +4868,7 @@ function openKRoutineDetail(routineId) {
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
     ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-    ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 인증 1회당 <b>+${r.certPointAmount}나다움</b> · 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정</div>`:''}
+    ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)</div>`:''}
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
       ${isAdmin?`신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>`:`참여자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${approved.length}명 / 최대 ${r.maxPeople}명)</span>`}
     </div>
@@ -5921,7 +5947,7 @@ if('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (!e.data || e.data.type !== 'notif-navigate' || !currentUser) return;
     if (e.data.routine && state.routines.some(r => r.id === parseInt(e.data.routine))) {
-      openRoutineDetail(parseInt(e.data.routine));
+      _openRoutineSmart(parseInt(e.data.routine));
       return;
     }
     if (e.data.post && (state.posts||[]).some(p => p.id === parseInt(e.data.post))) {
