@@ -2925,6 +2925,52 @@ function _certTextRowHtml(c) {
     </div>`:''}
   `;
 }
+function _certPhotoDisplayHtml(c) {
+  return (c.photos && c.photos.length)
+    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
+    : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
+      </div>`;
+}
+// 인증글 수정 시 사진도 같이 바꿀 수 있게 — 새로 고른 사진은 data: URL(FileReader) 그대로,
+// 기존 사진은 원래 https URL 그대로 이 배열에 섞여 담김(저장 시 data:인 것만 업로드)
+let _editCertPhotos = [];
+function _editCertPhotoGridHtml(id) {
+  let html = _editCertPhotos.map((src, i) => `
+    <div style="width:90px;aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;flex-shrink:0;">
+      <img src="${src}" style="width:100%;height:100%;object-fit:cover;">
+      <button onclick="_removeEditCertPhoto(${id},${i})" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        <i class="ti ti-x" style="font-size:11px;color:white;"></i>
+      </button>
+    </div>`).join('');
+  if(_editCertPhotos.length < 5) {
+    html += `<div onclick="document.getElementById('editCertPhotoInput_${id}').click()" style="width:90px;aspect-ratio:1;border-radius:10px;border:1.5px dashed #ccc;background:#f9f9f9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;flex-shrink:0;">
+      <i class="ti ti-plus" style="font-size:20px;color:#aaa;"></i>
+      <span style="font-size:10px;color:#aaa;">${_editCertPhotos.length}/5</span>
+    </div>`;
+  }
+  return `<div style="display:flex;gap:6px;overflow-x:auto;">${html}</div>
+    <input type="file" id="editCertPhotoInput_${id}" accept="image/*" multiple style="display:none;" onchange="_handleEditCertPhotos(event,${id})">`;
+}
+function _handleEditCertPhotos(e, id) {
+  const files = Array.from(e.target.files).filter(f=>f.type.startsWith('image/'));
+  const remaining = 5 - _editCertPhotos.length;
+  files.slice(0, remaining).forEach(file => {
+    const r = new FileReader();
+    r.onload = ev => {
+      _editCertPhotos.push(ev.target.result);
+      const box = document.getElementById('rdCertPhotos_'+id);
+      if(box) box.innerHTML = _editCertPhotoGridHtml(id);
+    };
+    r.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+function _removeEditCertPhoto(id, idx) {
+  _editCertPhotos.splice(idx, 1);
+  const box = document.getElementById('rdCertPhotos_'+id);
+  if(box) box.innerHTML = _editCertPhotoGridHtml(id);
+}
 function renderCertDetail(id) {
   currentCertDetailId = id;
   const c = (state.certFeed||[]).find(x=>x.id===id);
@@ -2939,13 +2985,8 @@ function renderCertDetail(id) {
   if(input) input.value='';
   _clearCommentPhoto(); _cancelReply();
 
-  const photoHtml = (c.photos && c.photos.length)
-    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
-    : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
-        <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
-      </div>`;
   document.getElementById('rdBody').innerHTML = `
-    ${photoHtml}
+    <div id="rdCertPhotos_${c.id}">${_certPhotoDisplayHtml(c)}</div>
     <div id="rdCertRow_${c.id}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
       ${_certTextRowHtml(c)}
     </div>
@@ -3006,7 +3047,10 @@ async function submitCommentFromBar() {
 }
 // 인증 내용 수정 — 예전엔 브라우저 기본 prompt() 창으로 텍스트만 따로 입력받아서
 // 올린 사진·기존 글이 안 보이는 채로 뜨는 게 불편하다는 피드백(QA) — 상세 화면
-// 그대로(사진 포함) 두고 텍스트 영역만 그 자리에서 편집 모드로 바꾸는 방식으로 변경
+// 그대로(사진 포함) 두고 텍스트 영역만 그 자리에서 편집 모드로 바꾸는 방식으로 변경.
+// 사진 수정도 같이 지원하되(QA 후속 요청), "실시간 촬영만 허용" 루틴은 제외 — 그
+// 옵션은 제출 당시 갤러리 업로드를 막는 부정방지 장치라, 수정 단계에서 사진 교체를
+// 허용하면 나중에 아무 갤러리 사진으로 바꿔서 그 장치를 무력화할 수 있기 때문
 function editCert(id) {
   const c = (state.certFeed||[]).find(x=>x.id===id);
   const row = document.getElementById(`rdCertRow_${id}`);
@@ -3020,11 +3064,20 @@ function editCert(id) {
       </div>
     </div>`;
   document.getElementById(`rdCertEditInput_${id}`).focus();
+  const r = state.routines.find(x=>x.id===c.routineId);
+  if(!(r && r.cameraOnly)) {
+    _editCertPhotos = [...(c.photos||[])];
+    const photoBox = document.getElementById(`rdCertPhotos_${id}`);
+    if(photoBox) photoBox.innerHTML = _editCertPhotoGridHtml(id);
+  }
 }
 function _cancelEditCert(id) {
   const c = (state.certFeed||[]).find(x=>x.id===id);
   const row = document.getElementById(`rdCertRow_${id}`);
   if(c && row) row.innerHTML = _certTextRowHtml(c);
+  const photoBox = document.getElementById(`rdCertPhotos_${id}`);
+  if(c && photoBox) photoBox.innerHTML = _certPhotoDisplayHtml(c);
+  _editCertPhotos = [];
 }
 async function _saveEditCert(id) {
   const c = (state.certFeed||[]).find(x=>x.id===id);
@@ -3032,11 +3085,35 @@ async function _saveEditCert(id) {
   const input = document.getElementById(`rdCertEditInput_${id}`);
   const newText = input.value.trim();
   if(!newText){ alert('내용을 입력해주세요.'); return; }
-  if(newText===c.text){ _cancelEditCert(id); return; }
-  const { data, error } = await sb.from('certifications').update({ content: newText }).eq('id', id).select('id');
+  const r = state.routines.find(x=>x.id===c.routineId);
+  const photosEditable = !(r && r.cameraOnly);
+
+  let newPhotos = c.photos || [];
+  if(photosEditable) {
+    newPhotos = [];
+    for(const src of _editCertPhotos) {
+      if(src.startsWith('data:')) {
+        const blob = _dataURLtoBlob(src);
+        const ext = blob.type.split('/')[1] || 'jpg';
+        const path = `${currentUser.id}/${Date.now()}_${newPhotos.length}.${ext}`;
+        const { error: upErr } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
+        if(upErr){ alert('사진 업로드 실패: '+upErr.message); return; }
+        newPhotos.push(sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl);
+      } else {
+        newPhotos.push(src);
+      }
+    }
+  }
+
+  if(newText===c.text && JSON.stringify(newPhotos)===JSON.stringify(c.photos||[])) { _cancelEditCert(id); return; }
+
+  const { data, error } = await sb.from('certifications').update({
+    content: newText, photo_url: newPhotos[0] || null, photo_urls: newPhotos,
+  }).eq('id', id).select('id');
   if(error){ alert('수정 실패: '+error.message); return; }
   if(!data || data.length===0){ alert('수정 권한이 없어요.'); return; }
   c.text = newText;
+  c.photos = newPhotos;
   _cancelEditCert(id);
 }
 // 인증글 삭제 — 완주 인정 일수·나다움 포인트 계산에 쓰이는 인증 횟수가 바뀌므로
