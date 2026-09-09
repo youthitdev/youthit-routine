@@ -3090,8 +3090,6 @@ function openPostDetail(id) {
         :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
-      ${canDelete?`<i class="ti ti-pencil" onclick="editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
-      ${canDelete?`<i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${_postDisplayTitle(p)}</div>
     ${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}
@@ -3105,6 +3103,10 @@ function openPostDetail(id) {
         <i class="ti ti-message-circle" style="font-size:22px;color:#aaa;"></i>
         <span style="font-size:14px;color:#666;">${comments.length}</span>
       </div>
+      ${canDelete?`<div style="display:flex;gap:16px;margin-left:auto;">
+        <i class="ti ti-pencil" onclick="editPost(${p.id})" style="font-size:18px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
+        <i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:18px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
+      </div>`:''}
     </div>
     <div style="font-size:13px;font-weight:600;color:#111;">댓글 <span id="postCommentCountLabel_${p.id}">${comments.length}</span>개</div>
     <div id="postCommentList_${p.id}" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
@@ -3768,8 +3770,6 @@ function _postCard(p, likeFn) {
         :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
-      ${canDelete?`<i class="ti ti-pencil" onclick="event.stopPropagation();editPost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
-      ${canDelete?`<i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:15px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
     </div>
     <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:5px;">${_postDisplayTitle(p)}</div>
     <div style="display:flex;gap:10px;align-items:flex-start;">
@@ -3779,13 +3779,17 @@ function _postCard(p, likeFn) {
       </div>
       ${p.photoUrl?`<img src="${p.photoUrl}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;">`:''}
     </div>
-    <div style="margin-top:12px;display:flex;gap:8px;">
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
       <span onclick="event.stopPropagation();${likeFn}(${p.id})" data-post-like="${p.id}" data-pl-style="card" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:${p.liked?'#FBEAF0':'#f5f5f7'};cursor:pointer;font-size:12px;font-weight:600;color:${p.liked?'#FF006C':'#888'};user-select:none;">
         <i class="ti ti-heart${p.liked?'-filled':''} plHeart" style="font-size:14px;color:${p.liked?'#FF006C':'#aaa'};"></i><span class="plCount">${p.likes>0?p.likes:'공감'}</span>
       </span>
       <span onclick="event.stopPropagation();openPostDetail(${p.id})" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:16px;background:#f5f5f7;cursor:pointer;font-size:12px;font-weight:600;color:#888;user-select:none;">
         <i class="ti ti-message-circle" style="font-size:14px;color:#aaa;"></i>${(p.comments&&p.comments.length>0)?p.comments.length:'댓글'}
       </span>
+      ${canDelete?`<div style="display:flex;gap:14px;margin-left:auto;">
+        <i class="ti ti-pencil" onclick="event.stopPropagation();editPost(${p.id})" style="font-size:16px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
+        <i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:16px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
+      </div>`:''}
     </div>
   </div>`;
 }
