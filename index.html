@@ -834,6 +834,7 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-hd">
       <button class="back-btn" onclick="closeOverlay('routineFeedOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
       <div><div style="font-size:11px;opacity:0.75;" id="feedOverlaySub"></div><div style="font-size:16px;font-weight:600;" id="feedOverlayTitle"></div></div>
+      <div id="feedCertDoneBadge" style="display:none;margin-left:auto;flex-shrink:0;background:rgba(255,255,255,0.2);padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;">✅ 오늘 인증완료</div>
     </div>
     <div style="overflow-y:auto;padding-bottom:100px;" id="feedOverlayBody"></div>
   </div>
@@ -1322,9 +1323,6 @@ select:focus { outline: none; border-color: #2E33BC; }
     <button id="certFloatingAction" onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
       <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
     </button>
-    <div id="certFloatingDone" style="display:none;width:100%;padding:14px;background:#fff;border:2px solid #83CA00;border-radius:14px;font-size:15px;font-weight:600;color:#27500A;text-align:center;box-shadow:0 4px 12px rgba(131,202,0,0.2);">
-      ✅ 오늘 인증 완료!
-    </div>
   </div>
 </div>
 <script>
@@ -1937,13 +1935,15 @@ async function loadRoutines() {
 }
 
 async function loadPosts() {
-  const [postRes, likeRes, profRes, commentRes] = await Promise.all([
+  const [postRes, likeRes, profRes, commentRes, commentLikeRes] = await Promise.all([
     sb.from('posts').select('*').order('created_at', { ascending: false }),
     sb.from('post_likes').select('post_id,user_id'),
     sb.from('profiles').select('id,name'),
     sb.from('post_comments').select('id,post_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
+    sb.from('post_comment_likes').select('comment_id,user_id'),
   ]);
   const posts = postRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
+  const commentLikes = commentLikeRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
@@ -1952,10 +1952,14 @@ async function loadPosts() {
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at), ts: new Date(p.created_at).getTime(),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
-    comments: comments.filter(cm => cm.post_id === p.id).map(cm => ({
-      id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
-      photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
-    })),
+    comments: comments.filter(cm => cm.post_id === p.id).map(cm => {
+      const cmLikes = commentLikes.filter(l => l.comment_id === cm.id);
+      return {
+        id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+        photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
+        likes: cmLikes.length, liked: currentUser ? cmLikes.some(l => l.user_id === currentUser.id) : false,
+      };
+    }),
   }));
 }
 // 공지(notice)를 최신순 상단에 고정, 그 아래로 나머지 글도 최신순
@@ -1968,22 +1972,28 @@ function _pinNotices(list) {
 }
 
 async function loadCertFeed() {
-  const [certRes, likeRes, commentRes, profRes] = await Promise.all([
+  const [certRes, likeRes, commentRes, profRes, commentLikeRes] = await Promise.all([
     sb.from('certifications').select('id,routine_id,user_id,content,photo_url,photo_urls,created_at').order('created_at', { ascending: false }).limit(500),
     sb.from('cert_likes').select('cert_id,user_id'),
     sb.from('cert_comments').select('id,cert_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
     sb.from('profiles').select('id,name'),
+    sb.from('cert_comment_likes').select('comment_id,user_id'),
   ]);
   const certs = certRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
+  const commentLikes = commentLikeRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.certFeed = certs.map(c => {
     const r = state.routines.find(x => x.id === c.routine_id);
     const cLikes = likes.filter(l => l.cert_id === c.id);
-    const cComments = comments.filter(cm => cm.cert_id === c.id).map(cm => ({
-      id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
-      photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
-    }));
+    const cComments = comments.filter(cm => cm.cert_id === c.id).map(cm => {
+      const cmLikes = commentLikes.filter(l => l.comment_id === cm.id);
+      return {
+        id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
+        photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
+        likes: cmLikes.length, liked: currentUser ? cmLikes.some(l => l.user_id === currentUser.id) : false,
+      };
+    });
     const photos = (c.photo_urls && c.photo_urls.length) ? c.photo_urls : (c.photo_url ? [c.photo_url] : []);
     return {
       id: c.id, routineId: c.routine_id, userId: c.user_id,
@@ -2606,11 +2616,16 @@ let currentFeedRoutineId=null;
 // 없는 화면을 열 때는 반드시 hide로, 관련 있는 화면은 이 함수로만 상태를 정하도록 통일
 function _setCertFloatingBtn(r) {
   const show = r && r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-  document.getElementById('certFloatingBtn').style.display = show ? 'block' : 'none';
+  const doneToday = show && r.todayCert;
+  // 오늘 인증을 이미 마친 뒤에도 루틴 피드에 들어갈 때마다 화면 하단을 가리는 큰 배너가
+  // 계속 떠서 불편하다는 QA 피드백 — 인증 전 CTA(오늘 인증하기)는 그대로 두되, 완료 상태는
+  // 화면을 안 가리는 작은 배지(#feedCertDoneBadge, 피드 헤더)로만 표시
+  document.getElementById('certFloatingBtn').style.display = (show && !doneToday) ? 'block' : 'none';
+  const badge = document.getElementById('feedCertDoneBadge');
+  if (badge) badge.style.display = doneToday ? 'block' : 'none';
   if (show) {
     currentFeedRoutineId = r.id;
-    document.getElementById('certFloatingAction').style.display = r.todayCert ? 'none' : 'flex';
-    document.getElementById('certFloatingDone').style.display = r.todayCert ? 'block' : 'none';
+    document.getElementById('certFloatingAction').style.display = 'flex';
   }
 }
 // 인증글(사진+소감) 그리드 — 청소년/끗짱 양쪽의 "전체 인증 기록" 화면에서 공용으로 씀
@@ -2765,6 +2780,10 @@ function _commentRowHtml(cm, replies, kind, entityId) {
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin:3px 0 0 4px;">
           <span style="font-size:10px;color:#aaa;">${timeAgo(cm.ts)}</span>
+          <span onclick="toggleCommentLike('${kind}',${cm.id})" style="display:flex;align-items:center;gap:2px;cursor:pointer;">
+            <i class="ti ti-heart${cm.liked?'-filled':''}" id="cmHeart_${kind}_${cm.id}" style="font-size:13px;color:${cm.liked?'#FF006C':'#ccc'};"></i>
+            <span id="cmLike_${kind}_${cm.id}" style="font-size:10px;color:#aaa;">${cm.likes||0}</span>
+          </span>
           <span onclick="_startReply(${cm.id},'${(cm.author||'').replace(/'/g,"\\'")}')" style="font-size:11px;color:#888;font-weight:600;cursor:pointer;">답글달기</span>
         </div>
         ${replies.length?`<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">${replies.map(r=>_replyRowHtml(r,kind,entityId)).join('')}</div>`:''}
@@ -2784,7 +2803,13 @@ function _replyRowHtml(cm, kind, entityId) {
         </div>
         ${cm.text?`<div style="font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
         ${photoHtml}
-        <div style="font-size:9px;color:#aaa;margin-top:3px;">${timeAgo(cm.ts)}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+          <span style="font-size:9px;color:#aaa;">${timeAgo(cm.ts)}</span>
+          <span onclick="toggleCommentLike('${kind}',${cm.id})" style="display:flex;align-items:center;gap:2px;cursor:pointer;">
+            <i class="ti ti-heart${cm.liked?'-filled':''}" id="cmHeart_${kind}_${cm.id}" style="font-size:11px;color:${cm.liked?'#FF006C':'#ccc'};"></i>
+            <span id="cmLike_${kind}_${cm.id}" style="font-size:9px;color:#aaa;">${cm.likes||0}</span>
+          </span>
+        </div>
       </div>
     </div>`;
 }
@@ -2801,6 +2826,41 @@ function _renderPostComments(p) {
   if(list) list.innerHTML = _commentListHtml(p.comments||[], 'post', p.id);
   const label = document.getElementById('postCommentCountLabel_'+p.id);
   if(label) label.textContent = (p.comments||[]).length;
+}
+// 댓글 좋아요(하트) — 인증글/게시글 댓글(답글 포함) 공용. cert_likes/toggleCertLike와
+// 같은 낙관적 갱신 패턴 — 댓글은 상세 화면 한 곳에만 떠 있으므로(게시글처럼 목록+상세에
+// 동시에 안 보임) id 기반으로 그 자리만 직접 갱신
+function _findComment(kind, commentId) {
+  const list = kind==='cert' ? (state.certFeed||[]) : (state.posts||[]);
+  for(const item of list) {
+    const cm = (item.comments||[]).find(x=>x.id===commentId);
+    if(cm) return cm;
+  }
+  return null;
+}
+function _paintCommentLike(kind, commentId, cm) {
+  const hi = document.getElementById(`cmHeart_${kind}_${commentId}`);
+  const li = document.getElementById(`cmLike_${kind}_${commentId}`);
+  if(hi){ hi.className='ti ti-heart'+(cm.liked?'-filled':''); hi.style.color=cm.liked?'#FF006C':'#ccc'; }
+  if(li) li.textContent = cm.likes||0;
+}
+async function toggleCommentLike(kind, commentId) {
+  if(!currentUser) return;
+  const cm = _findComment(kind, commentId);
+  if(!cm) return;
+  const table = kind==='cert' ? 'cert_comment_likes' : 'post_comment_likes';
+  const wasLiked = cm.liked;
+  cm.liked = !wasLiked; cm.likes = (cm.likes||0) + (cm.liked?1:-1);
+  _paintCommentLike(kind, commentId, cm);
+  const { error } = wasLiked
+    ? await sb.from(table).delete().eq('comment_id', commentId).eq('user_id', currentUser.id)
+    : await sb.from(table).insert({ comment_id: commentId, user_id: currentUser.id });
+  if(error) {
+    cm.liked = wasLiked; cm.likes = (cm.likes||0) + (wasLiked?1:-1);
+    _paintCommentLike(kind, commentId, cm);
+    return;
+  }
+  save();
 }
 // 댓글 사진 첨부 + 답글 대상 상태 — 인증글/게시글 상세 화면이 같은 입력바(#rdCommentBar)를
 // 공용으로 쓰므로 여기서 같이 관리
@@ -2921,7 +2981,7 @@ async function submitCommentFromBar() {
     const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
     if(error){ alert('댓글 등록 실패: '+error.message); return; }
     if(!c.comments) c.comments=[];
-    c.comments.push({id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId});
+    c.comments.push({id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, likes:0, liked:false});
     if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
     save();
     input.value='';
@@ -3052,7 +3112,7 @@ async function _submitPostComment(text, input) {
   const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
   if(error){ alert('댓글 등록 실패: '+error.message); return; }
   if(!p.comments) p.comments=[];
-  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId });
+  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, likes:0, liked:false });
   if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
   save();
   input.value='';

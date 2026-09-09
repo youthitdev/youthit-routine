@@ -2555,3 +2555,43 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-09-09a] 댓글 좋아요(하트) 기능
+-- QA: "댓글에 하트를 달수 있으면 좋을것 같아요" — 인증글/커뮤니티 게시글 댓글
+-- (답글 포함) 모두에 적용. 기존 cert_likes/post_likes와 동일한
+-- (대상 id, user_id) 조인 테이블 패턴, RLS도 그 최신 정책을 그대로 반영
+-- =====================================================
+CREATE TABLE IF NOT EXISTS cert_comment_likes (
+  comment_id  bigint REFERENCES cert_comments(id) ON DELETE CASCADE,
+  user_id     uuid   REFERENCES auth.users        ON DELETE CASCADE,
+  PRIMARY KEY (comment_id, user_id)
+);
+ALTER TABLE cert_comment_likes ENABLE ROW LEVEL SECURITY;
+-- cert_likes(2026-07-25l)와 동일 기준 — 그 인증글을 볼 수 있는 사람만 댓글 좋아요도 볼 수 있음
+CREATE POLICY "ccl_select" ON cert_comment_likes FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM cert_comments cm JOIN certifications c ON c.id = cm.cert_id
+    WHERE cm.id = cert_comment_likes.comment_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+    )
+  )
+  OR is_admin()
+);
+CREATE POLICY "ccl_insert" ON cert_comment_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "ccl_delete" ON cert_comment_likes FOR DELETE USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS post_comment_likes (
+  comment_id  bigint REFERENCES post_comments(id) ON DELETE CASCADE,
+  user_id     uuid   REFERENCES auth.users         ON DELETE CASCADE,
+  PRIMARY KEY (comment_id, user_id)
+);
+ALTER TABLE post_comment_likes ENABLE ROW LEVEL SECURITY;
+-- post_likes와 동일 기준 — 커뮤니티 게시글은 공개라 로그인한 사람이면 누구나 볼 수 있음
+CREATE POLICY "pcl_select" ON post_comment_likes FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "pcl_insert" ON post_comment_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "pcl_delete" ON post_comment_likes FOR DELETE USING (auth.uid() = user_id);
