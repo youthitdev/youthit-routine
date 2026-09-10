@@ -515,7 +515,8 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="header-title">한끗루틴<span class="role-badge" id="headerRoleBadge"></span></div>
       <div style="display:flex;align-items:center;gap:10px;">
         <span id="headerStreakBadge"></span>
-        <div style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
+        <button id="headerLoginBtn" onclick="_guestGoLogin()" style="display:none;padding:6px 14px;background:rgba(255,255,255,0.22);color:#fff;border:none;border-radius:14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;">로그인</button>
+        <div id="headerNotifBtn" style="position:relative;cursor:pointer;" onclick="openNotifHistory()">
           <i class="ti ti-bell" style="font-size:20px;color:white;"></i>
           <span id="notifUnreadDot" style="display:none;position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#FFD600;border:1.5px solid #FFD600;"></span>
         </div>
@@ -2166,6 +2167,8 @@ function enterAs(role) {
   document.getElementById('mainHeader').style.display = '';
   document.getElementById('mainContent').style.display = '';
   document.getElementById('mainNav').style.display = '';
+  document.getElementById('headerLoginBtn').style.display = 'none';
+  document.getElementById('headerNotifBtn').style.display = '';
   applyRole(role);
 }
 // 비로그인 둘러보기 — 로그인 전에도 홈(루틴 목록)·커뮤니티는 볼 수 있게(QA 요청).
@@ -2183,6 +2186,8 @@ async function enterAsGuest() {
   document.getElementById('mainHeader').style.display = '';
   document.getElementById('mainContent').style.display = '';
   document.getElementById('mainNav').style.display = '';
+  document.getElementById('headerLoginBtn').style.display = '';
+  document.getElementById('headerNotifBtn').style.display = 'none';
   applyRole('youth');
 }
 function _guestPromptHtml(msg) {

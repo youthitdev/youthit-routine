@@ -1129,9 +1129,9 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
   - DB: `profiles_public` 뷰(`id, name`만 노출 — 실명 등 개인정보는 그대로 비공개) 추가, `routine_people_count` 뷰(루틴별 승인 참여자 "수"만 집계 — 누가 참여하는지는 노출 안 함) 추가, `routines`/`posts`/`post_comments`/`post_likes`에 비로그인 조회를 허용하는 새 정책 추가(기존 정책 유지). `routine_participants`(신청 메모·거절 사유 포함) 원본과 `certifications`(인증 사진/내용)는 이번 범위에서 전혀 안 건드리고 그대로 잠금 유지
   - 클라이언트: `loadRoutines()`/`loadPosts()`의 이름 조회를 `profiles`→`profiles_public`으로 교체(로그인 사용자에게는 원래도 id+name만 쓰던 조회라 동작 변화 없음), `loadRoutines()`의 참여인원 수를 비로그인일 땐 `routine_people_count`로 보완. `initAuth()`가 세션이 없으면 `enterAsGuest()`를 호출해 홈/커뮤니티 데이터만 불러와 바로 앱 화면을 보여주고(로그인 화면 대신), 인증/MY 탭은 `switchTab()`에서 실제 렌더 대신 새로 만든 "로그인이 필요해요" 화면(`#certGuestPrompt`/`#myGuestPrompt`)을 보여줌. 좋아요(`togglePostLike`/`toggleCommentLike`)·댓글 작성(`submitCommentFromBar`)·글쓰기(`openCommWriteWithRoutine`)·참여 신청(`openApplyOverlay`, 기존 가드)은 비로그인 시 "로그인이 필요해요" 알림으로 막음
   - `DEFAULT.youth`가 데모용 가짜 데이터("지민", 나다움 120 등)였는데 비로그인 화면에 그대로 노출될 뻔한 걸 발견 — `enterAsGuest()` 진입 시 빈 값으로 초기화해서 실수로 가짜 정보가 안 보이게 함
-- DB 변경: `profiles_public`/`routine_people_count` 뷰 추가, `routines_select_public`/`posts_select_public`/`pc_select_public`/`pl_select_public` 정책 추가 — `supabase-schema.sql` [마이그레이션 2026-09-10b]
-  - **마이그레이션 실행 필요**: 위 파일의 [마이그레이션 2026-09-10b] 블록을 Supabase SQL Editor에서 직접 실행해주세요
-- 검증: `node -e`로 index.html 스크립트 블록 문법 오류 없음 확인. 브라우저에서 Supabase 응답을 mock해 (1) 비로그인 진입 시 로그인 화면 없이 바로 홈(루틴 카드+참여인원 수)이 보이는 것, (2) 인증/MY 탭 클릭 시 "로그인이 필요해요" 화면이 뜨는 것, (3) 커뮤니티 게시글 목록/작성자 닉네임이 정상 표시되는 것, (4) 좋아요·글쓰기·참여신청 시도 시 로그인 알림이 뜨는 것, (5) 루틴 카드를 눌러도 인증 피드가 아닌 소개 화면으로만 가는 것, (6) `state.youth`가 가짜 데모 데이터 대신 빈 값으로 초기화되는 것 확인. 실제 RLS 동작은 마이그레이션 실행 후 실사용으로 확인 필요
+  - **후속(같은 날)**: "비로그인시 홈화면에 로그인하기 버튼이 어딘가에 있어야 하지 않을까?" 피드백으로, 헤더의 알림 종 아이콘 자리에 항상 보이는 "로그인" 버튼(`#headerLoginBtn`) 추가 — 비로그인일 땐 종 아이콘(로그인 안 하면 못 쓰는 기능) 대신 이 버튼이 뜨고, 실제 로그인하면 다시 종 아이콘으로 바뀜
+- DB 변경: `profiles_public`/`routine_people_count` 뷰 추가, `routines_select_public`/`posts_select_public`/`pc_select_public`/`pl_select_public` 정책 추가 — `supabase-schema.sql` [마이그레이션 2026-09-10b] (사용자가 Supabase SQL Editor에서 실행 완료, 정책 4개 등록 확인함)
+- 검증: `node -e`로 index.html 스크립트 블록 문법 오류 없음 확인. 브라우저에서 Supabase 응답을 mock해 (1) 비로그인 진입 시 로그인 화면 없이 바로 홈(루틴 카드+참여인원 수)이 보이는 것, (2) 인증/MY 탭 클릭 시 "로그인이 필요해요" 화면이 뜨는 것, (3) 커뮤니티 게시글 목록/작성자 닉네임이 정상 표시되는 것, (4) 좋아요·글쓰기·참여신청 시도 시 로그인 알림이 뜨는 것, (5) 루틴 카드를 눌러도 인증 피드가 아닌 소개 화면으로만 가는 것, (6) `state.youth`가 가짜 데모 데이터 대신 빈 값으로 초기화되는 것, (7) 헤더의 로그인 버튼이 비로그인일 때만 보이고 클릭 시 로그인 화면으로 가는 것 확인
 
 ## 기술 부채 (급하지 않음)
 
