@@ -865,7 +865,7 @@ select:focus { outline: none; border-color: #2E33BC; }
             <i class="ti ti-camera" style="font-size:17px;color:#888;"></i>
           </label>
           <input type="file" id="rdCommentPhotoInput" accept="image/*" style="display:none;" onchange="_handleCommentPhoto(event)">
-          <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요..." maxlength="100"
+          <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요..." maxlength="500"
             style="flex:1;min-width:0;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
             onkeydown="if(event.key==='Enter' && !event.isComposing)submitCommentFromBar()">
           <button onclick="submitCommentFromBar()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;flex-shrink:0;">
@@ -921,10 +921,10 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div id="certPhotoRequired" style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;margin-top:4px;"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 인증이 불가해요</div>
       </div>
       <div>
-        <textarea id="certMemo" rows="4" placeholder="내용을 입력해 주세요." maxlength="200" oninput="updateCertCount()"></textarea>
+        <textarea id="certMemo" rows="4" placeholder="내용을 입력해 주세요." maxlength="1000" oninput="updateCertCount()"></textarea>
         <div class="count-row">
           <span id="certCountHint" class="count-not">최소 15자 이상 작성해주세요</span>
-          <span style="font-size:11px;color:#aaa;"><span id="certCharCount">0</span>/200</span>
+          <span style="font-size:11px;color:#aaa;"><span id="certCharCount">0</span>/1000</span>
         </div>
       </div>
       <button class="primary-btn" id="certSubmitBtn" disabled onclick="submitCert()">인증하기</button>
@@ -3057,7 +3057,7 @@ function editCert(id) {
   if(!c || !row) return;
   row.innerHTML = `
     <div style="flex:1;min-width:0;">
-      <textarea id="rdCertEditInput_${id}" rows="4" maxlength="200" style="width:100%;font-size:14px;">${_escHtml(c.text)}</textarea>
+      <textarea id="rdCertEditInput_${id}" rows="4" maxlength="1000" style="width:100%;font-size:14px;">${_escHtml(c.text)}</textarea>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
         <button onclick="_cancelEditCert(${id})" style="padding:6px 14px;border-radius:20px;border:0.5px solid #ddd;background:#fff;color:#666;font-size:12px;font-weight:600;cursor:pointer;">취소</button>
         <button onclick="_saveEditCert(${id})" style="padding:6px 14px;border-radius:20px;border:none;background:#2E33BC;color:#fff;font-size:12px;font-weight:600;cursor:pointer;">저장</button>

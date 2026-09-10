@@ -2595,3 +2595,39 @@ ALTER TABLE post_comment_likes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pcl_select" ON post_comment_likes FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "pcl_insert" ON post_comment_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "pcl_delete" ON post_comment_likes FOR DELETE USING (auth.uid() = user_id);
+
+-- =====================================================
+-- [마이그레이션 2026-09-10a] 같은 루틴 참여자가 인증하면 다른 참여자들에게 알림
+-- QA: "같은 루틴하는 사람들의 인증시 알림오면 좋겠음" — 일단 단순하게(참여자별 알림
+-- 종류 on/off 설정은 아직 없어서, 켜져 있으면 인증할 때마다 그 루틴의 다른 승인된
+-- 참여자 전원에게 바로 감) 시작하고, 참여자 많은 루틴에서 너무 잦다는 피드백이 오면
+-- 그때 배치/제한을 추가하기로 함
+-- =====================================================
+CREATE OR REPLACE FUNCTION on_cert_notify_fellow_participants()
+RETURNS TRIGGER AS $$
+DECLARE
+  certifier_name text;
+  r_title text;
+  participant_id uuid;
+BEGIN
+  SELECT name INTO certifier_name FROM profiles WHERE id = NEW.user_id;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  FOR participant_id IN
+    SELECT user_id FROM routine_participants
+    WHERE routine_id = NEW.routine_id AND status = 'approved' AND user_id <> NEW.user_id
+  LOOP
+    PERFORM notify_push(
+      participant_id,
+      '📸 ' || coalesce(certifier_name, '누군가') || '님이 인증했어요',
+      '"' || coalesce(r_title, '루틴') || '"에서 함께하는 친구가 오늘 한 끗을 남겼어요!',
+      '/youthit-routine/?routine=' || NEW.routine_id
+    );
+  END LOOP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_cert_notify_fellow_push ON certifications;
+CREATE TRIGGER trg_cert_notify_fellow_push
+  AFTER INSERT ON certifications
+  FOR EACH ROW EXECUTE FUNCTION on_cert_notify_fellow_participants();
