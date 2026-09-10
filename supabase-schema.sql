@@ -2631,3 +2631,31 @@ DROP TRIGGER IF EXISTS trg_cert_notify_fellow_push ON certifications;
 CREATE TRIGGER trg_cert_notify_fellow_push
   AFTER INSERT ON certifications
   FOR EACH ROW EXECUTE FUNCTION on_cert_notify_fellow_participants();
+
+-- =====================================================
+-- [마이그레이션 2026-09-10b] 비로그인 둘러보기 (홈/커뮤니티만 공개)
+-- QA(관리자): "로그인 하지 않아도 홈화면이 보이면 좋겠음. 커뮤니티는 콘텐츠까지."
+-- 2026-07-25b에서 "비로그인 전체 조회 차단(보안 긴급 수정)"으로 routines/posts 등을
+-- auth.uid() IS NOT NULL로 막았던 조치는 그대로 두고(제거하지 않음), 그 위에 새로운
+-- 공개 정책을 추가하는 방식으로만 진행 — Postgres RLS는 같은 명령(SELECT)에 여러
+-- permissive 정책이 있으면 OR로 합쳐지므로, 기존 정책을 안 건드리고도 비로그인 접근을
+-- 열 수 있음. profiles 테이블 자체(실명/생년월일/전화번호/지역/서류 URL 등 미성년자
+-- 개인정보 포함)는 절대 공개하지 않고, 화면 표시용 닉네임만 담은 별도 뷰로 우회.
+-- routine_participants(신청 메모/거절 사유 등)도 원본은 그대로 잠그고, "참여 인원 수"
+-- 집계만 별도 뷰로 공개. certifications(인증 사진/내용)는 이번 범위에서 전혀 안 건드림
+-- — 참여자만 볼 수 있는 상태 그대로 유지
+-- =====================================================
+CREATE OR REPLACE VIEW profiles_public AS SELECT id, name FROM profiles;
+GRANT SELECT ON profiles_public TO anon, authenticated;
+
+CREATE OR REPLACE VIEW routine_people_count AS
+  SELECT routine_id, count(*)::int AS people
+  FROM routine_participants
+  WHERE status = 'approved'
+  GROUP BY routine_id;
+GRANT SELECT ON routine_people_count TO anon, authenticated;
+
+CREATE POLICY "routines_select_public" ON routines FOR SELECT USING (true);
+CREATE POLICY "posts_select_public" ON posts FOR SELECT USING (true);
+CREATE POLICY "pc_select_public" ON post_comments FOR SELECT USING (true);
+CREATE POLICY "pl_select_public" ON post_likes FOR SELECT USING (true);

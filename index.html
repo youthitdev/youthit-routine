@@ -564,6 +564,7 @@ select:focus { outline: none; border-color: #2E33BC; }
 
       <!-- 인증 -->
       <div class="tab-page" id="page-cert">
+        <div id="certGuestPrompt" style="display:none;"></div>
         <div class="scroll-body">
           <div id="certMeetBannerArea"></div>
           <div id="certRoutineList"></div>
@@ -586,6 +587,7 @@ select:focus { outline: none; border-color: #2E33BC; }
 
       <!-- MY (청소년) -->
       <div class="tab-page" id="page-my">
+        <div id="myGuestPrompt" style="display:none;"></div>
         <div class="scroll-body">
           <div class="profile-card" style="position:relative;">
             <button onclick="openEditProfile()" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:#f5f5f7;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">✏️</button>
@@ -1437,6 +1439,9 @@ async function initAuth() {
     currentUser = session.user;
     if (isRecoveryFlow) { showResetScreen(); }
     else await loadProfileAndEnter();
+  } else {
+    // 비로그인 둘러보기 — 홈/커뮤니티는 그대로 볼 수 있게(QA 요청)
+    await enterAsGuest();
   }
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
@@ -1862,15 +1867,20 @@ function _completionGoal(r) {
 }
 
 async function loadRoutines() {
-  const [rRes, pRes, cRes, profRes] = await Promise.all([
+  const [rRes, pRes, cRes, profRes, peopleCountRes] = await Promise.all([
     sb.from('routines').select('*').order('created_at', { ascending: false }),
     sb.from('routine_participants').select('*'),
     sb.from('certifications').select('id,routine_id,user_id,created_at'),
-    sb.from('profiles').select('id,name'),
+    sb.from('profiles_public').select('id,name'),
+    sb.from('routine_people_count').select('routine_id,people'),
   ]);
   const routines = (rRes.data || []).filter(r => !r.archived), parts = pRes.data || [], certs = cRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  // 비로그인 방문자는 routine_participants를 못 읽어서(RLS) parts가 항상 비어있음 —
+  // 참여인원 "수"만 공개하는 별도 뷰(routine_people_count)로 보완(QA: 비로그인 홈 화면 요청)
+  const peopleCountById = {};
+  (peopleCountRes.data || []).forEach(p => peopleCountById[p.routine_id] = p.people);
   const today = _todayStr();
   const isAdmin = currentUser ? ADMINS.includes(currentUser.email) : false;
   state.routines = routines.map(r => {
@@ -1901,7 +1911,7 @@ async function loadRoutines() {
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
       isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
-      people: approved.length, maxPeople: r.max_people || 10, minPeople: r.min_people || null,
+      people: currentUser ? approved.length : (peopleCountById[r.id] || 0), maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', certGuide: r.cert_guide || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
@@ -1938,7 +1948,7 @@ async function loadPosts() {
   const [postRes, likeRes, profRes, commentRes, commentLikeRes] = await Promise.all([
     sb.from('posts').select('*').order('created_at', { ascending: false }),
     sb.from('post_likes').select('post_id,user_id'),
-    sb.from('profiles').select('id,name'),
+    sb.from('profiles_public').select('id,name'),
     sb.from('post_comments').select('id,post_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
     sb.from('post_comment_likes').select('comment_id,user_id'),
   ]);
@@ -2158,6 +2168,47 @@ function enterAs(role) {
   document.getElementById('mainNav').style.display = '';
   applyRole(role);
 }
+// 비로그인 둘러보기 — 로그인 전에도 홈(루틴 목록)·커뮤니티는 볼 수 있게(QA 요청).
+// 역할을 알 방법이 없으니(로그인해야 profile.role을 알 수 있음) 항상 청소년 화면
+// 기준으로 보여줌 — 끗짱은 원래 기관을 통해 심사받아 가입하므로 둘러보기가 필요 없고
+// 항상 정상 로그인으로 들어옴. 인증/MY 탭은 그대로 로그인 유도 화면으로 막음
+async function enterAsGuest() {
+  // DEFAULT.youth는 데모용 가짜 데이터("지민", 나다움 120 등)라 로그인 전 화면에
+  // 그대로 노출되면 안 됨 — 실제 로그인 시 loadProfileAndEnter()가 서버 값으로 덮어씀
+  state.youth = { name:'', joinDate:'', certCount:0, commCount:0, avatar:null, pendingRoutines:[], rejectedRoutines:{}, nadaeum:0, badges:[], certDates:[] };
+  try {
+    await Promise.all([loadRoutines(), loadPosts(), loadBanners()]);
+  } catch(e) { console.error('게스트 데이터 로드 실패', e); }
+  document.getElementById('splashScreen').classList.add('hide');
+  document.getElementById('mainHeader').style.display = '';
+  document.getElementById('mainContent').style.display = '';
+  document.getElementById('mainNav').style.display = '';
+  applyRole('youth');
+}
+function _guestPromptHtml(msg) {
+  return `<div style="padding:100px 24px 0;text-align:center;">
+    <div style="font-size:40px;margin-bottom:14px;">🔒</div>
+    <div style="font-size:15px;font-weight:600;color:#333;margin-bottom:8px;">${msg}</div>
+    <div style="font-size:13px;color:#999;margin-bottom:24px;line-height:1.6;">로그인하면 이용할 수 있어요.</div>
+    <button onclick="_guestGoLogin()" style="padding:13px 28px;background:#2E33BC;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">로그인하기</button>
+  </div>`;
+}
+function _showGuestPrompt(tab) {
+  const msg = tab==='cert' ? '인증 기록을 보려면 로그인해주세요' : 'MY 정보를 보려면 로그인해주세요';
+  const el = document.getElementById(tab==='cert' ? 'certGuestPrompt' : 'myGuestPrompt');
+  const scrollBody = document.querySelector('#page-'+tab+' .scroll-body');
+  if(scrollBody) scrollBody.style.display = 'none';
+  if(el) { el.innerHTML = _guestPromptHtml(msg); el.style.display = ''; }
+}
+function _hideGuestPrompt(tab) {
+  const el = document.getElementById(tab==='cert' ? 'certGuestPrompt' : 'myGuestPrompt');
+  if(el) el.style.display = 'none';
+  const scrollBody = document.querySelector('#page-'+tab+' .scroll-body');
+  if(scrollBody) scrollBody.style.display = '';
+}
+function _guestGoLogin() {
+  document.getElementById('splashScreen').classList.remove('hide');
+}
 function applyRole(role) {
   state.currentRole = role;
   save();
@@ -2198,10 +2249,15 @@ function switchTab(tab) {
   document.querySelectorAll('#youthNav .nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+tab).classList.add('active');
   document.getElementById('nav-'+tab).classList.add('active');
+  if(!currentUser && (tab==='cert' || tab==='my')) {
+    _showGuestPrompt(tab);
+    _navPushTab(tab, false);
+    return;
+  }
   if(tab==='routine') renderRoutine();
-  else if(tab==='cert') renderCertTab();
+  else if(tab==='cert') { _hideGuestPrompt('cert'); renderCertTab(); }
   else if(tab==='comm') { renderComm('all'); markCommSeen(); }
-  else if(tab==='my') { renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
+  else if(tab==='my') { _hideGuestPrompt('my'); renderMy(); refreshExpiryBanner(); refreshVerifyStatus().then(()=>renderVerifyCard()); loadBadges().then(renderBadges); }
   _navPushTab(tab, false);
 }
 // MY탭에 올 때마다 인증 상태를 서버에서 다시 확인 — 로그인 이후 관리자가 승인/반려했으면 재로그인 없이도 최신화
@@ -2852,7 +2908,7 @@ function _paintCommentLike(kind, commentId, cm) {
   if(li) li.textContent = cm.likes||0;
 }
 async function toggleCommentLike(kind, commentId) {
-  if(!currentUser) return;
+  if(!currentUser){ alert('로그인이 필요해요.'); return; }
   const cm = _findComment(kind, commentId);
   if(!cm) return;
   const table = kind==='cert' ? 'cert_comment_likes' : 'post_comment_likes';
@@ -3012,7 +3068,8 @@ function renderCertDetail(id) {
 
 let _submittingComment = false;
 async function submitCommentFromBar() {
-  if(!currentUser || _submittingComment) return;
+  if(!currentUser){ alert('로그인이 필요해요.'); return; }
+  if(_submittingComment) return;
   const input = document.getElementById('rdCommentInput');
   const text = input.value.trim();
   if(!text && !_commentPhotoFile) return;
@@ -3154,7 +3211,8 @@ function openPostDetail(id) {
   const avatar = document.getElementById('rdCommentAvatar');
   const input = document.getElementById('rdCommentInput');
   if(bar) bar.style.display='';
-  if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
+  // 비로그인 방문자도 커뮤니티 상세는 볼 수 있어서(QA) state.youth가 아직 없을 수 있음
+  if(avatar) avatar.textContent = currentUser ? (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0] : '?';
   if(input) input.value='';
   _clearCommentPhoto(); _cancelReply();
 
@@ -3939,7 +3997,7 @@ function _updatePostLikeUI(p) {
   });
 }
 async function togglePostLike(id) {
-  if(!currentUser) return;
+  if(!currentUser){ alert('로그인이 필요해요.'); return; }
   const p=state.posts.find(x=>x.id===id);
   if(!p) return;
   const wasLiked = p.liked;
@@ -3974,6 +4032,7 @@ function handleReviewPhoto(e) {
   r.readAsDataURL(f);
 }
 function openCommWriteWithRoutine(routineId, type) {
+  if(!currentUser){ alert('로그인이 필요해요.'); return; }
   // 완료 루틴 목록으로 글쓰기 시트 열기 (특정 루틴 선택된 상태로)
   if(routineId) {
     const r = state.routines.find(x=>x.id===routineId);
