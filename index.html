@@ -163,6 +163,8 @@ select:focus { outline: none; border-color: #2E33BC; }
 .overlay { position: fixed; top: 0; left: 50%; transform: translateX(-50%) translateX(100vw); width: 100%; max-width: 390px; height: 100%; background: #fff; z-index: 200; overflow-y: auto; transition: transform 0.25s ease; }
 .overlay.open { transform: translateX(-50%) translateX(0); }
 .overlay-hd { background: var(--role-color, #2E33BC); padding: calc(16px + env(safe-area-inset-top)) 16px 16px; color: white; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 10; }
+@keyframes certCtaBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.cert-cta-blink { animation: certCtaBlink 1.3s ease-in-out infinite; }
 .back-btn { background: none; border: none; color: white; cursor: pointer; padding: 0; display: flex; align-items: center; }
 .overlay-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; padding-bottom: 32px; }
 
@@ -837,6 +839,9 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-hd">
       <button class="back-btn" onclick="closeOverlay('routineFeedOverlay')"><i class="ti ti-arrow-left" style="font-size:20px;"></i></button>
       <div><div style="font-size:11px;opacity:0.75;" id="feedOverlaySub"></div><div style="font-size:16px;font-weight:600;" id="feedOverlayTitle"></div></div>
+      <button id="feedCertActionBtn" class="cert-cta-blink" onclick="openCertFromFeed()" style="display:none;margin-left:auto;flex-shrink:0;background:#fff;color:#27500A;border:none;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;align-items:center;gap:5px;">
+        <i class="ti ti-camera" style="font-size:14px;"></i> 오늘 인증하기
+      </button>
       <div id="feedCertDoneBadge" style="display:none;margin-left:auto;flex-shrink:0;background:rgba(255,255,255,0.2);padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;">✅ 오늘 인증완료</div>
     </div>
     <div style="overflow-y:auto;padding-bottom:100px;" id="feedOverlayBody"></div>
@@ -1322,11 +1327,6 @@ select:focus { outline: none; border-color: #2E33BC; }
     <button class="primary-btn" style="width:auto;padding:12px 32px;" onclick="closeCreateSuccess()">루틴으로 이동</button>
   </div>
 
-  <div id="certFloatingBtn" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:358px;z-index:250;">
-    <button id="certFloatingAction" onclick="openCertFromFeed()" style="width:100%;padding:14px;background:#83CA00;color:#27500A;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(131,202,0,0.4);display:flex;align-items:center;justify-content:center;gap:8px;">
-      <i class="ti ti-camera" style="font-size:18px;"></i> 오늘 인증하기
-    </button>
-  </div>
 </div>
 <script>
 // ════════════════════════════════════════════════════════
@@ -2679,23 +2679,21 @@ function clearSearch() {
 
 // 루틴 피드
 let currentFeedRoutineId=null;
-// "오늘 인증하기/완료" 플로팅 버튼 — 여러 화면이 같은 오버레이(routineDetailOverlay)를
-// 재사용하면서 내용만 바꿔치기하다 보니, 이 버튼을 껐다 켜는 화면이 아닌 다른 화면(커뮤니티
-// 글, 끗짱 인증 상세 등)으로 넘어가도 이전 상태가 그대로 남아있던 문제(QA 발견) — 관련
-// 없는 화면을 열 때는 반드시 hide로, 관련 있는 화면은 이 함수로만 상태를 정하도록 통일
+// "오늘 인증하기/완료" 표시 — 원래는 화면 하단에 크게 뜨는 플로팅 배너였는데, 화면을
+// 가려서 불편하다는 QA 피드백으로 루틴 피드 헤더의 작은 버튼/배지로 옮김(QA: "하단에
+// 애매하게 있다, 오른쪽 상단에 버튼을 만드는 게 어떠냐" — 깜빡이는 효과도 함께 추가해
+// 눈에 잘 띄게 함). 여러 화면이 같은 오버레이를 재사용하다 보니 이 버튼을 껐다 켜는
+// 화면이 아닌 다른 화면(커뮤니티 글, 끗짱 인증 상세 등)으로 넘어가도 이전 상태가 그대로
+// 남아있던 문제(QA 발견)가 있었으나, 이제 루틴 피드(#routineFeedOverlay) 자기 헤더 안에만
+// 있는 요소라 그 화면이 안 보이면 같이 안 보여서 별도로 hide 처리할 필요가 없어짐
 function _setCertFloatingBtn(r) {
   const show = r && r.status==='active' && currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
   const doneToday = show && r.todayCert;
-  // 오늘 인증을 이미 마친 뒤에도 루틴 피드에 들어갈 때마다 화면 하단을 가리는 큰 배너가
-  // 계속 떠서 불편하다는 QA 피드백 — 인증 전 CTA(오늘 인증하기)는 그대로 두되, 완료 상태는
-  // 화면을 안 가리는 작은 배지(#feedCertDoneBadge, 피드 헤더)로만 표시
-  document.getElementById('certFloatingBtn').style.display = (show && !doneToday) ? 'block' : 'none';
+  const actionBtn = document.getElementById('feedCertActionBtn');
   const badge = document.getElementById('feedCertDoneBadge');
-  if (badge) badge.style.display = doneToday ? 'block' : 'none';
-  if (show) {
-    currentFeedRoutineId = r.id;
-    document.getElementById('certFloatingAction').style.display = 'flex';
-  }
+  if (actionBtn) actionBtn.style.display = (show && !doneToday) ? 'flex' : 'none';
+  if (badge) badge.style.display = doneToday ? 'flex' : 'none';
+  if (show) currentFeedRoutineId = r.id;
 }
 // 인증글(사진+소감) 그리드 — 청소년/끗짱 양쪽의 "전체 인증 기록" 화면에서 공용으로 씀
 // (빈 상태 문구는 화면마다 어울리는 톤이 달라서 호출하는 쪽에서 따로 처리)
@@ -2742,7 +2740,8 @@ function openRoutineFeed(routineId) {
   const isLeaderOrAdmin = currentUser && (r.createdBy===currentUser.id || r.ledBy===currentUser.id || ADMINS.includes(currentUser.email));
   if (!isParticipant && !isLeaderOrAdmin) {
     document.getElementById('feedOverlayBody').innerHTML = `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🔒 이 루틴에 참여한 사람만<br>인증글을 볼 수 있어요</div>`;
-    document.getElementById('certFloatingBtn').style.display='none';
+    document.getElementById('feedCertActionBtn').style.display='none';
+    document.getElementById('feedCertDoneBadge').style.display='none';
     openOverlay('routineFeedOverlay');
     return;
   }
@@ -2936,15 +2935,14 @@ async function toggleCommentLike(kind, commentId) {
 // 공용으로 쓰므로 여기서 같이 관리
 let _commentPhotoFile = null;
 let _replyToCommentId = null;
-function _handleCommentPhoto(e) {
+async function _handleCommentPhoto(e) {
   const f = e.target.files[0]; if(!f) return;
-  _commentPhotoFile = f;
-  const r = new FileReader();
-  r.onload = ev => {
-    document.getElementById('rdCommentPhotoPreviewImg').src = ev.target.result;
-    document.getElementById('rdCommentPhotoPreview').style.display = 'block';
-  };
-  r.readAsDataURL(f);
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  try {
+    _commentPhotoFile = await _resizeImageFile(f, 1280, 0.82);
+  } catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  document.getElementById('rdCommentPhotoPreviewImg').src = _commentPhotoFile;
+  document.getElementById('rdCommentPhotoPreview').style.display = 'block';
 }
 function _clearCommentPhoto() {
   _commentPhotoFile = null;
@@ -2969,10 +2967,10 @@ function _cancelReply() {
   _replyToCommentId = null;
   document.getElementById('rdCommentReplyBanner').style.display = 'none';
 }
-async function _uploadCommentPhoto(file) {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = `${currentUser.id}/comment_${Date.now()}.${ext}`;
-  const { error } = await sb.storage.from('cert-photos').upload(path, file, { contentType: file.type });
+async function _uploadCommentPhoto(dataUrl) {
+  const blob = _dataURLtoBlob(dataUrl);
+  const path = `${currentUser.id}/comment_${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
   if(error) { alert('사진 업로드 실패: ' + error.message); return false; }
   return sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
 }
@@ -3015,18 +3013,16 @@ function _editCertPhotoGridHtml(id) {
   return `<div style="display:flex;gap:6px;overflow-x:auto;">${html}</div>
     <input type="file" id="editCertPhotoInput_${id}" accept="image/*" multiple style="display:none;" onchange="_handleEditCertPhotos(event,${id})">`;
 }
-function _handleEditCertPhotos(e, id) {
+async function _handleEditCertPhotos(e, id) {
   const files = Array.from(e.target.files).filter(f=>f.type.startsWith('image/'));
   const remaining = 5 - _editCertPhotos.length;
-  files.slice(0, remaining).forEach(file => {
-    const r = new FileReader();
-    r.onload = ev => {
-      _editCertPhotos.push(ev.target.result);
+  for (const file of files.slice(0, remaining)) {
+    try {
+      _editCertPhotos.push(await _resizeImageFile(file, 1280, 0.82));
       const box = document.getElementById('rdCertPhotos_'+id);
       if(box) box.innerHTML = _editCertPhotoGridHtml(id);
-    };
-    r.readAsDataURL(file);
-  });
+    } catch(err) { alert('사진을 불러오지 못했어요.'); }
+  }
   e.target.value = '';
 }
 function _removeEditCertPhoto(id, idx) {
@@ -3552,7 +3548,7 @@ function openCertForm(id,title) {
 let certPhotos = [];
 let certPhotoWatermarked = []; // certPhotos와 같은 인덱스로 "지금 찍기"(워터마크 적용) 여부 추적
 
-function handleCertPhotos(e) {
+async function handleCertPhotos(e) {
   const r = state.routines.find(x=>x.id===currentCertId);
   if(r && r.cameraOnly){ e.target.value=''; alert('이 루틴은 실시간 촬영만 가능해요. "📸 지금 찍기"로 올려주세요.'); return; }
   const files = Array.from(e.target.files);
@@ -3564,17 +3560,15 @@ function handleCertPhotos(e) {
   if(nonImage.length) alert('사진 파일만 첨부할 수 있어요.');
   const remaining = 5 - certPhotos.length;
   const toAdd = imageFiles.slice(0, remaining);
-  toAdd.forEach(file => {
-    const r = new FileReader();
-    r.onload = ev => {
-      certPhotos.push(ev.target.result);
+  for (const file of toAdd) {
+    try {
+      certPhotos.push(await _resizeImageFile(file, 1280, 0.82));
       certPhotoWatermarked.push(false);
       certHasPhoto = certPhotos.length > 0;
       renderCertPhotoGrid();
       checkCertBtn();
-    };
-    r.readAsDataURL(file);
-  });
+    } catch(err) { alert('사진을 불러오지 못했어요.'); }
+  }
   e.target.value = '';
 }
 
@@ -3624,14 +3618,17 @@ function handleCertCameraPhoto(e) {
     // 멈춘 것처럼 보이던 문제 — 위에서 이미 걸렀지만 이중 안전장치로 명확히 실패 알림
     img.onerror = () => alert('사진을 불러오지 못했어요. 다른 사진으로 시도해주세요.');
     img.onload = () => {
+      // 원본 해상도 그대로 워터마크만 새겨서 올리면 파일이 너무 커서 느리다는 피드백(QA)
+      // — 다른 사진 첨부 경로처럼 적당한 해상도로 줄인 캔버스에 그림
+      const { width, height } = _clampImageSize(img.width, img.height, 1280);
       const canvas = document.createElement('canvas');
-      canvas.width = img.width; canvas.height = img.height;
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, width, height);
       const now = new Date();
       const p = n => String(n).padStart(2, '0');
       const label = `📸 ${now.getFullYear()}.${p(now.getMonth()+1)}.${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())} 실시간 인증`;
-      const fs = Math.max(14, Math.round(img.width * 0.035));
+      const fs = Math.max(14, Math.round(width * 0.035));
       ctx.font = `700 ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`;
       const pad = Math.round(fs * 0.6);
       const tw = ctx.measureText(label).width;
@@ -3823,6 +3820,33 @@ function _dataURLtoBlob(dataURL) {
   const arr = new Uint8Array(bin.length);
   for (let i=0; i<bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
+}
+// 카메라/갤러리 사진을 원본 해상도(수천 px, 수 MB) 그대로 올리면 인증 피드에서 작은
+// 썸네일로 보여줄 때도 그 큰 원본을 통째로 내려받아야 해서 사진이 느리게 뜬다는 피드백
+// (QA: "사진 나오는데 매우 느리더라") — 업로드 전에 적당한 해상도로 줄여서 올림
+function _clampImageSize(w, h, maxDim) {
+  if (w <= maxDim && h <= maxDim) return { width: w, height: h };
+  const scale = maxDim / Math.max(w, h);
+  return { width: Math.round(w * scale), height: Math.round(h * scale) };
+}
+function _resizeImageFile(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('파일을 읽지 못했어요'));
+    r.onload = ev => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('사진을 불러오지 못했어요'));
+      img.onload = () => {
+        const { width, height } = _clampImageSize(img.width, img.height, maxDim);
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
 }
 async function submitCert() {
   // Supabase에 인증 기록 저장
@@ -4031,12 +4055,13 @@ function _showReviewPhotoPreview(url) {
   pu.innerHTML = `<img class="photo-prev-img" src="${url}"><div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.5);border-radius:20px;padding:3px 9px;font-size:11px;color:white;">변경</div>`;
   pu.onclick = () => document.getElementById('reviewPhotoInput').click();
 }
-function handleReviewPhoto(e) {
+async function handleReviewPhoto(e) {
   const f = e.target.files[0]; if(!f) return;
-  reviewPhotoFile = f;
-  const r = new FileReader();
-  r.onload = ev => _showReviewPhotoPreview(ev.target.result);
-  r.readAsDataURL(f);
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  try {
+    reviewPhotoFile = await _resizeImageFile(f, 1280, 0.82);
+  } catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  _showReviewPhotoPreview(reviewPhotoFile);
 }
 function openCommWriteWithRoutine(routineId, type) {
   if(!currentUser){ alert('로그인이 필요해요.'); return; }
@@ -4083,9 +4108,9 @@ async function submitPost() {
   if(btn){btn.disabled=true;}
   let photoUrl = reviewExistingPhotoUrl;
   if(reviewPhotoFile) {
-    const ext=(reviewPhotoFile.name.split('.').pop()||'jpg').toLowerCase();
-    const path=`${currentUser.id}/review_${Date.now()}.${ext}`;
-    const { error: upErr } = await sb.storage.from('cert-photos').upload(path, reviewPhotoFile, { contentType: reviewPhotoFile.type });
+    const blob = _dataURLtoBlob(reviewPhotoFile);
+    const path=`${currentUser.id}/review_${Date.now()}.jpg`;
+    const { error: upErr } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
     if(upErr){ alert('사진 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;} return; }
     photoUrl = sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
   }
@@ -5228,18 +5253,18 @@ function updateCreatePreview(){
   document.getElementById('pvPeriod').textContent=(s&&e&&e>=s)?`${s.replace(/-/g,'.').slice(2)} – ${e.replace(/-/g,'.').slice(2)}`:'기간 미설정';
 }
 let createPhotoFile=null;
-function handleCreatePhoto(e){
+async function handleCreatePhoto(e){
   const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    createHasPhoto=true;
-    createPhotoFile=f;
-    const el=document.getElementById('createPhotoUpload');
-    el.className='photo-upload has-photo';
-    el.innerHTML=`<img class="photo-prev-img" src="${ev.target.result}"><div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);border-radius:20px;padding:4px 10px;font-size:11px;color:white;">변경</div>`;
-    el.onclick=()=>document.getElementById('createPhotoInput').click();
-  };
-  r.readAsDataURL(f);
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  let resized;
+  try { resized = await _resizeImageFile(f, 1280, 0.82); }
+  catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  createHasPhoto=true;
+  createPhotoFile=resized;
+  const el=document.getElementById('createPhotoUpload');
+  el.className='photo-upload has-photo';
+  el.innerHTML=`<img class="photo-prev-img" src="${resized}"><div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);border-radius:20px;padding:4px 10px;font-size:11px;color:white;">변경</div>`;
+  el.onclick=()=>document.getElementById('createPhotoInput').click();
 }
 function _readCreateFormCommon(){
   const n=document.getElementById('rName').value.trim(),d=document.getElementById('rDesc').value.trim();
@@ -5284,9 +5309,9 @@ async function submitCreateRoutine(){
   if(!currentUser){alert('로그인이 필요해요.');return;}
   const btn=document.getElementById('createSubmitBtn');
   if(btn){btn.disabled=true;btn.textContent='등록 중...';}
-  const ext=(createPhotoFile.name.split('.').pop()||'jpg').toLowerCase();
-  const path=`${currentUser.id}/${Date.now()}.${ext}`;
-  const { error: upErr } = await sb.storage.from('routine-covers').upload(path, createPhotoFile);
+  const coverBlob=_dataURLtoBlob(createPhotoFile);
+  const path=`${currentUser.id}/${Date.now()}.jpg`;
+  const { error: upErr } = await sb.storage.from('routine-covers').upload(path, coverBlob, { contentType: coverBlob.type });
   if(upErr){ alert('이미지 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';} return; }
   const coverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
   const { error } = await sb.from('routines').insert({
@@ -5314,9 +5339,9 @@ async function submitEditRoutine(){
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   let coverUrl = editExistingCoverUrl;
   if(createHasPhoto && createPhotoFile){
-    const ext=(createPhotoFile.name.split('.').pop()||'jpg').toLowerCase();
-    const path=`${currentUser.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await sb.storage.from('routine-covers').upload(path, createPhotoFile);
+    const coverBlob=_dataURLtoBlob(createPhotoFile);
+    const path=`${currentUser.id}/${Date.now()}.jpg`;
+    const { error: upErr } = await sb.storage.from('routine-covers').upload(path, coverBlob, { contentType: coverBlob.type });
     if(upErr){ alert('이미지 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='수정 완료';} return; }
     coverUrl = sb.storage.from('routine-covers').getPublicUrl(path).data.publicUrl;
   }
@@ -5999,13 +6024,9 @@ function closeOverlay(id) {
     else break;
   }
   const wasOpen = _navRemoveModal('overlay', id);
-  if(id==='routineFeedOverlay') {
-    document.getElementById('certFloatingBtn').style.display='none';
-  }
   if(id==='routineDetailOverlay') {
     const bar=document.getElementById('rdCommentBar');
     if(bar) bar.style.display='none';
-    document.getElementById('certFloatingBtn').style.display='none';
     currentCertDetailId=null;
     currentPostDetailId=null;
     _rdCurrentRender=null;
