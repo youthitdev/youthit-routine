@@ -2123,7 +2123,9 @@ function openHomeBanner() {
 // 유틸
 // ════════════════════════════════════════════════════════
 function timeAgo(ts) {
-  const d = Math.floor((Date.now()-ts)/60000);
+  // 서버 시각(댓글 생성시각)이 클라이언트 기기 시계보다 살짝 앞서 있으면(기기 시계
+  // 오차/드리프트) 음수가 나와서 "-1분 전"처럼 보이던 버그(QA) — 0 밑으로는 안 내려가게 clamp
+  const d = Math.max(0, Math.floor((Date.now()-ts)/60000));
   if(d<60) return d+'분 전';
   if(d<1440) return Math.floor(d/60)+'시간 전';
   return Math.floor(d/1440)+'일 전';
@@ -5948,6 +5950,23 @@ window.addEventListener('popstate', () => {
   _poppingNav = false;
 });
 
+// 모바일 키보드가 뜨면 브라우저가 포커스된 입력창을 보이게 하려고 화면(레이아웃 뷰포트)을
+// 스크롤시켜서, 정작 댓글 입력창 위에 있던 글 내용은 화면 밖으로 밀려나 안 보이던 문제(QA:
+// "댓글 작성 하며 루틴의 글을 볼수있으면 좋겠습니다") — 키보드가 뜰 때마다 열려있는
+// 오버레이 높이를 실제 보이는 영역(visualViewport)에 맞춰 줄여서, 브라우저가 따로 스크롤할
+// 필요 없이 댓글 입력창(하단 고정)과 그 위 글 내용이 항상 같이 보이게 함
+function _fitOverlayToKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  document.querySelectorAll('.overlay.open').forEach(el => {
+    el.style.height = vv.height + 'px';
+    el.style.top = vv.offsetTop + 'px';
+  });
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', _fitOverlayToKeyboard);
+  window.visualViewport.addEventListener('scroll', _fitOverlayToKeyboard);
+}
 function openOverlay(id) {
   document.getElementById(id).classList.add('open');
   // 역할 색상 헤더에 적용
@@ -5960,7 +5979,9 @@ function openOverlay(id) {
   _navPushModal('overlay', id);
 }
 function closeOverlay(id) {
-  document.getElementById(id).classList.remove('open');
+  const el = document.getElementById(id);
+  el.classList.remove('open');
+  el.style.height = ''; el.style.top = ''; // _fitOverlayToKeyboard가 남긴 인라인 크기 초기화
   // _navRemoveModal이 실제로 스택에서 지운 경우에만(=진짜 열려있던 오버레이를 지금
   // 처음 닫는 경우에만) 남아있는 history 항목을 함께 소비함 — 화면 상의 "←" 버튼이
   // closeOverlay()를 직접 불러 화면만 닫고 history.pushState()로 쌓인 항목은 그대로
