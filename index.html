@@ -1820,10 +1820,15 @@ function _fmtPeriod(s, e) {
   const f = x => x ? x.slice(2).replace(/-/g, '.') : '';
   return (s && e) ? `${f(s)}–${f(e)}` : '';
 }
-function _dayLabel(startDate) {
+// asOf를 안 넘기면 "오늘" 기준(참여자 목록 등, 지금 며칠째인지 보여줄 때)으로 계산.
+// 인증글처럼 "이 글을 쓴 시점"이 따로 있는 경우엔 asOf에 그 시점(created_at)을 넘겨야
+// 함 — 예전엔 항상 오늘 기준으로만 계산해서, 같은 루틴의 모든 인증글이 실제로 올린
+// 날짜와 상관없이 전부 "오늘 기준 며칠째"로 똑같이 표시되던 버그가 있었음(QA)
+function _dayLabel(startDate, asOf) {
   if (!startDate) return '1일째';
   const start = new Date(startDate + 'T00:00:00');
-  const diff = Math.floor((Date.now() - start.getTime()) / 86400000) + 1;
+  const ref = new Date((asOf ? _todayStr(new Date(asOf)) : _todayStr()) + 'T00:00:00');
+  const diff = Math.floor((ref.getTime() - start.getTime()) / 86400000) + 1;
   return (diff < 1 ? 1 : diff) + '일째';
 }
 // 자유루틴은 참여자마다 승인 시점부터 개인 기간(duration_days)이 시작됨 —
@@ -2009,7 +2014,7 @@ async function loadCertFeed() {
     return {
       id: c.id, routineId: c.routine_id, userId: c.user_id,
       name: nameById[c.user_id] || '익명',
-      day: r ? _dayLabel(r.isFree ? ((r.participants||[]).find(p=>p.userId===c.user_id)?.approvedAt?.slice(0,10) || null) : r.startDate) : '',
+      day: r ? _dayLabel(r.isFree ? ((r.participants||[]).find(p=>p.userId===c.user_id)?.approvedAt?.slice(0,10) || null) : r.startDate, c.created_at) : '',
       text: c.content || '',
       ts: new Date(c.created_at).getTime(),
       likes: cLikes.length,
