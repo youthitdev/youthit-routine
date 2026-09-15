@@ -350,14 +350,14 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="signupRealName" class="auth-input" placeholder="이름 (실명)">
-      <div class="date-field-wrap">
+      <div class="date-field-wrap" id="signupBirthWrap">
         <input type="date" id="signupBirth" class="auth-input" oninput="_toggleDateLabel(this)">
         <span class="date-label-overlay" id="signupBirthLabel">생년월일</span>
       </div>
       <input type="email" id="signupEmail" class="auth-input" placeholder="이메일">
       <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)">
       <input type="tel" id="signupPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;" id="signupRegionWrap">
         <select id="signupSido" class="auth-input" style="flex:1;" onfocus="populateSidoSelect()" onchange="populateSigugunSelect()"><option value="">시/도 선택</option></select>
         <select id="signupSigugun" class="auth-input" style="flex:1;"><option value="">시/군/구 선택</option></select>
       </div>
@@ -370,7 +370,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         </select>
       </div>
       <div style="text-align:left;margin:6px 2px 14px;">
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:12px;cursor:pointer;">
+        <label id="signupAgeAgreeWrap" style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:12px;cursor:pointer;">
           <input type="checkbox" id="agreeAge" style="margin-top:2px;flex-shrink:0;">
           <span>[필수] 만 14세 이상입니다</span>
         </label>
@@ -452,12 +452,12 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="cpName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="cpRealName" class="auth-input" placeholder="이름 (실명)">
-      <div class="date-field-wrap">
+      <div class="date-field-wrap" id="cpBirthWrap">
         <input type="date" id="cpBirth" class="auth-input" oninput="_toggleDateLabel(this)">
         <span class="date-label-overlay" id="cpBirthLabel">생년월일</span>
       </div>
       <input type="tel" id="cpPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;" id="cpRegionWrap">
         <select id="cpSido" class="auth-input" style="flex:1;" onchange="populateSigugunSelect('cpSido','cpSigugun')"><option value="">시/도 선택</option></select>
         <select id="cpSigugun" class="auth-input" style="flex:1;"><option value="">시/군/구 선택</option></select>
       </div>
@@ -470,7 +470,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         </select>
       </div>
       <div style="text-align:left;margin:6px 2px 14px;">
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:12px;cursor:pointer;">
+        <label id="cpAgeAgreeWrap" style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:rgba(255,255,255,0.85);margin-bottom:12px;cursor:pointer;">
           <input type="checkbox" id="cpAgreeAge" style="margin-top:2px;flex-shrink:0;">
           <span>[필수] 만 14세 이상입니다</span>
         </label>
@@ -1637,20 +1637,27 @@ async function doSignup() {
   const agreeAge = document.getElementById('agreeAge').checked;
   const agreePrivacy = document.getElementById('agreePrivacy').checked;
   const agreeMarketing = document.getElementById('agreeMarketing').checked;
-  if (!name || !realName || !birthDate || !email || !pw || !phone || !sido || !sigugun) return showAuthMsg('모든 항목을 입력해주세요');
-  if (!agreeAge || !agreePrivacy) return showAuthMsg('필수 동의 항목에 체크해주세요');
-  const ageMs = Date.now() - new Date(birthDate).getTime();
-  const age = Math.floor(ageMs / (365.25 * 24 * 60 * 60 * 1000));
-  if (age < 14) return showAuthMsg('만 14세 이상만 가입할 수 있어요');
+  const isYouth = signupRole === 'youth';
+  // 만 14세 확인(생년월일)·거주지역은 미성년자인 청소년 보호를 위한 항목이라 청소년만
+  // 필수 — 끗짱(성인, 기관을 통해 이미 확인된 사람)은 현장 가입 편의를 위해 선택사항으로
+  // 뺌(QA 요청: 9/21 행사에서 끗짱 가입이 번거롭지 않아야 함)
+  if (!name || !realName || !email || !pw || !phone) return showAuthMsg('모든 항목을 입력해주세요');
+  if (isYouth && (!birthDate || !sido || !sigugun)) return showAuthMsg('모든 항목을 입력해주세요');
+  if (!agreePrivacy || (isYouth && !agreeAge)) return showAuthMsg('필수 동의 항목에 체크해주세요');
+  if (isYouth) {
+    const ageMs = Date.now() - new Date(birthDate).getTime();
+    const age = Math.floor(ageMs / (365.25 * 24 * 60 * 60 * 1000));
+    if (age < 14) return showAuthMsg('만 14세 이상만 가입할 수 있어요');
+  }
   if (pw.length < 6) return showAuthMsg('비밀번호는 6자 이상이어야 해요');
-  if (signupRole === 'youth' && !schoolStatus) return showAuthMsg('재학 상태를 선택해주세요');
+  if (isYouth && !schoolStatus) return showAuthMsg('재학 상태를 선택해주세요');
   showAuthMsg('가입 중...');
   const { error } = await sb.auth.signUp({
     email, password: pw,
     options: { data: {
-      name, role: signupRole, real_name: realName, birth_date: birthDate, phone,
-      region_sido: sido, region_sigugun: sigugun,
-      school_status: signupRole === 'youth' ? schoolStatus : null,
+      name, role: signupRole, real_name: realName, birth_date: isYouth ? birthDate : null, phone,
+      region_sido: isYouth ? sido : null, region_sigugun: isYouth ? sigugun : null,
+      school_status: isYouth ? schoolStatus : null,
       marketing_agreed: agreeMarketing,
     } }
   });
@@ -1678,6 +1685,13 @@ function selectSignupRole(role) {
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
   document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
   document.getElementById('kkHint').style.display = role === 'kkutjjang' ? '' : 'none';
+  // 9/21 현장행사 등 끗짱 가입은 빠르게 할 수 있도록, 청소년 미성년자 보호를 위해서만
+  // 필요한 생년월일(만 14세 확인)·거주지역은 끗짱 가입 시 선택사항으로 뺌(QA 요청).
+  // regionWrap/ageAgreeWrap은 원래 display:flex라서 ''로 되돌리면 각각 div/label의
+  // 기본값(block/inline)으로 떨어져 레이아웃이 깨짐 — 'flex'로 명시해서 되돌림
+  document.getElementById('signupBirthWrap').style.display = role === 'youth' ? '' : 'none';
+  document.getElementById('signupRegionWrap').style.display = role === 'youth' ? 'flex' : 'none';
+  document.getElementById('signupAgeAgreeWrap').style.display = role === 'youth' ? 'flex' : 'none';
 }
 
 function showAuthMsg(msg) {
@@ -1708,6 +1722,11 @@ function selectCpRole(role) {
   document.getElementById('cpRoleKk').classList.toggle('active', role === 'kkutjjang');
   document.getElementById('cpYouthExtra').style.display = role === 'youth' ? '' : 'none';
   document.getElementById('cpKkHint').style.display = role === 'kkutjjang' ? '' : 'none';
+  // signupBirthWrap/signupRegionWrap과 같은 이유(QA 요청) — 끗짱은 생년월일/거주지역 선택사항.
+  // regionWrap/ageAgreeWrap은 원래 display:flex라서 'flex'로 명시해서 되돌림
+  document.getElementById('cpBirthWrap').style.display = role === 'youth' ? '' : 'none';
+  document.getElementById('cpRegionWrap').style.display = role === 'youth' ? 'flex' : 'none';
+  document.getElementById('cpAgeAgreeWrap').style.display = role === 'youth' ? 'flex' : 'none';
 }
 function showCompleteProfile(profile) {
   document.getElementById('splashScreen').classList.add('hide');
@@ -1736,15 +1755,20 @@ async function submitCompleteProfile() {
   const agreeAge = document.getElementById('cpAgreeAge').checked;
   const agreePrivacy = document.getElementById('cpAgreePrivacy').checked;
   const agreeMarketing = document.getElementById('cpAgreeMarketing').checked;
-  if (!name || !realName || !birthDate || !phone || !sido || !sigugun) return msg('모든 항목을 입력해주세요');
-  if (!agreeAge || !agreePrivacy) return msg('필수 동의 항목에 체크해주세요');
-  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-  if (age < 14) return msg('만 14세 이상만 가입할 수 있어요');
-  if (cpRole === 'youth' && !schoolStatus) return msg('재학 상태를 선택해주세요');
+  const isYouthCp = cpRole === 'youth';
+  // doSignup()과 동일한 이유(QA 요청) — 끗짱은 생년월일/거주지역/만14세 동의가 선택사항
+  if (!name || !realName || !phone) return msg('모든 항목을 입력해주세요');
+  if (isYouthCp && (!birthDate || !sido || !sigugun)) return msg('모든 항목을 입력해주세요');
+  if (!agreePrivacy || (isYouthCp && !agreeAge)) return msg('필수 동의 항목에 체크해주세요');
+  if (isYouthCp) {
+    const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    if (age < 14) return msg('만 14세 이상만 가입할 수 있어요');
+  }
+  if (isYouthCp && !schoolStatus) return msg('재학 상태를 선택해주세요');
   msg('저장 중...');
   const payload = {
-    name, real_name: realName, birth_date: birthDate, phone,
-    region_sido: sido, region_sigugun: sigugun,
+    name, real_name: realName, birth_date: isYouthCp ? birthDate : null, phone,
+    region_sido: isYouthCp ? sido : null, region_sigugun: isYouthCp ? sigugun : null,
     role: cpRole,
     school_status: cpRole === 'youth' ? schoolStatus : null,
     privacy_agreed_at: new Date().toISOString(),
