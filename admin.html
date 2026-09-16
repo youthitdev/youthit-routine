@@ -52,6 +52,7 @@
   .bulk-bar button { padding:6px 14px; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
   .bulk-approve { background:#2E33BC; color:#fff; }
   .bulk-reject { background:#fff; color:#333; }
+  .bulk-grant { background:#B8860B; color:#fff; }
 
   .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
   .kpi-card { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
@@ -222,6 +223,7 @@
     <span id="bulkCount"></span>
     <button class="bulk-approve" onclick="bulkAction('approved')">일괄 승인</button>
     <button class="bulk-reject" onclick="bulkAction('rejected')">일괄 반려</button>
+    <button class="bulk-grant" id="bulkGrantBtn" onclick="bulkGrantNadaeum()">나다움 지급</button>
   </div>
 
   <div style="overflow-x:auto;" id="tableWrap">
@@ -1845,6 +1847,7 @@ function renderBulkBar() {
     document.getElementById('bulkCount').textContent = currentTab === 'youth'
       ? `${selectedIds.size}명 선택됨 (청소년 서류 승인/반려)`
       : `${selectedIds.size}명 선택됨 (끗짱 가입 승인/반려)`;
+    document.getElementById('bulkGrantBtn').style.display = currentTab === 'youth' ? 'inline-block' : 'none';
   } else {
     bar.style.display = 'none';
   }
@@ -1875,6 +1878,39 @@ async function bulkAction(status) {
       }}).catch(() => {});
     });
   }
+  selectedIds.clear();
+  await loadData();
+}
+
+// 체크한 청소년에게 나다움 포인트 일괄 수동 지급(QA 요청) — 기존엔 리워드 탭에서
+// 한 명씩 검색해서 지급해야 했음. 각자 현재 잔액이 달라 개별 계산이 필요해 벌크
+// UPDATE 한 번으로 못 하고 사용자별로 나눠 처리(grantNadaeum()과 동일한 로직 재사용)
+async function bulkGrantNadaeum() {
+  if (selectedIds.size === 0 || currentTab !== 'youth') return;
+  const amountStr = prompt(`선택한 ${selectedIds.size}명에게 지급할 나다움 포인트를 입력해주세요 (음수 가능):`, '');
+  if (amountStr === null) return;
+  const amount = parseInt(amountStr);
+  if (!amount) { alert('숫자를 입력해주세요.'); return; }
+  const reason = prompt('지급 사유를 입력해주세요 (선택한 모두에게 동일하게 적용돼요):', '');
+  if (reason === null) return;
+  if (!reason.trim()) { alert('지급 사유를 입력해주세요.'); return; }
+  if (!confirm(`선택한 ${selectedIds.size}명에게 각각 ${amount}점을 지급할까요?\n사유: ${reason.trim()}`)) return;
+  const ids = [...selectedIds];
+  let success = 0, fail = 0;
+  await Promise.all(ids.map(async (id) => {
+    const row = youthRows.find(r => r.id === id);
+    const newBalance = (row?.nadaeum || 0) + amount;
+    const { error } = await sb.from('profiles').update({ nadaeum: newBalance }).eq('id', id);
+    if (error) { fail++; return; }
+    success++;
+    await sb.from('nadaeum_log').insert({ user_id: id, amount, reason: '관리자 수동 지급: ' + reason.trim() });
+    sb.functions.invoke('send-push', { body: {
+      user_id: id,
+      title: amount >= 0 ? '✨ 나다움 포인트가 지급됐어요' : '나다움 포인트가 조정됐어요',
+      body: `${amount >= 0 ? '+' : ''}${amount}N — ${reason.trim()}`,
+    }}).catch(() => {});
+  }));
+  alert(`지급 완료: 성공 ${success}명${fail ? `, 실패 ${fail}명` : ''}`);
   selectedIds.clear();
   await loadData();
 }
