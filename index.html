@@ -2810,10 +2810,10 @@ function openRoutineFeed(routineId) {
     <div style="padding:16px 16px 8px;text-align:center;">
       <div style="font-size:28px;margin-bottom:6px;">🏅</div>
       <div style="font-size:13px;color:#888;margin-bottom:14px;">함께한 ${r.people}명, 수고했어요!</div>
-      ${daysSinceEnd<=7 ? `<div style="display:flex;gap:8px;">
+      ${(daysSinceEnd<=7 && isMyDoneRoutine) ? `<div style="display:flex;gap:8px;">
         <button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:11px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
         <button onclick="openLetterOverlay(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="flex:1;padding:11px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
-        ${isMyDoneRoutine?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:11px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
+        <button onclick="openReportCard(${r.id})" style="flex:1;padding:11px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>
       </div>` : ''}
     </div>
     <div style="padding:4px 16px 0;font-size:13px;font-weight:600;color:#111;">📸 그동안의 인증 기록</div>
@@ -3429,10 +3429,10 @@ function openRoutineDetail(id) {
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
-    ${withinGrace?`<div style="display:flex;gap:8px;">
+    ${(withinGrace && isMyDone)?`<div style="display:flex;gap:8px;">
       <button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>
       <button onclick="openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>
-      ${isMyDone?`<button onclick="openReportCard(${r.id})" style="flex:1;padding:13px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>`:''}
+      <button onclick="openReportCard(${r.id})" style="flex:1;padding:13px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>
     </div>`:''}`;
   }
   document.getElementById('rdBody').innerHTML=body;
