@@ -2426,14 +2426,14 @@ function renderRoutineBanners() {
   const nowTs = Date.now();
   const banners = [];
   myRoutines.forEach(r=>{
-    [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징 모임']].forEach(([field,icon,label])=>{
+    [['kickoffAt','🚀','OT'],['closingAt','🎉','공유회']].forEach(([field,icon,label])=>{
       const iso=r[field]; if(!iso) return;
       const diff=new Date(iso).getTime()-nowTs;
       if(_isToday(iso) && diff > -90*60000) { // 오늘, 종료 90분 전까지만 노출 (사전 D-day 배너는 번잡해서 제거)
         banners.push(`<div style="background:linear-gradient(135deg,#FF006C,#FF6B00);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
           <div style="font-size:26px;">${icon}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:700;color:white;">오늘 ${label}! ${_fmtDT(iso).split(' ')[1]}에 만나요</div>
+            <div style="font-size:14px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">오늘 ${label}! ${_fmtDT(iso).split(' ')[1]}에 만나요</div>
             <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title}</div>
           </div>
           ${r.meetingLink?`<a href="${r.meetingLink}" target="_blank" style="flex-shrink:0;padding:9px 14px;background:white;color:#FF006C;border-radius:12px;font-size:12px;font-weight:700;text-decoration:none;">줌 참여</a>`:''}
@@ -4806,7 +4806,7 @@ function kRenderHome() {
   // _isToday가 실제로 "오늘"인 모임만 걸러줌)
   const todayMeets=[];
   myRoutines.forEach(r=>{
-    [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징']].forEach(([f,icon,label])=>{
+    [['kickoffAt','🚀','OT'],['closingAt','🎉','공유회']].forEach(([f,icon,label])=>{
       if(r[f]&&_isToday(r[f])) todayMeets.push({r,iso:r[f],icon,label});
     });
   });
@@ -4814,7 +4814,7 @@ function kRenderHome() {
     <div style="background:linear-gradient(135deg,#FF006C,#FF6B00);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:10px;">
       <div style="font-size:26px;">${icon}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;color:white;">오늘 ${label} ${_fmtDT(iso).split(' ')[1]}</div>
+        <div style="font-size:14px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">오늘 ${label} ${_fmtDT(iso).split(' ')[1]}</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${r.title} · ${r.people}명 참여</div>
       </div>
       ${r.meetingLink?`<a href="${r.meetingLink}" target="_blank" style="flex-shrink:0;padding:9px 14px;background:white;color:#FF006C;border-radius:12px;font-size:12px;font-weight:700;text-decoration:none;">줌 열기</a>`:''}
