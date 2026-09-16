@@ -2506,8 +2506,12 @@ function filterRoutine(type, el) {
 function renderRoutineGrid(type, q) {
   // '참여 중'(active) 필터는 상태만이 아니라 "내가 참여자인" 루틴만 — 홈의 참여 중 목록과 기준 통일
   // '전체' 기본 필터에선 완료된 루틴은 빼서 "지금 뭘 시작할 수 있나" 탐색에 집중되게 함
-  // (완료 루틴은 "완료" 칩으로 여전히 볼 수 있고, MY탭·인증탭에도 별도 진입점이 있음)
-  const base = type==='all' ? state.routines.filter(r=>r.status!=='done')
+  // (완료 루틴은 "완료" 칩으로 여전히 볼 수 있고, MY탭·인증탭에도 별도 진입점이 있음).
+  // 단, 루틴 종료일 당일/다음날에 클로징(공유회) 줌 모임이 잡혀있으면, 종료일이 지나
+  // status가 'done'으로 바뀌자마자 기본 화면(전체)에서 사라져서 정작 그날 줌 링크를
+  // 못 찾는 문제(QA: "공유회 줌 링크가 홈화면에 안 떠요")가 있었음 — 줌 링크가 아직
+  // 유효한 시간대(_zoomLinkVisible)인 완료 루틴은 전체 필터에서도 계속 보이게 함
+  const base = type==='all' ? state.routines.filter(r=>r.status!=='done' || (r.meetingLink && _zoomLinkVisible(r.kickoffAt,r.closingAt)))
     : type==='active' ? _myActiveRoutines()
     : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : state.routines.filter(r=>r.status===type);
