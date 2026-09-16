@@ -2414,9 +2414,13 @@ function renderRoutineBanners() {
 
   const active = _myActiveRoutines();
 
-  // 온라인 모임(OT/클로징) 배너 — 내가 참여한 루틴 중 모임이 오늘이거나 다가오는 것
+  // 온라인 모임(OT/클로징) 배너 — 내가 참여한 루틴 중 모임이 오늘이거나 다가오는 것.
+  // status==='done'도 포함시킴 — 루틴 종료일이 지나 상태가 완료로 바뀌어도 클로징
+  // 모임이 바로 그 다음날인 경우가 많아서, 완료라고 배너 자체가 안 뜨면 정작 클로징
+  // 당일에 이 눈에 띄는 배너(QA가 "전에는 상단에 보였는데" 라고 기억하던 그 배너)를
+  // 못 보게 됨(아래 _isToday 체크가 이미 "오늘" 모임인지는 정확히 걸러줌)
   const myRoutines = state.routines.filter(r =>
-    (r.status==='active'||r.status==='recruit') &&
+    (r.status==='active'||r.status==='recruit'||r.status==='done') &&
     currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id)
   );
   const nowTs = Date.now();
@@ -4798,9 +4802,10 @@ function kRenderHome() {
   document.getElementById('kStatTotalCert').textContent = active.reduce((sum,r)=>sum+(r.certCount||0),0);
 
   // 승인 대기 알림 카드
-  // 오늘 온라인 모임(OT/클로징) 배너
+  // 오늘 온라인 모임(OT/클로징) 배너 — 청소년 쪽과 같은 이유로 done도 포함(아래
+  // _isToday가 실제로 "오늘"인 모임만 걸러줌)
   const todayMeets=[];
-  myRoutines.filter(r=>r.status!=='done').forEach(r=>{
+  myRoutines.forEach(r=>{
     [['kickoffAt','🚀','OT'],['closingAt','🎉','클로징']].forEach(([f,icon,label])=>{
       if(r[f]&&_isToday(r[f])) todayMeets.push({r,iso:r[f],icon,label});
     });
