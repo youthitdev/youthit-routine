@@ -2604,7 +2604,7 @@ function renderRoutineGrid(type, q) {
           ${ddHtml}
         </div>
         ${isRecruit&&r.kickoffAt?`<div style="font-size:10px;color:#FF6B00;font-weight:700;margin-top:4px;">💻 OT ${_fmtDT(r.kickoffAt)}</div>`:''}
-        ${isMine&&r.meetingLink&&_zoomLinkVisible(r.kickoffAt)?`<a href="${r.meetingLink}" target="_blank" onclick="event.stopPropagation();" style="display:inline-block;margin-top:6px;padding:5px 10px;background:#FF006C;color:#fff;border-radius:10px;font-size:10px;font-weight:700;text-decoration:none;">🎥 줌 열기</a>`:''}
+        ${isMine&&r.meetingLink&&_zoomLinkVisible(r.kickoffAt,r.closingAt)?`<a href="${r.meetingLink}" target="_blank" onclick="event.stopPropagation();" style="display:inline-block;margin-top:6px;padding:5px 10px;background:#FF006C;color:#fff;border-radius:10px;font-size:10px;font-weight:700;text-decoration:none;">🎥 줌 열기</a>`:''}
         ${bottom}${nickHtml}
       </div>
     </div>`;
@@ -2666,13 +2666,18 @@ function _isToday(iso) {
   if(!iso) return false;
   return new Date(iso).toDateString() === new Date().toDateString();
 }
-// 줌 링크는 OT 시작 24시간 전부터 뜨고, 시작 1시간 후엔 사라짐(QA 요청) — OT
-// 일정 자체가 없는 루틴이면 기준 시각이 없어서 노출 안 함
-function _zoomLinkVisible(kickoffAtIso) {
-  if(!kickoffAtIso) return false;
-  const kickoff = new Date(kickoffAtIso).getTime();
+// 줌 링크는 모임 시작 24시간 전부터 뜨고, 시작 1시간 후엔 사라짐(QA 요청) — 원래
+// OT(kickoffAt) 기준으로만 판단해서, OT가 지나고 나면 클로징(공유회) 당일이 돼도 버튼이
+// 다시 안 뜨던 문제(QA: "공유회 줌 링크가 홈화면에 안 나와요") — OT/클로징 둘 중 하나라도
+// 지금이 그 시간대(전후 24h/1h)면 보이도록 수정. 일정 자체가 없으면 노출 안 함
+function _zoomLinkVisible(kickoffAtIso, closingAtIso) {
   const now = Date.now();
-  return now >= kickoff - 24*60*60000 && now <= kickoff + 60*60000;
+  const within = (iso) => {
+    if(!iso) return false;
+    const t = new Date(iso).getTime();
+    return now >= t - 24*60*60000 && now <= t + 60*60000;
+  };
+  return within(kickoffAtIso) || within(closingAtIso);
 }
 function _gcalLink(title, iso, link) {
   const s=new Date(iso), e=new Date(s.getTime()+60*60000);
