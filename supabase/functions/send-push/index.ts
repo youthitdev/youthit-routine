@@ -70,12 +70,12 @@ Deno.serve(async (req) => {
   }
   if (!body.title) return json(400, { error: "title은 필수예요" });
 
-  let subs: { id: number; endpoint: string; p256dh: string; auth: string }[] | null = null;
+  let subs: { id: number; user_id: string; endpoint: string; p256dh: string; auth: string }[] | null = null;
   let subErr: { message: string } | null = null;
 
   if (body.target === "all") {
     ({ data: subs, error: subErr } = await supabase
-      .from("push_subscriptions").select("id,endpoint,p256dh,auth"));
+      .from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth"));
   } else if (body.target === "routine") {
     if (!body.routine_id) return json(400, { error: "routine_id가 필요해요" });
     const { data: approved, error: rpErr } = await supabase
@@ -84,15 +84,31 @@ Deno.serve(async (req) => {
     if (rpErr) return json(500, { error: rpErr.message });
     const ids = (approved ?? []).map((p) => p.user_id);
     ({ data: subs, error: subErr } = ids.length
-      ? await supabase.from("push_subscriptions").select("id,endpoint,p256dh,auth").in("user_id", ids)
+      ? await supabase.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", ids)
       : { data: [], error: null });
   } else {
     const targets = body.user_ids ?? (body.user_id ? [body.user_id] : null);
     if (!targets?.length) return json(400, { error: "user_id·user_ids 또는 target이 필요해요" });
     ({ data: subs, error: subErr } = await supabase
-      .from("push_subscriptions").select("id,endpoint,p256dh,auth").in("user_id", targets));
+      .from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", targets));
   }
   if (subErr) return json(500, { error: subErr.message });
+
+  // 관리자가 보낸 알림이 폰 배너(그 순간 못 보면 사라짐)로만 남고 앱 안 알림 내역(🔔)엔
+  // 안 남는다는 피드백(QA) — 일반 트리거 알림은 notify_push()가 notifications 테이블에도
+  // 같이 남기는데, 이 함수는 관리자가 직접 호출하는 경로라 그게 빠져있었음. service role로
+  // RLS 없이 직접 insert(사용자당 구독 기기가 여러 대일 수 있어 user_id로 중복 제거)
+  const uniqueUserIds = [...new Set((subs ?? []).map((s) => s.user_id))];
+  if (uniqueUserIds.length) {
+    await supabase.from("notifications").insert(
+      uniqueUserIds.map((uid) => ({
+        user_id: uid,
+        title: body.title,
+        body: body.body ?? "",
+        link: body.url ?? null,
+      })),
+    );
+  }
 
   const payload = JSON.stringify({
     title: body.title,

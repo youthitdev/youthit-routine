@@ -2659,3 +2659,11 @@ CREATE POLICY "routines_select_public" ON routines FOR SELECT USING (true);
 CREATE POLICY "posts_select_public" ON posts FOR SELECT USING (true);
 CREATE POLICY "pc_select_public" ON post_comments FOR SELECT USING (true);
 CREATE POLICY "pl_select_public" ON post_likes FOR SELECT USING (true);
+
+-- =====================================================
+-- [마이그레이션 2026-09-16a] 끗짱에게 보내는 편지에 사진 첨부
+-- QA: "끗짱님께 보내는 편지에 사진을 올릴수있었으면 좋겠어요!" — letters 테이블에
+-- 사진 URL 컬럼만 추가(letters_select/insert/update 정책은 이미 content 컬럼과
+-- 동일한 기준으로 걸려있어서 그대로 재사용 — 별도 정책 변경 불필요)
+-- =====================================================
+ALTER TABLE letters ADD COLUMN IF NOT EXISTS photo_url text;

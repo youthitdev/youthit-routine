@@ -626,7 +626,7 @@ async function loadData() {
     id: p.id, name: p.name, realName: p.real_name || '', birthDate: p.birth_date || '',
     phone: p.phone || '', sido: p.region_sido || '', sigugun: p.region_sigugun || '',
     schoolStatus: p.school_status || '', verifyStatus: p.verify_status || 'none',
-    verifyDocUrl: p.verify_doc_url || null,
+    verifyDocUrl: p.verify_doc_url || null, nadaeum: p.nadaeum || 0,
     routines: routinesByUser[p.id] || [], createdAt: p.created_at,
   }));
   kkRows = profiles.filter(p => p.role === 'kkutjjang').map(p => ({
@@ -711,8 +711,11 @@ function _filteredRoutines() {
 function sortRows(rows) {
   if (!sortKey) return rows;
   return [...rows].sort((a, b) => {
-    const av = (a[sortKey] ?? '').toString(), bv = (b[sortKey] ?? '').toString();
-    return av.localeCompare(bv, 'ko') * sortDir;
+    const av = a[sortKey], bv = b[sortKey];
+    // 나다움처럼 숫자인 컬럼은 문자열 비교(localeCompare)하면 "9" > "80"처럼 틀리게
+    // 정렬되므로, 둘 다 숫자일 땐 그냥 뺄셈으로 비교
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+    return (av ?? '').toString().localeCompare((bv ?? '').toString(), 'ko') * sortDir;
   });
 }
 function toggleSort(key) {
@@ -1779,6 +1782,7 @@ function renderYouthTable() {
     <th onclick="toggleSort('verifyStatus')">서류상태</th>
     <th>인증서류</th>
     <th>참여 루틴</th>
+    <th onclick="toggleSort('nadaeum')">나다움</th>
     <th onclick="toggleSort('createdAt')">가입일</th>
   </tr>`;
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
@@ -1793,8 +1797,9 @@ function renderYouthTable() {
       <td><span class="pill ${STATUS_CLASS[r.verifyStatus]||'pill-none'}">${STATUS_LABEL[r.verifyStatus]||'미제출'}</span></td>
       <td>${r.verifyDocUrl ? `<button onclick="viewVerifyDoc('${r.verifyDocUrl}')" style="padding:4px 9px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;">서류 보기</button>` : '-'}</td>
       <td><div class="routine-tags">${r.routines.length?r.routines.map(t=>`<span class="routine-tag">${t}</span>`).join(''):'-'}</div></td>
+      <td>${(r.nadaeum||0).toLocaleString()}N</td>
       <td>${(r.createdAt||'').slice(0,10)}</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="11">조건에 맞는 청소년이 없어요</td></tr>`;
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="12">조건에 맞는 청소년이 없어요</td></tr>`;
   renderBulkBar();
 }
 
@@ -1889,8 +1894,8 @@ function exportCSV(tab) {
   const rows = tab === 'youth' ? sortRows(_filteredYouth()) : sortRows(_filteredKk());
   let headers, lines;
   if (tab === 'youth') {
-    headers = ['닉네임','실명','생년월일','휴대폰','시도','시군구','재학상태','서류상태','참여루틴','가입일'];
-    lines = rows.map(r => [r.name, r.realName, r.birthDate, r.phone, r.sido, r.sigugun, SCHOOL_LABEL[r.schoolStatus]||'', STATUS_LABEL[r.verifyStatus]||'', r.routines.join('|'), (r.createdAt||'').slice(0,10)]);
+    headers = ['닉네임','실명','생년월일','휴대폰','시도','시군구','재학상태','서류상태','참여루틴','나다움','가입일'];
+    lines = rows.map(r => [r.name, r.realName, r.birthDate, r.phone, r.sido, r.sigugun, SCHOOL_LABEL[r.schoolStatus]||'', STATUS_LABEL[r.verifyStatus]||'', r.routines.join('|'), r.nadaeum||0, (r.createdAt||'').slice(0,10)]);
   } else {
     headers = ['닉네임','실명','휴대폰','시도','시군구','승인상태','가입일'];
     lines = rows.map(r => [r.name, r.realName, r.phone, r.sido, r.sigugun, STATUS_LABEL[r.status]||'', (r.createdAt||'').slice(0,10)]);

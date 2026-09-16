@@ -995,6 +995,7 @@ select:focus { outline: none; border-color: #2E33BC; }
           <span style="font-size:11px;color:#aaa;"><span id="letterCharCount">0</span>/500</span>
         </div>
       </div>
+      <div style="margin-bottom:16px;"><div class="field-label">사진 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div class="photo-upload" id="letterPhotoUpload" style="height:120px;" onclick="document.getElementById('letterPhotoInput').click()"><i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div></div><input type="file" id="letterPhotoInput" accept="image/*" style="display:none;" onchange="handleLetterPhoto(event)"></div>
       <button class="primary-btn" id="letterSubmitBtn" disabled onclick="submitLetter()">편지 보내기 💌</button>
       <button onclick="closeOverlay('letterOverlay')" style="width:100%;padding:12px;background:none;border:none;font-size:14px;color:#aaa;cursor:pointer;">나중에 쓸게요</button>
     </div>
@@ -1067,6 +1068,7 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="overlay-body">
       <div style="background:#f0f1fb;border-radius:16px;padding:20px;">
         <div style="font-size:11px;color:#888;margin-bottom:12px;" id="letterDetailMeta"></div>
+        <img id="letterDetailPhoto" style="display:none;width:100%;border-radius:12px;margin-bottom:14px;object-fit:cover;cursor:pointer;" onclick="openPhotoLightbox(this.src)">
         <div style="font-size:15px;color:#111;line-height:1.8;white-space:pre-wrap;" id="letterDetailContent"></div>
         <div style="text-align:right;margin-top:16px;font-size:13px;color:#888;" id="letterDetailSign"></div>
       </div>
@@ -2070,7 +2072,7 @@ async function loadBanners() {
 // 그 루틴의 담당 끗짱/관리자에게만 자동으로 스코핑해줌
 async function loadLetters() {
   if (!currentUser) { state.letters = []; return; }
-  const { data, error } = await sb.from('letters').select('id,from_user_id,routine_id,content,opened,created_at').order('created_at', { ascending: false });
+  const { data, error } = await sb.from('letters').select('id,from_user_id,routine_id,content,photo_url,opened,created_at').order('created_at', { ascending: false });
   if (error) { console.error('편지 로드 실패', error); return; }
   const rows = data || [];
   const userIds = [...new Set(rows.map(l => l.from_user_id))];
@@ -2083,7 +2085,7 @@ async function loadLetters() {
   const titleById = {}; (routRes.data || []).forEach(r => titleById[r.id] = r.title);
   state.letters = rows.map(l => ({
     id: l.id, from: nameById[l.from_user_id] || '익명', routine: titleById[l.routine_id] || '',
-    content: l.content, opened: !!l.opened, date: _relDate(l.created_at),
+    content: l.content, photoUrl: l.photo_url || null, opened: !!l.opened, date: _relDate(l.created_at),
   }));
 }
 let _bannerRotateIdx = 0;
@@ -5614,7 +5616,10 @@ function kRenderMy() {
           ${!l.opened?'<span style="background:#FF006C;color:white;font-size:10px;padding:2px 7px;border-radius:10px;">NEW</span>':''}
           <span style="font-size:11px;color:#aaa;">${l.date}</span>
         </div>
-        <div style="font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
+          ${l.photoUrl?`<img src="${l.photoUrl}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;">`:''}
+        </div>
       </div>`).join('')
       +(letters.length>2?`<div class="more-btn" onclick="openAllLetters()">편지 더보기 (${letters.length}통) <i class="ti ti-chevron-right" style="font-size:13px;"></i></div>`:'')
     :`<div style="padding:24px 16px;text-align:center;font-size:13px;color:#aaa;">아직 받은 편지가 없어요</div>`;
@@ -5667,7 +5672,10 @@ function openAllLetters() {
         ${!l.opened?'<span style="background:#FF006C;color:white;font-size:10px;padding:2px 7px;border-radius:10px;">NEW</span>':''}
         <span style="font-size:11px;color:#aaa;">${l.date}</span>
       </div>
-      <div style="font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="flex:1;min-width:0;font-size:13px;color:#555;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${l.content}</div>
+        ${l.photoUrl?`<img src="${l.photoUrl}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;">`:''}
+      </div>
     </div>`).join('');
   openOverlay('letterAllOverlay');
 }
@@ -5679,6 +5687,9 @@ function openLetter(id) {
   l.opened=true; save();
   document.getElementById('letterDetailFrom').textContent=l.from;
   document.getElementById('letterDetailMeta').textContent=`${l.routine} 완주 · ${l.date}`;
+  const photoEl = document.getElementById('letterDetailPhoto');
+  if(l.photoUrl) { photoEl.src = l.photoUrl; photoEl.style.display = 'block'; }
+  else { photoEl.style.display = 'none'; photoEl.src = ''; }
   document.getElementById('letterDetailContent').textContent=l.content;
   document.getElementById('letterDetailSign').textContent=`— ${l.from} 드림`;
   kRenderMy();
@@ -5888,6 +5899,7 @@ function openLetterOverlay(routineId,title) {
   document.getElementById('letterCountHint').textContent='최소 20자 이상 작성해주세요';
   document.getElementById('letterCountHint').className='count-not';
   document.getElementById('letterSubmitBtn').disabled=true;
+  _resetLetterPhotoUpload();
   openOverlay('letterOverlay');
 }
 function updateLetterCount() {
@@ -5898,13 +5910,43 @@ function updateLetterCount() {
   else{h.textContent=`최소 20자 이상 작성해주세요 (${20-v}자 남음)`;h.className='count-not';}
   document.getElementById('letterSubmitBtn').disabled=v<20;
 }
+let letterPhotoFile = null;
+function _resetLetterPhotoUpload() {
+  letterPhotoFile = null;
+  const pu = document.getElementById('letterPhotoUpload');
+  pu.className = 'photo-upload';
+  pu.innerHTML = `<i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div>`;
+  pu.onclick = () => document.getElementById('letterPhotoInput').click();
+}
+function _showLetterPhotoPreview(url) {
+  const pu = document.getElementById('letterPhotoUpload');
+  pu.className = 'photo-upload has-photo';
+  pu.innerHTML = `<img class="photo-prev-img" src="${url}"><div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.5);border-radius:20px;padding:3px 9px;font-size:11px;color:white;">변경</div>`;
+  pu.onclick = () => document.getElementById('letterPhotoInput').click();
+}
+async function handleLetterPhoto(e) {
+  const f = e.target.files[0]; if(!f) return;
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  try {
+    letterPhotoFile = await _resizeImageFile(f, 1280, 0.82);
+  } catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  _showLetterPhotoPreview(letterPhotoFile);
+}
 async function submitLetter() {
   if(!currentUser){alert('로그인이 필요해요.');return;}
   const content=document.getElementById('letterContent').value.trim();
   const btn=document.getElementById('letterSubmitBtn');
   if(btn){btn.disabled=true;btn.textContent='보내는 중...';}
+  let photoUrl = null;
+  if(letterPhotoFile) {
+    const blob = _dataURLtoBlob(letterPhotoFile);
+    const path = `${currentUser.id}/letter_${Date.now()}.jpg`;
+    const { error: upErr } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
+    if(upErr){ alert('사진 업로드 실패: '+upErr.message); if(btn){btn.disabled=false;btn.textContent='편지 보내기 💌';} return; }
+    photoUrl = sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
+  }
   const { error } = await sb.from('letters').insert({
-    from_user_id: currentUser.id, routine_id: currentLetterRoutineId, content,
+    from_user_id: currentUser.id, routine_id: currentLetterRoutineId, content, photo_url: photoUrl,
   });
   if(btn){btn.disabled=false;btn.textContent='편지 보내기 💌';}
   if(error){alert('편지 보내기 실패: '+error.message);return;}
