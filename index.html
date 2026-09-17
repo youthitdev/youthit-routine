@@ -3441,7 +3441,8 @@ function openRoutineDetail(id) {
       <div style="font-size:13px;color:#888;line-height:1.6;">최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강됐어요</div>
     </div>`;
   else if(r.status==='active') body+=`
-    <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;">🗓 이미 시작돼서 모집이 마감됐어요</div>`;
+    <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;margin-bottom:10px;">🗓 이미 시작돼서 모집이 마감됐어요</div>
+    <button onclick="openRoutineFeed(${r.id})" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📸 인증 사진 보기</button>`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     // 완주 직후에만 의미있는 액션들이라 종료일로부터 7일까지만 노출
@@ -3455,6 +3456,7 @@ function openRoutineDetail(id) {
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
+    <button onclick="openRoutineFeed(${r.id})" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:${(withinGrace && isMyDone)?'8':'0'}px;">📸 인증 사진 보기</button>
     ${(withinGrace && isMyDone)?`<div style="display:flex;gap:8px;">
       ${hasReview?`<button disabled style="flex:1;padding:13px 8px;background:#f0f0f0;color:#bbb;border:1.5px solid #e5e5e5;border-radius:12px;font-size:13px;font-weight:600;cursor:default;">✍️ 후기 작성완료</button>`:`<button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>`}
       ${hasLetter?`<button disabled style="flex:1;padding:13px 8px;background:#f0f0f0;color:#bbb;border:1.5px solid #e5e5e5;border-radius:12px;font-size:13px;font-weight:600;cursor:default;">💌 편지 전송완료</button>`:`<button onclick="openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>`}
