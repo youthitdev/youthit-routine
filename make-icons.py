@@ -62,11 +62,17 @@ def seg_dist(px_, py, x1, y1, x2, y2):
         ((px_ - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
     return math.hypot(px_ - (x1 + t * dx), py - (y1 + t * dy))
 
-def spark(cx, cy, R, w, inner_ratio=0.36):
+# 유스보이스 로고를 픽셀 단위로 재서 맞춘 값.
+# 선 굵기는 마크 지름의 약 8% 인데, 그대로 쓰면 32px 파비콘에서 흐려진다.
+# 11% 로 조금만 두껍게 해 눈에 띄게 얇으면서 작은 크기에서도 버티게 했다
+SPARK_ANGLE = 37      # 대각선 각도 (로고 실측 ±36~39)
+SPARK_INNER = 0.26    # 가운데 빈 구멍 / 바깥 반지름
+
+def spark(cx, cy, R, w, inner_ratio=SPARK_INNER, ang=SPARK_ANGLE):
     """유스보이스 마크 — 가운데가 빈 6갈래. 세로 2 + 대각선 4"""
     inner = R * inner_ratio
     segs = []
-    for a in (-90, 90, -150, -30, 150, 30):
+    for a in (-90, 90, -180 + ang, -ang, 180 - ang, ang):
         r = math.radians(a)
         segs.append((cx + math.cos(r)*inner, cy + math.sin(r)*inner,
                      cx + math.cos(r)*R,     cy + math.sin(r)*R))
@@ -149,7 +155,7 @@ def write_png(path, size, px_):
 # ── 한끗루틴 ────────────────────────────────────────────
 # 흰 고리 ◯ + 오른쪽 위 유스보이스 마크(노란 단색).
 # 마크 자리·크기는 원래 노란 점(cx134 cy60 r17)을 그대로 이어받는다
-RING  = lambda: [ring(96, 96, 40, 24), spark(134, 58, 24, 10)]
+RING  = lambda: [ring(96, 96, 40, 24), spark(134, 58, 26, 6)]
 BLUE  = ((0x2B, 0x76, 0xFB), (0x18, 0x58, 0xE3))   # 지금 아이콘에서 뽑은 색
 PINK  = ((0xFF, 0x00, 0x6C), (0xFF, 0x4D, 0x94))   # 관리자
 
