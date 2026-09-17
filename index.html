@@ -2511,10 +2511,10 @@ function filterRoutine(type, el) {
 
 function renderRoutineGrid(type, q) {
   // '참여 중'(active) 필터는 상태만이 아니라 "내가 참여자인" 루틴만 — 홈의 참여 중 목록과 기준 통일
-  // '전체'는 상태와 무관하게 등록된 루틴을 전부 보여줌(완료·폐강 포함) — 원래는 완료 루틴을
-  // 뺐었는데(QA: "전체에는 모든게 다 보이면 좋겠어"), 완료/폐강도 "완료"·다른 칩으로 따로
-  // 볼 필요 없이 전체에서 한눈에 보이길 원해서 제외 없이 다 보여주도록 변경(2026-09-17)
-  const base = type==='all' ? state.routines
+  // '전체'는 완료 루틴도 포함해서 다 보여줌(QA: "전체에는 모든게 다 보이면 좋겠어") —
+  // 단, 폐강된 루틴은 다시 봐도 의미가 없다고 판단해 계속 제외(QA: "폐강된 루틴은
+  // 안보여도 될 것 같아")
+  const base = type==='all' ? state.routines.filter(r=>r.status!=='cancelled')
     : type==='active' ? _myActiveRoutines()
     : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
     : state.routines.filter(r=>r.status===type);
