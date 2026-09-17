@@ -205,7 +205,7 @@ select:focus { outline: none; border-color: #2E33BC; }
 .ys-logo-wrap { position: relative; width: 100px; height: 100px; }
 .ys-ring { width: 100px; height: 100px; border-radius: 50%; border: 17px solid white; position: absolute; inset: 0; }
 .ys-arm { position: absolute; inset: 0; transform-origin: 50px 50px; animation: ysArm 1.2s cubic-bezier(0.5,0,0.3,1) forwards; }
-.ys-dot { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; border-radius: 50%; background: #FFD700; animation: ysDotPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 1.15s both; }
+.ys-dot { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; animation: ysDotPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 1.15s both; }
 @keyframes ysArm { from { transform: rotate(30deg); } to { transform: rotate(390deg); } }
 @keyframes ysDotPop { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.6); } 70% { transform: translateX(-50%) scale(0.85); } 100% { transform: translateX(-50%) scale(1); } }
 .ys-name { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
@@ -282,7 +282,17 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div class="ys-logo-wrap">
       <div class="ys-ring"></div>
       <div class="ys-arm">
-        <div class="ys-dot"></div>
+        <!-- 노란 점 -> 유스보이스 마크(가운데가 빈 6갈래 별, logo-blue.svg와 동일 모양·색)로 교체(2026-09-17 로고 변경 반영) -->
+        <svg class="ys-dot" viewBox="0 0 48 48">
+          <g stroke="#FFD600" stroke-width="10" stroke-linecap="round">
+            <line x1="24" y1="15.4" x2="24" y2="0"/>
+            <line x1="24" y1="32.6" x2="24" y2="48"/>
+            <line x1="16.5" y1="19.7" x2="3.2" y2="12"/>
+            <line x1="31.5" y1="19.7" x2="44.8" y2="12"/>
+            <line x1="16.5" y1="28.3" x2="3.2" y2="36"/>
+            <line x1="31.5" y1="28.3" x2="44.8" y2="36"/>
+          </g>
+        </svg>
       </div>
     </div>
     <div class="ys-name">Youth-it</div>
