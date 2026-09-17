@@ -2667,3 +2667,50 @@ CREATE POLICY "pl_select_public" ON post_likes FOR SELECT USING (true);
 -- 동일한 기준으로 걸려있어서 그대로 재사용 — 별도 정책 변경 불필요)
 -- =====================================================
 ALTER TABLE letters ADD COLUMN IF NOT EXISTS photo_url text;
+
+-- =====================================================
+-- [마이그레이션 2026-09-17a] 후기 나다움 중복 지급 방지
+-- QA: "후기를 작성하고, 삭제 후에 다시 작성 했을 때 포인트가 또 지급되었다"
+-- 원인: award_review_nadaeum()이 "이미 지급했는지"를 posts 테이블에 그 루틴의 리뷰
+-- 글이 남아있는지로 판단하고 있었음 — 후기를 삭제하면 그 행이 사라지므로, 다시 작성하면
+-- prior_count가 다시 0이 되어 나다움이 또 지급됨. 삭제해도 남는 지급 이력(nadaeum_log)을
+-- 기준으로 판단하도록 바꾸고, 동시 요청(레이스 컨디션)에도 안전하도록 부분 유니크
+-- 인덱스로 DB 레벨에서 "루틴당 1회"를 직접 강제(댓글 나다움처럼 nadaeum_log를
+-- 근거로 삼는 방식과 통일 — 댓글은 하루 상한이라 유니크 제약까진 필요 없었음)
+-- =====================================================
+ALTER TABLE nadaeum_log ADD COLUMN IF NOT EXISTS routine_id bigint REFERENCES routines(id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS nadaeum_log_review_once_per_routine
+  ON nadaeum_log (user_id, routine_id)
+  WHERE reason = '후기 작성';
+
+CREATE OR REPLACE FUNCTION award_review_nadaeum() RETURNS TRIGGER AS $$
+DECLARE inserted_id bigint;
+BEGIN
+  IF NEW.type <> 'review' OR NEW.routine_id IS NULL THEN RETURN NEW; END IF;
+  INSERT INTO nadaeum_log(user_id, amount, reason, routine_id)
+  VALUES (NEW.author_id, 30, '후기 작성', NEW.routine_id)
+  ON CONFLICT (user_id, routine_id) WHERE reason = '후기 작성' DO NOTHING
+  RETURNING id INTO inserted_id;
+  IF inserted_id IS NOT NULL THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 30 WHERE id = NEW.author_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- [마이그레이션 2026-09-17b] 다른 루틴 인증 사진 미리보기(썸네일만) 공개
+-- QA: "다른 루틴게시글도 볼 수 있으면 좋겠다 - 단, 게시물 썸네일까지는 가능하지만,
+-- 게시물 클릭하여 내용은 볼 수 없도록." — 인증 사진만 따로 공개하는 전용 뷰를 추가.
+-- 소감(content)·좋아요·댓글은 이 뷰에 아예 담지 않아 노출되지 않고, certifications
+-- 테이블 자체의 RLS(참여자·담당 끗짱·관리자만 전체 내용 조회 가능, 2026-07-25k)는
+-- 그대로 유지 — 상세 화면(openCertFeedDetail 등)은 여전히 참여자만 실제로 열람 가능함.
+-- 로그인 안 한 방문자에게까지 열 필요는 없다고 판단해 anon에는 권한을 안 줌
+-- (profiles_public/routine_people_count와 달리 authenticated만 허용).
+-- =====================================================
+CREATE OR REPLACE VIEW certifications_public AS
+  SELECT id, routine_id, user_id, photo_url, photo_urls, created_at
+  FROM certifications;
+GRANT SELECT ON certifications_public TO authenticated;
