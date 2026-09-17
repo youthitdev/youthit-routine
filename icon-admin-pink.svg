@@ -1,3 +1,4 @@
+<!-- 관리자 화면 탭 구분용 — 같은 마크의 핑크 변형 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
@@ -7,5 +8,12 @@
   </defs>
   <rect width="192" height="192" rx="44" fill="url(#g)"/>
   <circle cx="96" cy="96" r="40" fill="none" stroke="#ffffff" stroke-width="24"/>
-  <circle cx="134" cy="60" r="17" fill="#FFD600"/>
+  <g stroke="#FFD600" stroke-width="10" stroke-linecap="round">
+  <line x1="134.0" y1="49.4" x2="134.0" y2="34.0"/>
+  <line x1="134.0" y1="66.6" x2="134.0" y2="82.0"/>
+  <line x1="126.5" y1="53.7" x2="113.2" y2="46.0"/>
+  <line x1="141.5" y1="53.7" x2="154.8" y2="46.0"/>
+  <line x1="126.5" y1="62.3" x2="113.2" y2="70.0"/>
+  <line x1="141.5" y1="62.3" x2="154.8" y2="70.0"/>
+  </g>
 </svg>
