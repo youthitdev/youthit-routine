@@ -3544,9 +3544,16 @@ function renderCertTab() {
     return;
   }
   const doneCount = active.filter(r=>r.todayCert).length;
+  // 지금 참여/대기 중인 루틴이 하나도 없으면(완주한 루틴만 있어도) 새 루틴을 찾도록
+  // 안내(QA: "인증탭에서 진행 중인 루틴이 없을 땐 루틴 둘러보기가 나오는게 낫지 않아?")
+  const browsePromptHtml = (active.length===0 && upcoming.length===0) ? `
+    <div style="margin:16px;padding:20px 16px;text-align:center;border:0.5px solid #eee;border-radius:16px;background:#fafbff;">
+      <div style="font-size:13px;color:#555;margin-bottom:10px;">지금 참여 중인 루틴이 없어요</div>
+      <button onclick="goToRecruitRoutines()" style="padding:10px 22px;background:#2E33BC;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">루틴 둘러보기</button>
+    </div>` : '';
   // 카드 전체 클릭은 그 루틴의 인증글 피드로 이동(참여자만 볼 수 있음, openRoutineFeed에서
   // 가드). "인증하기" 버튼만 별도로 눌러야 인증 폼이 열리도록 stopPropagation 분리
-  el.innerHTML = (upcoming.length>0 ? `<div style="padding:14px 16px 6px;">
+  el.innerHTML = browsePromptHtml + (upcoming.length>0 ? `<div style="padding:14px 16px 6px;">
       <div style="font-size:15px;font-weight:700;color:#111;">곧 시작해요</div>
       <div style="font-size:12px;color:#888;margin-top:2px;">시작일부터 인증할 수 있어요</div>
     </div>` +
@@ -3583,9 +3590,10 @@ function renderCertTab() {
         ?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;background:#EAF3DE;color:#3B6D11;flex-shrink:0;">인증 완료</span>`
         :`<span onclick="event.stopPropagation();selectCertRoutine(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:10px;background:#2E33BC;color:#fff;flex-shrink:0;">인증하기</span>`}
     </div>`).join('') : '') +
-    (done.length>0 ? `<div style="padding:20px 16px 6px;">
-      <div style="font-size:15px;font-weight:700;color:#111;">완주한 루틴</div>
-      <div style="font-size:12px;color:#888;margin-top:2px;">인증글을 모아볼 수 있어요</div>
+    (done.length>0 ? `<div style="padding:20px 16px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="openMyCompleted()">
+      <div><div style="font-size:15px;font-weight:700;color:#111;">완주한 루틴</div>
+      <div style="font-size:12px;color:#888;margin-top:2px;">인증글을 모아볼 수 있어요</div></div>
+      <i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;flex-shrink:0;"></i>
     </div>` + done.map(r=>`<div onclick="openRoutineFeed(${r.id})" style="display:flex;align-items:center;gap:12px;margin:8px 16px;padding:14px;border:0.5px solid #e8e8e8;border-radius:16px;cursor:pointer;background:#fafafa;">
       <div style="width:42px;height:42px;border-radius:12px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${r.emoji}</div>
       <div style="flex:1;min-width:0;">
