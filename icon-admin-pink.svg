@@ -8,12 +8,12 @@
   </defs>
   <rect width="192" height="192" rx="44" fill="url(#g)"/>
   <circle cx="96" cy="96" r="40" fill="none" stroke="#ffffff" stroke-width="24"/>
-  <g stroke="#FFD600" stroke-width="6" stroke-linecap="round">
-    <line x1="134.0" y1="51.2" x2="134.0" y2="32.0"/>
-    <line x1="134.0" y1="64.8" x2="134.0" y2="84.0"/>
-    <line x1="128.6" y1="53.9" x2="113.2" y2="42.4"/>
-    <line x1="139.4" y1="53.9" x2="154.8" y2="42.4"/>
-    <line x1="128.6" y1="62.1" x2="113.2" y2="73.6"/>
-    <line x1="139.4" y1="62.1" x2="154.8" y2="73.6"/>
+  <g stroke="#FFD600" stroke-width="10" stroke-linecap="round">
+    <line x1="134.0" y1="49.4" x2="134.0" y2="34.0"/>
+    <line x1="134.0" y1="66.6" x2="134.0" y2="82.0"/>
+    <line x1="126.5" y1="53.7" x2="113.2" y2="46.0"/>
+    <line x1="141.5" y1="53.7" x2="154.8" y2="46.0"/>
+    <line x1="126.5" y1="62.3" x2="113.2" y2="70.0"/>
+    <line x1="141.5" y1="62.3" x2="154.8" y2="70.0"/>
   </g>
 </svg>
