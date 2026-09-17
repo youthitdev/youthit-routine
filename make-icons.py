@@ -90,8 +90,12 @@ def ring(cx, cy, r, w, color=(255,255,255), alpha=1.0):
             'bbox': (cx - r - w, cy - r - w, cx + r + w, cy + r + w)}
 
 # ── 그리기 ──────────────────────────────────────────────
-def render(size, c0, c1, shapes, maskable=False):
-    scale, off = (0.72, 26.88) if maskable else (1.0, 0.0)
+# bleed=True  모서리를 깎지 않고 꽉 채운다 (홈 화면용)
+# k           내용 크기. 안드로이드 maskable 은 0.72 로 줄여 안전영역에 넣고,
+#             아이폰은 스퀘어클로 조금만 깎으므로 0.88 이면 충분하다
+def render(size, c0, c1, shapes, bleed=False, k=1.0):
+    scale, off = k, BASE * (1 - k) / 2
+    maskable = bleed
     k = BASE / size                      # 출력 픽셀 → 192 좌표
     px_ = bytearray(size * size * 4)
     step, o0 = 1.0 / SS, 1.0 / (2 * SS)
@@ -161,10 +165,12 @@ PINK  = ((0xFF, 0x00, 0x6C), (0xFF, 0x4D, 0x94))   # 관리자
 
 if __name__ == '__main__':
     print('한끗루틴 아이콘 굽는 중…')
-    jobs = [('icon-192.png',           192, BLUE, False),
-            ('icon-512.png',           512, BLUE, False),
-            ('icon-192-maskable.png',  192, BLUE, True),
-            ('icon-512-maskable.png',  512, BLUE, True)]
-    for name, size, (c0, c1), mask in jobs:
-        write_png(name, size, render(size, c0, c1, RING(), mask))
-    print('끝. 탭 아이콘은 모서리 바깥 투명, maskable 은 꽉 참.')
+    #        파일                      크기  색    꽉참   내용크기
+    jobs = [('icon-192.png',           192, BLUE, False, 1.00),   # 탭 — 모서리 투명
+            ('icon-512.png',           512, BLUE, False, 1.00),
+            ('icon-192-maskable.png',  192, BLUE, True,  0.72),   # 안드로이드
+            ('icon-512-maskable.png',  512, BLUE, True,  0.72),
+            ('icon-apple.png',         192, BLUE, True,  0.88)]   # 아이폰 홈 화면
+    for name, size, (c0, c1), bleed, k in jobs:
+        write_png(name, size, render(size, c0, c1, RING(), bleed, k))
+    print('끝. 탭은 모서리 투명, 홈 화면(maskable·apple)은 꽉 참.')
