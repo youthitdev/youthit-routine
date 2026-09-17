@@ -209,6 +209,11 @@ select:focus { outline: none; border-color: #2E33BC; }
 @keyframes ysArm { from { transform: rotate(30deg); } to { transform: rotate(390deg); } }
 @keyframes ysDotPop { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.6); } 70% { transform: translateX(-50%) scale(0.85); } 100% { transform: translateX(-50%) scale(1); } }
 .ys-name { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
+/* 화면 움직임을 불편해하는 사람에게는 돌리지 않는다. 완성된 모습만 보여준다 */
+@media (prefers-reduced-motion: reduce) {
+  .ys-arm { animation: none; transform: rotate(30deg); }
+  .ys-dot { animation: none; opacity: 1; }
+}
 
 /* 온보딩 */
 .onboarding { position: absolute; inset: 0; background: #fff; z-index: 600; display: flex; flex-direction: column; overflow: hidden; }
