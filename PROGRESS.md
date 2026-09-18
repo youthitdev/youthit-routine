@@ -1343,6 +1343,14 @@ QA 신규 6항목 배치 중 6번: "루틴탭 전체 탭에서는 모집중/진�
 - DB 변경 없음
 - 검증: 브라우저에서 admin.html 로드 후 `sb.auth.storageKey`가 `sb-ynqvhsffoesjzefitafv-admin-auth-token`으로 index.html과 다르게 분리된 것, 콘솔 에러 없이 정상 로드되는 것 확인
 
+## 최근 완료 (2026-09-18, 이어서 — "인증 사진 보기" 클릭해도 안 뜨고 뒤로가기 눌러야 뜨던 버그)
+
+- **요청**: "비로그인-인증사진보기 클릭하면 인증페이지가 안나오고, 뒤로가기 누르면 인증페이지가 나와."
+- **원인**: 모든 `.overlay`가 같은 z-index(200)를 공유해서, 루틴 상세 화면(`routineDetailOverlay`)이 열려있는 상태에서 그 화면 안의 버튼으로 `openRoutineFeed()`(→ `routineFeedOverlay`)를 곧바로 열면, 이미 열려있던 `routineDetailOverlay`에 가려 안 보이다가 그걸 닫을 때(뒤로가기)에야 드러남 — 이전에 다른 화면(`myCompletedOverlay`)에서 이미 한 번 발견돼 `closeOverlay()`를 먼저 부르는 식으로 고쳐뒀던 것과 똑같은 유형의 문제였는데, 어제 새로 추가한 "인증 사진 보기" 버튼엔 그 처리가 빠져있었음
+- **수정**: `openRoutineDetail`의 "인증 사진 보기" 버튼(진행중/완료 루틴 두 곳) onclick에 `closeOverlay('routineDetailOverlay')`를 먼저 호출하도록 추가
+- DB 변경 없음
+- 검증: 브라우저에서 비로그인 상태로 루틴 상세 화면을 연 뒤 버튼 클릭 → `routineDetailOverlay`는 닫히고 `routineFeedOverlay`가 즉시 열리는 것을 확인(이전엔 둘 다 열린 상태로 남아 뒤에 가려짐). 스크린샷으로 클릭 즉시 인증 사진 미리보기 화면이 뜨는 것 확인
+
 ## 기술 부채 (급하지 않음)
 
 - `index.html` 단일 파일 240KB+ — 필요시 CSS/JS 분리 검토
