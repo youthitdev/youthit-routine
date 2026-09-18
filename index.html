@@ -3459,7 +3459,7 @@ function openRoutineDetail(id) {
     </div>`;
   else if(r.status==='active') body+=`
     <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;margin-bottom:10px;">🗓 이미 시작돼서 모집이 마감됐어요</div>
-    <button onclick="closeOverlay('routineDetailOverlay');openRoutineFeed(${r.id})" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📸 인증 사진 보기</button>`;
+    <button onclick="_switchOverlayInstant('routineDetailOverlay', () => openRoutineFeed(${r.id}))" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📸 인증 사진 보기</button>`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
     // 완주 직후에만 의미있는 액션들이라 종료일로부터 7일까지만 노출
@@ -3473,7 +3473,7 @@ function openRoutineDetail(id) {
       <div style="font-size:32px;margin-bottom:8px;">🏅</div>
       <div style="font-size:14px;color:#888;margin-bottom:20px;">함께한 ${r.people}명, 수고했어요!</div>
     </div>
-    <button onclick="closeOverlay('routineDetailOverlay');openRoutineFeed(${r.id})" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:${(withinGrace && isMyDone)?'8':'0'}px;">📸 인증 사진 보기</button>
+    <button onclick="_switchOverlayInstant('routineDetailOverlay', () => openRoutineFeed(${r.id}))" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:${(withinGrace && isMyDone)?'8':'0'}px;">📸 인증 사진 보기</button>
     ${(withinGrace && isMyDone)?`<div style="display:flex;gap:8px;">
       ${hasReview?`<button disabled style="flex:1;padding:13px 8px;background:#f0f0f0;color:#bbb;border:1.5px solid #e5e5e5;border-radius:12px;font-size:13px;font-weight:600;cursor:default;">✍️ 후기 작성완료</button>`:`<button onclick="openCommWriteWithRoutine(${r.id},'review')" style="flex:1;padding:13px 8px;background:#2E33BC;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">✍️ 후기</button>`}
       ${hasLetter?`<button disabled style="flex:1;padding:13px 8px;background:#f0f0f0;color:#bbb;border:1.5px solid #e5e5e5;border-radius:12px;font-size:13px;font-weight:600;cursor:default;">💌 편지 전송완료</button>`:`<button onclick="openLetterOverlay(${r.id},'${r.title}')" style="flex:1;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">💌 편지</button>`}
@@ -6195,6 +6195,20 @@ function closeOverlay(id) {
   }
   const backs = (wasOpen?1:0) + extraSubviews;
   if(backs>0) { _selfTriggeredBackCount += backs; for(let i=0;i<backs;i++) history.back(); }
+}
+// 같은 z-index를 쓰는 오버레이 A가 열려있는 동안 B를 곧바로 열어야 할 때 — closeOverlay로
+// A를 닫고 바로 openOverlay로 B를 열면 둘 다 동시에 슬라이드 애니메이션이 겹쳐서 화면이
+// "휙" 튀는 것처럼 보임(QA: "인증사진보기 클릭하면 빠르게 휙 옆에서 나타나는데, 부드럽게
+// 해줘"). A는 애니메이션 없이 즉시 감추고 B만 부드럽게 슬라이드 인 되도록 분리
+function _switchOverlayInstant(fromId, openFn) {
+  const el = document.getElementById(fromId);
+  if (el) el.style.transition = 'none';
+  closeOverlay(fromId);
+  openFn();
+  if (el) {
+    void el.offsetWidth; // transition:none이 실제로 적용되도록 강제 리플로우
+    requestAnimationFrame(() => { el.style.transition = ''; });
+  }
 }
 function openSheet(id) { document.getElementById(id).classList.add('open'); _navPushModal('sheet', id); }
 function closeSheet(id) {
