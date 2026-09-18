@@ -3082,8 +3082,11 @@ function _certTextRowHtml(c) {
   `;
 }
 function _certPhotoDisplayHtml(c) {
+  // 사진 1장이면 본문 폭에 맞춰 원본 비율 그대로(잘리지 않게) 보여줌(QA: "본문 글에서
+  // 사진은 사이즈 그대로 해줘" — 가로로 긴 사진이 200px 높이에 잘려 보이던 문제).
+  // 여러 장이면 가로 스크롤 썸네일 목록이라 칸 높이를 맞춰야 해서 기존처럼 자름
   return (c.photos && c.photos.length)
-    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="width:${c.photos.length>1?'160px':'100%'};height:200px;object-fit:cover;border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
+    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" style="${c.photos.length>1?'width:160px;height:200px;object-fit:cover;':'width:100%;height:auto;'}border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
     : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
         <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
       </div>`;
