@@ -339,8 +339,11 @@ select:focus { outline: none; border-color: #2E33BC; }
     </div>
   </div>
 
-  <!-- 로그인 -->
-  <div class="splash" id="splashScreen">
+  <!-- 로그인. 처음부터 hide 다.
+       켜둔 채로 두면 인트로가 떠 있는 동안 iOS 가 비밀번호 칸을 발견하고
+       「암호 채우기」 창을 띄운다. 앱을 열 때마다 뜨는 그 창이다.
+       로그인이 필요하면 enterAsGuest() 대신 _guestGoLogin() 이 켠다 -->
+  <div class="splash hide" id="splashScreen">
     <button class="back-btn" onclick="backToOnboarding()" style="position:absolute;top:20px;left:20px;"><i class="ti ti-arrow-left" style="font-size:22px;"></i></button>
     <div class="splash-logo">한끗루틴</div>
     <div class="splash-sub">오늘 하루도 한끗씩 ✦</div>
@@ -350,8 +353,8 @@ select:focus { outline: none; border-color: #2E33BC; }
     </div>
     <!-- 로그인 폼 -->
     <div class="auth-form" id="authFormLogin">
-      <input type="email" id="loginEmail" class="auth-input" placeholder="이메일" onkeydown="if(event.key==='Enter')doLogin()">
-      <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="email" id="loginEmail" class="auth-input" placeholder="이메일" autocomplete="username" inputmode="email" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="loginPw" class="auth-input" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="splash-btn splash-btn-primary" onclick="doLogin()">로그인</button>
       <button onclick="signInWithKakao()" style="width:100%;padding:14px;border:none;border-radius:14px;background:#FEE500;color:#191919;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;">💬 카카오로 시작하기</button>
       <button onclick="sendResetEmail()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:12px;text-decoration:underline;cursor:pointer;margin-top:12px;font-family:inherit;">비밀번호를 잊으셨나요?</button>
@@ -370,7 +373,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <span class="date-label-overlay" id="signupBirthLabel">생년월일</span>
       </div>
       <input type="email" id="signupEmail" class="auth-input" placeholder="이메일">
-      <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)">
+      <input type="password" id="signupPw" class="auth-input" placeholder="비밀번호 (6자 이상)" autocomplete="new-password">
       <input type="tel" id="signupPhone" class="auth-input" placeholder="휴대폰번호 ('-' 없이 입력)">
       <div style="display:flex;gap:6px;" id="signupRegionWrap">
         <select id="signupSido" class="auth-input" style="flex:1;" onfocus="populateSidoSelect()" onchange="populateSigugunSelect()"><option value="">시/도 선택</option></select>
@@ -509,8 +512,8 @@ select:focus { outline: none; border-color: #2E33BC; }
     <div style="font-size:52px;margin-bottom:18px;">🔑</div>
     <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:8px;">새 비밀번호 설정</div>
     <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:24px;text-align:center;">사용할 새 비밀번호를 입력해주세요.</div>
-    <input type="password" id="resetPw1" class="auth-input" placeholder="새 비밀번호 (6자 이상)" style="max-width:320px;">
-    <input type="password" id="resetPw2" class="auth-input" placeholder="새 비밀번호 확인" style="max-width:320px;" onkeydown="if(event.key==='Enter')submitNewPassword()">
+    <input type="password" id="resetPw1" class="auth-input" placeholder="새 비밀번호 (6자 이상)" autocomplete="new-password" style="max-width:320px;">
+    <input type="password" id="resetPw2" class="auth-input" placeholder="새 비밀번호 확인" autocomplete="new-password" style="max-width:320px;" onkeydown="if(event.key==='Enter')submitNewPassword()">
     <div id="resetPwMsg" style="font-size:12px;color:#FFD600;margin-bottom:12px;min-height:16px;"></div>
     <button class="splash-btn splash-btn-primary" style="width:auto;padding:12px 36px;" onclick="submitNewPassword()">비밀번호 변경</button>
   </div>
@@ -1454,14 +1457,21 @@ var pendingTab = (function(){ const m = location.search.match(/tab=(\w+)/); retu
 var pendingPostId = (function(){ const m = location.search.match(/[?&]post=(\d+)/); return m ? parseInt(m[1]) : null; })();
 var pendingCertId = (function(){ const m = location.search.match(/[?&]cert=(\d+)/); return m ? parseInt(m[1]) : null; })();
 async function initAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    if (isRecoveryFlow) { showResetScreen(); }
-    else await loadProfileAndEnter();
-  } else {
-    // 비로그인 둘러보기 — 홈/커뮤니티는 그대로 볼 수 있게(QA 요청)
-    await enterAsGuest();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      if (isRecoveryFlow) { showResetScreen(); }
+      else await loadProfileAndEnter();
+    } else {
+      // 비로그인 둘러보기 — 홈/커뮤니티는 그대로 볼 수 있게(QA 요청)
+      await enterAsGuest();
+    }
+  } catch (e) {
+    // 로그인 화면이 이제 처음부터 숨어 있어서, 여기서 막히면 아무것도 안 보인다.
+    // 예전엔 켜져 있어서 저절로 보였다
+    console.error('세션 확인 실패', e);
+    document.getElementById('splashScreen').classList.remove('hide');
   }
   sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
