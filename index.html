@@ -763,7 +763,7 @@ select:focus { outline: none; border-color: #2E33BC; }
         <div class="scroll-body">
           <div class="profile-card" style="position:relative;">
             <button onclick="openEditProfile()" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:#f5f5f7;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">✏️</button>
-            <div class="avatar-circle" id="kAvatar"></div>
+            <div class="avatar-circle" id="kAvatar" onclick="document.getElementById('avatarInput').click()"></div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:16px;font-weight:600;color:#111;" id="kMyName"></div>
               <div><span class="kkutjjang-badge"><i class="ti ti-star" style="font-size:11px;"></i>끗짱</span></div>
@@ -1559,7 +1559,7 @@ async function loadProfileAndEnter() {
     showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
     return;
   }
-  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadLetters(); } catch(e) { console.error('데이터 로드 실패', e); }
+  try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadLetters(); await loadAvatars(); } catch(e) { console.error('데이터 로드 실패', e); }
   enterAs(profile.role);
   maybeShowInstallPrompt();
   _maybeCelebrateCompletion();
@@ -1818,6 +1818,7 @@ async function doLogout() {
 const DEFAULT = {
   loginType: null,
   currentRole: null,
+  avatarById: {}, // 로그인 사용자에게만 보이는 프로필 사진(userId -> url) — loadAvatars()가 채움
   youth: {name:'지민',joinDate:'2024.03.12',certCount:24,commCount:31,avatar:null,pendingRoutines:[],nadaeum:120,badges:[],certDates:['2026-06-10','2026-06-11','2026-06-12','2026-06-13','2026-06-15','2026-06-16','2026-06-17','2026-06-19','2026-06-20','2026-06-21','2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-26','2026-06-28','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04','2026-07-05','2026-07-06']},
   kkutjjang: {name:'김선생',joinDate:'2024.01.08'},
   routines: [
@@ -2116,6 +2117,25 @@ async function loadLetters() {
     routineId: l.routine_id, fromUserId: l.from_user_id,
     content: l.content, photoUrl: l.photo_url || null, opened: !!l.opened, date: _relDate(l.created_at),
   }));
+}
+// 프로필 사진 — 청소년 포함 전체 계정 대상, 로그인 사용자에게만 공개(QA: "유스보이스
+// 프로필 사진을 변경했는데 반영이 안 되네" → 원래 이 기능 자체가 없었음). profiles
+// 테이블 자체가 로그인 사용자만 select 가능(RLS)해서, 비로그인 둘러보기 화면(홈/커뮤니티
+// 일부, profiles_public 사용)에는 이 맵을 아예 안 넘겨줘도 자연스럽게 노출이 안 됨
+async function loadAvatars() {
+  if (!currentUser) { state.avatarById = {}; return; }
+  const { data, error } = await sb.from('profiles').select('id,avatar_url').not('avatar_url', 'is', null);
+  if (error) { console.error('프로필 사진 로드 실패', error); return; }
+  const map = {};
+  (data || []).forEach(p => { if (p.avatar_url) map[p.id] = p.avatar_url; });
+  state.avatarById = map;
+}
+// 사람 아바타를 그리는 공용 헬퍼 — 사진이 있으면 사진, 없으면 기존처럼 이름 첫 글자
+// 원형 배지. 댓글/게시글/신청자 목록 등 사람이 표시되는 모든 곳에서 재사용
+function _avatarHtml(userId, name, size, bg, color) {
+  const url = userId && state.avatarById && state.avatarById[userId];
+  if (url) return `<img src="${url}" onerror="_retryImgLoad(this)" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;">`;
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.42)}px;font-weight:600;color:${color};flex-shrink:0;">${(name||'?')[0]}</div>`;
 }
 let _bannerRotateIdx = 0;
 let _bannerRotateTimer = null;
@@ -2941,7 +2961,7 @@ function _commentRowHtml(cm, replies, kind, entityId) {
   const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
   const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:150px;max-height:150px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
   return `<div style="display:flex;gap:8px;" id="${idPrefix}${cm.id}">
-      <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+      ${_avatarHtml(cm.userId, cm.author, 28, '#E6F1FB', '#2E33BC')}
       <div style="flex:1;min-width:0;">
         <div style="background:#f5f5f7;border-radius:12px;padding:8px 12px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
@@ -2968,7 +2988,7 @@ function _replyRowHtml(cm, kind, entityId) {
   const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
   const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:130px;max-height:130px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
   return `<div style="display:flex;gap:6px;margin-left:10px;" id="${idPrefix}${cm.id}">
-      <div style="width:22px;height:22px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#2E33BC;flex-shrink:0;">${cm.author[0]}</div>
+      ${_avatarHtml(cm.userId, cm.author, 22, '#E6F1FB', '#2E33BC')}
       <div style="flex:1;min-width:0;background:#eef0f5;border-radius:10px;padding:6px 10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <div style="font-size:11px;font-weight:600;color:#111;">${cm.author}</div>
@@ -3156,7 +3176,11 @@ function renderCertDetail(id) {
   const avatar = document.getElementById('rdCommentAvatar');
   const input = document.getElementById('rdCommentInput');
   if(bar) { bar.style.display=''; }
-  if(avatar) avatar.textContent = (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0];
+  if(avatar) {
+    const meName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+    const meUrl = currentUser && state.avatarById && state.avatarById[currentUser.id];
+    avatar.innerHTML = meUrl ? `<img src="${meUrl}" onerror="_retryImgLoad(this)" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : meName[0];
+  }
   if(input) input.value='';
   _clearCommentPhoto(); _cancelReply();
 
@@ -3333,7 +3357,14 @@ function openPostDetail(id) {
   const input = document.getElementById('rdCommentInput');
   if(bar) bar.style.display='';
   // 비로그인 방문자도 커뮤니티 상세는 볼 수 있어서(QA) state.youth가 아직 없을 수 있음
-  if(avatar) avatar.textContent = currentUser ? (state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name)[0] : '?';
+  if(avatar) {
+    if (!currentUser) { avatar.innerHTML = '?'; }
+    else {
+      const meName = state.currentRole==='youth' ? state.youth.name : state.kkutjjang.name;
+      const meUrl = state.avatarById && state.avatarById[currentUser.id];
+      avatar.innerHTML = meUrl ? `<img src="${meUrl}" onerror="_retryImgLoad(this)" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : meName[0];
+    }
+  }
   if(input) input.value='';
   _clearCommentPhoto(); _cancelReply();
 
@@ -3343,7 +3374,7 @@ function openPostDetail(id) {
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
       ${p.type==='notice'
         ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
-        :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
+        :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
     </div>
@@ -4064,7 +4095,7 @@ function _postCard(p, likeFn) {
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
       ${isNotice
         ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
-        :`<div style="width:30px;height:30px;border-radius:50%;background:${_avColor(p.author)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:rgba(0,0,0,0.55);flex-shrink:0;">${(p.author||'?')[0]}</div>`}
+        :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
     </div>
@@ -4395,7 +4426,8 @@ function openMyComm() {
 function renderMy() {
   const lv=getYLevel(state.youth.certCount);
   const av=document.getElementById('myAvatar');
-  av.innerHTML=state.youth.avatar?`<img src="${state.youth.avatar}">`:(state.youth.name[0]);
+  const myAvatarUrl = currentUser && state.avatarById && state.avatarById[currentUser.id];
+  av.innerHTML = state.youth.avatar?`<img src="${state.youth.avatar}">`:(myAvatarUrl?`<img src="${myAvatarUrl}" onerror="_retryImgLoad(this)">`:state.youth.name[0]);
   document.getElementById('myName').textContent=state.youth.name;
   document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('myVerifiedBadge').style.display = state.youth.verifyStatus==='approved' ? 'inline-flex' : 'none';
@@ -4500,11 +4532,31 @@ async function handleVerifyDoc(e) {
   renderVerifyCard();
 }
 
-function handleAvatar(e) {
-  const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{state.youth.avatar=ev.target.result;save();renderMy();};
-  r.readAsDataURL(f);
+// 프로필 사진 업로드 — 청소년/끗짱 공용(#myAvatar·#kAvatar가 같은 input을 공유,
+// state.currentRole로 어느 화면을 다시 그릴지만 구분). 예전엔 고른 사진을 로컬
+// (data URL)에만 저장해서 본인 기기 밖으로는 전혀 반영이 안 됐음(QA: "유스보이스
+// 프로필 사진을 변경했는데 반영이 안되어 있네") — Supabase Storage에 올리고
+// profiles.avatar_url에 저장해서 댓글·게시글 등 다른 사람에게도 보이도록 함
+async function handleAvatar(e) {
+  const f = e.target.files[0]; if(!f) return;
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  if(!currentUser) { alert('로그인이 필요해요.'); e.target.value=''; return; }
+  const avEl = document.getElementById(state.currentRole==='youth' ? 'myAvatar' : 'kAvatar');
+  let resized;
+  try {
+    resized = await _resizeImageFile(f, 512, 0.85);
+  } catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  if(avEl) avEl.innerHTML = `<img src="${resized}">`; // 업로드 완료 전 즉시 미리보기
+  const blob = _dataURLtoBlob(resized);
+  const path = `${currentUser.id}/${Date.now()}.jpg`;
+  const { error: upErr } = await sb.storage.from('avatars').upload(path, blob, { contentType: blob.type });
+  if(upErr) { alert('사진 업로드 실패: '+upErr.message); e.target.value=''; return; }
+  const url = sb.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  const { error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', currentUser.id);
+  if(error) { alert('프로필 사진 저장 실패: '+error.message); e.target.value=''; return; }
+  state.avatarById[currentUser.id] = url;
+  e.target.value = '';
+  if(state.currentRole==='youth') renderMy(); else kRenderMy();
 }
 function _profileState() { return state.currentRole==='youth' ? state.youth : state.kkutjjang; }
 function openEditProfile() {
@@ -4959,7 +5011,7 @@ function kRenderCertTab() {
         ${parts.length>0?`<div style="display:none;border-top:0.5px solid #f0f0f0;">
           ${parts.map(p=>`
             <div class="youth-row" onclick="event.stopPropagation();openKCertDetail(${r.id},'${(p.name||'').replace(/'/g,"\\'")}')" style="padding-left:28px;border-top:0;">
-              <div class="youth-avatar" style="${p.todayDone?'':'background:#FBEAF0;color:#FF006C;'}">${p.name[0]}</div>
+              ${_avatarHtml(p.userId, p.name, 32, p.todayDone?'#E6F1FB':'#FBEAF0', p.todayDone?'#2E33BC':'#FF006C')}
               <div><div style="font-size:13px;font-weight:500;color:#111;">${p.name}</div><div style="font-size:11px;color:#888;margin-top:1px;">${p.day}</div></div>
               <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
                 ${p.todayDone?'':`<button onclick="event.stopPropagation();sendPoke(${r.id},'${p.userId}','${(p.name||'').replace(/'/g,"\\'")}')" style="background:rgba(46,51,188,0.1);border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#2E33BC;font-weight:600;cursor:pointer;">👋 콕</button>`}
@@ -5131,7 +5183,7 @@ function openKRoutineDetail(routineId) {
           ${applicants.map(a=>`
             <div style="padding:12px;background:${a.status==='approved'?'#EAF3DE':a.status==='rejected'?'#f5f5f5':'#fff'};border:0.5px solid ${a.status==='approved'?'#83CA00':a.status==='rejected'?'#e0e0e0':'#e8e8e8'};border-radius:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                ${_avatarHtml(a.userId, a.name, 32, '#E6F1FB', '#2E33BC')}
                 <div style="flex:1;">
                   <div style="font-size:13px;font-weight:500;color:${a.status==='rejected'?'#aaa':'#111'};">${a.name}</div>
                   <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
@@ -5155,7 +5207,7 @@ function openKRoutineDetail(routineId) {
           ${approved.map(a=>`
             <div style="padding:12px;background:#EAF3DE;border:0.5px solid #83CA00;border-radius:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                ${_avatarHtml(a.userId, a.name, 32, '#E6F1FB', '#2E33BC')}
                 <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${a.name}</div></div>
                 <span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#EAF3DE;color:#3B6D11;">✓ 참여 중</span>
               </div>
@@ -5163,7 +5215,7 @@ function openKRoutineDetail(routineId) {
           ${pending.map(a=>`
             <div style="padding:12px;background:#fff;border:0.5px solid #e8e8e8;border-radius:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${a.name[0]}</div>
+                ${_avatarHtml(a.userId, a.name, 32, '#E6F1FB', '#2E33BC')}
                 <div style="flex:1;">
                   <div style="font-size:13px;font-weight:500;color:#111;">${a.name}</div>
                   <div style="font-size:11px;color:#888;margin-top:1px;">${a.date} 신청</div>
@@ -5604,7 +5656,7 @@ async function renderAdminVerifySection() {
       url = data?.signedUrl || null;
     }
     return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:0.5px solid #f0f0f0;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#2E33BC;flex-shrink:0;">${(p.name||'?')[0]}</div>
+      ${_avatarHtml(p.id, p.name, 32, '#E6F1FB', '#2E33BC')}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#111;">${p.name}</div>
         ${url?`<a href="${url}" target="_blank" style="font-size:11px;color:#2E33BC;">서류 보기 ↗</a>`:`<span style="font-size:11px;color:#aaa;">서류 없음</span>`}
@@ -5647,7 +5699,7 @@ async function renderAdminKkutjjangSection() {
     return;
   }
   const rows = pending.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:0.5px solid #f0f0f0;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#FBEAF0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#FF006C;flex-shrink:0;">${(p.name||'?')[0]}</div>
+      ${_avatarHtml(p.id, p.name, 32, '#FBEAF0', '#FF006C')}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#111;">${p.name}${p.real_name?` · ${p.real_name}`:''}</div>
         <div style="font-size:11px;color:#888;">${p.phone||'연락처 없음'}</div>
@@ -5679,7 +5731,8 @@ async function adminRejectKkutjjang(userId) {
 // ════════════════════════════════════════════════════════
 function kRenderMy() {
   const s=kStats(), lv=getKLevel(s.routineCount);
-  document.getElementById('kAvatar').textContent=state.kkutjjang.name[0];
+  const kAvatarUrl = currentUser && state.avatarById && state.avatarById[currentUser.id];
+  document.getElementById('kAvatar').innerHTML = kAvatarUrl ? `<img src="${kAvatarUrl}" onerror="_retryImgLoad(this)">` : state.kkutjjang.name[0];
   document.getElementById('kMyName').textContent=state.kkutjjang.name;
   document.getElementById('kJoinDate').textContent=state.kkutjjang.joinDate;
   document.getElementById('kMyRoutine').textContent=s.routineCount;
@@ -5702,7 +5755,7 @@ function kRenderMy() {
     ?showLetters.map(l=>`
       <div onclick="openLetter(${l.id})" style="padding:14px 16px;border-top:0.5px solid #f0f0f0;cursor:pointer;background:${l.opened?'#fff':'#f0f1fb'};">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${l.from[0]}</div>
+          ${_avatarHtml(l.fromUserId, l.from, 28, '#E6F1FB', '#2E33BC')}
           <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${l.from} <span style="font-size:11px;color:#888;font-weight:400;">· ${l.routine}</span></div></div>
           ${!l.opened?'<span style="background:#FF006C;color:white;font-size:10px;padding:2px 7px;border-radius:10px;">NEW</span>':''}
           <span style="font-size:11px;color:#aaa;">${l.date}</span>
@@ -5758,7 +5811,7 @@ function openAllLetters() {
   document.getElementById('letterAllBody').innerHTML = letters.map(l=>`
     <div onclick="openLetter(${l.id})" style="background:${l.opened?'#fff':'#f0f1fb'};border:0.5px solid ${l.opened?'#e8e8e8':'#2E33BC'};border-radius:16px;padding:14px;cursor:pointer;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <div style="width:28px;height:28px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2E33BC;">${l.from[0]}</div>
+        ${_avatarHtml(l.fromUserId, l.from, 28, '#E6F1FB', '#2E33BC')}
         <div style="flex:1;"><div style="font-size:13px;font-weight:500;color:#111;">${l.from} <span style="font-size:11px;color:#888;font-weight:400;">· ${l.routine}</span></div></div>
         ${!l.opened?'<span style="background:#FF006C;color:white;font-size:10px;padding:2px 7px;border-radius:10px;">NEW</span>':''}
         <span style="font-size:11px;color:#aaa;">${l.date}</span>
@@ -6306,7 +6359,7 @@ async function refetchOnResume() {
   if (now - _lastRefetchAt < 8000) return; // 너무 잦은 재조회 방지
   _lastRefetchAt = now;
   try {
-    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners(), loadLetters()]);
+    await Promise.all([loadRoutines(), loadPosts(), loadCertFeed(), loadBanners(), loadLetters(), loadAvatars()]);
   } catch (e) { console.error('재조회 실패', e); return; }
   const isYouth = state.currentRole === 'youth';
   const prefix = isYouth ? 'page-' : 'kpage-';

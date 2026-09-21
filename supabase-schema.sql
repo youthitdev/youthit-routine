@@ -2714,3 +2714,31 @@ CREATE OR REPLACE VIEW certifications_public AS
   SELECT id, routine_id, user_id, photo_url, photo_urls, created_at
   FROM certifications;
 GRANT SELECT ON certifications_public TO authenticated;
+
+-- =====================================================
+-- [마이그레이션 2026-09-21a] 프로필 사진 기능 신설
+-- 요청: "유스보이스 프로필 사진을 변경했는데 반영이 안 되네" → 확인해보니 이 앱엔
+-- 다른 사람에게 보이는 프로필 사진 기능 자체가 없었음(MY탭 아바타는 로컬 기기에만
+-- 저장, 서버 미전송) — 청소년 포함 전체 계정에 실제로 동작하는 프로필 사진 기능을
+-- 새로 만듦. 본인 또는 관리자만 변경 가능(기존 profiles_update/profiles_admin_update
+-- 정책이 auth.uid()=id / is_admin()으로 이미 그렇게 되어 있어 정책 추가 불필요).
+-- 비로그인 방문자에겐 안 보이게(청소년 얼굴 사진이 인터넷에 그대로 노출되는 것을
+-- 막기 위해) profiles_public 뷰에는 avatar_url을 넣지 않음 — 로그인 사용자만 볼 수
+-- 있는 profiles 테이블 select(auth.uid() IS NOT NULL)에서만 노출.
+-- =====================================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url text;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 본인 폴더(자기 uid 경로)에만 업로드 가능, 관리자는 다른 사람 폴더에도 업로드 가능
+-- (admin.html에서 다른 계정 사진을 대신 바꿔줄 때 필요) — 조회는 공개 버킷이라 전체 허용
+DROP POLICY IF EXISTS "avatars_insert" ON storage.objects;
+CREATE POLICY "avatars_insert" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'avatars' AND (auth.uid()::text = (storage.foldername(name))[1] OR is_admin())
+);
+DROP POLICY IF EXISTS "avatars_select_all" ON storage.objects;
+CREATE POLICY "avatars_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'avatars'
+);
