@@ -2742,3 +2742,14 @@ DROP POLICY IF EXISTS "avatars_select_all" ON storage.objects;
 CREATE POLICY "avatars_select_all" ON storage.objects FOR SELECT USING (
   bucket_id = 'avatars'
 );
+
+-- =====================================================
+-- [마이그레이션 2026-09-22a] 댓글 수정 기능
+-- QA: "댓글도 수정할 수 있도록 해줘" — cert_comments/post_comments엔 지금까지
+-- select/insert/delete 정책만 있고 update 정책이 아예 없어서, 클라이언트에서
+-- update()를 호출해도 RLS에 막혀 조용히 0건 반영으로 끝났음. 삭제(cc_delete/pc_delete)는
+-- 관리자도 가능하지만, 수정은 본인 글만 가능하도록 제한(다른 사람 말을 관리자가
+-- 바꿔치기하면 오해 소지가 있어서 삭제와 다르게 둠)
+-- =====================================================
+CREATE POLICY "cc_update" ON cert_comments FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "pc_update" ON post_comments FOR UPDATE USING (auth.uid() = user_id);

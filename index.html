@@ -2958,20 +2958,32 @@ function _commentListHtml(comments, kind, entityId) {
   if(!top.length) return '<div style="text-align:center;padding:20px;font-size:13px;color:#aaa;">첫 댓글을 남겨보세요! 💬</div>';
   return top.map(cm=>_commentRowHtml(cm, repliesByParent[cm.id]||[], kind, entityId)).join('');
 }
-function _commentRowHtml(cm, replies, kind, entityId) {
+// 댓글 버블 안쪽(이름+수정/삭제 아이콘+본문+사진) — 댓글/답글 공용, 수정 모드일 때
+// 이 부분만 통째로 textarea로 바꿔치기함(editComment/_cancelEditComment)
+function _commentBubbleInnerHtml(cm, kind, entityId, isReply) {
   const deleteFn = kind==='cert' ? 'deleteCertComment' : 'deletePostComment';
+  const iconSize = isReply ? '12px' : '13px';
+  const photoMax = isReply ? 130 : 150;
+  const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:${photoMax}px;max-height:${photoMax}px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
+  const canEdit = currentUser && currentUser.id===cm.userId;
+  const canDelete = _canModerate(cm.userId);
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="font-size:${isReply?'11px':'12px'};font-weight:600;color:#111;${isReply?'':'margin-bottom:2px;'}">${cm.author}</div>
+      ${(canEdit||canDelete)?`<div style="display:flex;gap:8px;flex-shrink:0;">
+        ${canEdit?`<i class="ti ti-pencil" onclick="editComment('${kind}',${entityId},${cm.id})" style="font-size:${iconSize};color:#ccc;cursor:pointer;"></i>`:''}
+        ${canDelete?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:${iconSize};color:#ccc;cursor:pointer;"></i>`:''}
+      </div>`:''}
+    </div>
+    ${cm.text?`<div style="font-size:${isReply?'12px':'13px'};color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
+    ${photoHtml}`;
+}
+function _commentRowHtml(cm, replies, kind, entityId) {
   const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
-  const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:150px;max-height:150px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
   return `<div style="display:flex;gap:8px;" id="${idPrefix}${cm.id}">
       ${_avatarHtml(cm.userId, cm.author, 28, '#E6F1FB', '#2E33BC')}
       <div style="flex:1;min-width:0;">
-        <div style="background:#f5f5f7;border-radius:12px;padding:8px 12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <div style="font-size:12px;font-weight:600;color:#111;margin-bottom:2px;">${cm.author}</div>
-            ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:13px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
-          </div>
-          ${cm.text?`<div style="font-size:13px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
-          ${photoHtml}
+        <div id="commentBubble_${kind}_${cm.id}" data-is-reply="0" style="background:#f5f5f7;border-radius:12px;padding:8px 12px;">
+          ${_commentBubbleInnerHtml(cm, kind, entityId, false)}
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin:3px 0 0 4px;">
           <span style="font-size:10px;color:#aaa;">${timeAgo(cm.ts)}</span>
@@ -2986,18 +2998,13 @@ function _commentRowHtml(cm, replies, kind, entityId) {
     </div>`;
 }
 function _replyRowHtml(cm, kind, entityId) {
-  const deleteFn = kind==='cert' ? 'deleteCertComment' : 'deletePostComment';
   const idPrefix = kind==='cert' ? 'commentRow_' : 'postCommentRow_';
-  const photoHtml = cm.photoUrl?`<img src="${cm.photoUrl}" onclick="event.stopPropagation();openPhotoLightbox('${cm.photoUrl}')" style="max-width:130px;max-height:130px;border-radius:8px;margin-top:6px;display:block;cursor:pointer;">`:'';
   return `<div style="display:flex;gap:6px;margin-left:10px;" id="${idPrefix}${cm.id}">
       ${_avatarHtml(cm.userId, cm.author, 22, '#E6F1FB', '#2E33BC')}
       <div style="flex:1;min-width:0;background:#eef0f5;border-radius:10px;padding:6px 10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <div style="font-size:11px;font-weight:600;color:#111;">${cm.author}</div>
-          ${_canModerate(cm.userId)?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:12px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>`:''}
+        <div id="commentBubble_${kind}_${cm.id}" data-is-reply="1">
+          ${_commentBubbleInnerHtml(cm, kind, entityId, true)}
         </div>
-        ${cm.text?`<div style="font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
-        ${photoHtml}
         <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
           <span style="font-size:9px;color:#aaa;">${timeAgo(cm.ts)}</span>
           <span onclick="toggleCommentLike('${kind}',${cm.id})" style="display:flex;align-items:center;gap:2px;cursor:pointer;">
@@ -3008,6 +3015,41 @@ function _replyRowHtml(cm, kind, entityId) {
         </div>
       </div>
     </div>`;
+}
+// 댓글 수정 — 인증글 수정(editCert)과 같은 방식으로, 버블 안쪽만 그 자리에서 textarea로
+// 바꿔치기(QA: "댓글도 수정할 수 있도록 해줘"). 삭제는 관리자도 가능하지만 수정은
+// 본인 글만(다른 사람 말을 관리자가 바꿔치기하면 오해 소지가 있어서 삭제와 다르게 제한)
+function editComment(kind, entityId, commentId) {
+  const cm = _findComment(kind, commentId);
+  const bubble = document.getElementById(`commentBubble_${kind}_${commentId}`);
+  if(!cm || !bubble) return;
+  if(!currentUser || currentUser.id!==cm.userId) return;
+  bubble.innerHTML = `
+    <textarea id="commentEditInput_${kind}_${commentId}" rows="2" maxlength="500" style="width:100%;font-size:13px;font-family:inherit;border:0.5px solid #ddd;border-radius:8px;padding:6px 8px;resize:none;box-sizing:border-box;">${_escHtml(cm.text||'')}</textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+      <button onclick="_cancelEditComment('${kind}',${entityId},${commentId})" style="padding:5px 12px;border-radius:16px;border:0.5px solid #ddd;background:#fff;color:#666;font-size:11px;font-weight:600;cursor:pointer;">취소</button>
+      <button onclick="_saveEditComment('${kind}',${entityId},${commentId})" style="padding:5px 12px;border-radius:16px;border:none;background:#2E33BC;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">저장</button>
+    </div>`;
+  document.getElementById(`commentEditInput_${kind}_${commentId}`).focus();
+}
+function _cancelEditComment(kind, entityId, commentId) {
+  const cm = _findComment(kind, commentId);
+  const bubble = document.getElementById(`commentBubble_${kind}_${commentId}`);
+  if(cm && bubble) bubble.innerHTML = _commentBubbleInnerHtml(cm, kind, entityId, bubble.dataset.isReply==='1');
+}
+async function _saveEditComment(kind, entityId, commentId) {
+  const cm = _findComment(kind, commentId);
+  const input = document.getElementById(`commentEditInput_${kind}_${commentId}`);
+  if(!cm || !input) return;
+  const newText = input.value.trim();
+  if(!newText){ alert('내용을 입력해주세요.'); return; }
+  if(newText===cm.text){ _cancelEditComment(kind, entityId, commentId); return; }
+  const table = kind==='cert' ? 'cert_comments' : 'post_comments';
+  const { data, error } = await sb.from(table).update({ content: newText }).eq('id', commentId).select('id');
+  if(error){ alert('수정 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('수정 권한이 없어요.'); return; }
+  cm.text = newText;
+  _cancelEditComment(kind, entityId, commentId);
 }
 function _renderCertComments(c) {
   const list = document.getElementById('commentList_'+c.id);
