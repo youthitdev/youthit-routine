@@ -208,6 +208,8 @@ select:focus { outline: none; border-color: #2E33BC; }
 .ys-dot { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; animation: ysDotPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 1.15s both; }
 @keyframes ysArm { from { transform: rotate(30deg); } to { transform: rotate(390deg); } }
 @keyframes ysDotPop { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.6); } 70% { transform: translateX(-50%) scale(0.85); } 100% { transform: translateX(-50%) scale(1); } }
+/* 가입 직후 설치 안내 버튼을 더 눈에 띄게(QA: "가입 안내도 눈에 띄게 해줘") — 살짝 커졌다 작아지는 걸 반복 */
+@keyframes installBtnPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
 .ys-name { font-size: 28px; font-weight: 800; color: white; letter-spacing: -1px; }
 /* 화면 움직임을 불편해하는 사람에게는 돌리지 않는다. 완성된 모습만 보여준다 */
 @media (prefers-reduced-motion: reduce) {
@@ -520,15 +522,15 @@ select:focus { outline: none; border-color: #2E33BC; }
 
   <!-- 가입 직후 1회, 홈 화면 추가 안내 (iOS/안드로이드 분기) -->
   <div class="splash" id="installPromptScreen" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;">
-    <div style="font-size:52px;margin-bottom:18px;">🌱</div>
-    <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:8px;">홈 화면에 추가해두세요</div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:24px;">앱처럼 바로 열어서 매일 인증할 수 있어요.</div>
-    <div id="installPromptIOS" style="display:none;background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:20px;max-width:320px;">
-      <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:14px;margin-bottom:12px;"><span style="font-size:20px;">1️⃣</span> 하단 공유 버튼(📤)을 눌러요</div>
-      <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:14px;"><span style="font-size:20px;">2️⃣</span> "홈 화면에 추가"를 선택해요</div>
+    <div style="font-size:60px;margin-bottom:18px;">🌱</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px;">홈 화면에 추가해두세요</div>
+    <div style="font-size:13.5px;color:rgba(255,255,255,0.75);margin-bottom:26px;">앱처럼 바로 열어서 매일 인증할 수 있어요.</div>
+    <div id="installPromptIOS" style="display:none;background:rgba(255,255,255,0.16);border:1.5px solid rgba(255,255,255,0.3);border-radius:18px;padding:24px;margin-bottom:22px;max-width:320px;">
+      <div style="display:flex;align-items:center;gap:12px;color:#fff;font-size:16px;font-weight:600;margin-bottom:16px;"><span style="font-size:24px;">1️⃣</span> 하단 공유 버튼(📤)을 눌러요</div>
+      <div style="display:flex;align-items:center;gap:12px;color:#fff;font-size:16px;font-weight:600;"><span style="font-size:24px;">2️⃣</span> "홈 화면에 추가"를 선택해요</div>
     </div>
-    <button id="installPromptAndroidBtn" onclick="triggerAndroidInstall()" style="display:none;width:100%;max-width:320px;padding:14px;border:none;border-radius:14px;background:#fff;color:#2E33BC;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">📲 지금 설치하기</button>
-    <div id="installPromptAndroidFallback" style="display:none;background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:20px;max-width:320px;color:#fff;font-size:14px;text-align:left;">브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 눌러주세요.</div>
+    <button id="installPromptAndroidBtn" onclick="triggerAndroidInstall()" style="display:none;width:100%;max-width:320px;padding:19px;border:none;border-radius:16px;background:#fff;color:#2E33BC;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,0.3);animation:installBtnPulse 1.8s ease-in-out infinite;">📲 지금 설치하기</button>
+    <div id="installPromptAndroidFallback" style="display:none;background:rgba(255,255,255,0.16);border:1.5px solid rgba(255,255,255,0.3);border-radius:18px;padding:24px;margin-bottom:22px;max-width:320px;color:#fff;font-size:16px;font-weight:600;text-align:left;line-height:1.6;">브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 눌러주세요.</div>
     <button onclick="closeInstallPrompt()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:13px;text-decoration:underline;cursor:pointer;">나중에 할게요</button>
   </div>
 
