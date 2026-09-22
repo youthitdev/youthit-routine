@@ -5128,16 +5128,21 @@ function _renderKRoutineFeed(routineId) {
       if(doneParticipants.length===0 && extraTodayCerts.length===0){
         return `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;margin-bottom:20px;">🐈 지나가던 고양이가<br>오늘의 첫 인증글을 기다리는 중... 🐾</div>`;
       }
-      return `<div class="feed-grid" style="margin-bottom:20px;">
-        ${doneParticipants.map((p,i)=>{
+      // 타일 순서가 참여자 목록 순서(사실상 무작위)를 따라가서 최신순이 아닌 것처럼
+      // 보인다는 피드백(QA) — 참여자든 담당 끗짱(extra)이든 구분 없이 실제 인증 시각
+      // 기준으로 합쳐서 정렬(최신순), 나머지 "전체 인증 기록"과 기준을 통일함
+      const tiles = [
+        ...doneParticipants.map(p=>{
           const todayCert=certs.filter(c=>c.userId===p.userId && _isToday(c.ts)).sort((a,b)=>b.ts-a.ts)[0];
-          const photo=todayCert && todayCert.photos && todayCert.photos[0];
-          return `<div class="feed-item" style="background:${photo?'#eee':colors[i%4]};" onclick="openKCertDetail(${r.id},'${p.name}')">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${p.day}</div></div></div>`;
-        }).join('')}
-        ${extraTodayCerts.map((c,i)=>{
-          const photo=c.photos && c.photos[0];
-          return `<div class="feed-item" style="background:${photo?'#eee':colors[(doneParticipants.length+i)%4]};" onclick="openCertFeedDetail(${c.id})">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${c.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">담당 끗짱</div></div></div>`;
-        }).join('')}
+          return { ts: todayCert?todayCert.ts:0, photo: todayCert && todayCert.photos && todayCert.photos[0], isParticipant:true, p };
+        }),
+        ...extraTodayCerts.map(c=>({ ts:c.ts, photo:c.photos && c.photos[0], isParticipant:false, c })),
+      ].sort((a,b)=>b.ts-a.ts);
+      return `<div class="feed-grid" style="margin-bottom:20px;">
+        ${tiles.map((t,i)=>t.isParticipant
+          ? `<div class="feed-item" style="background:${t.photo?'#eee':colors[i%4]};" onclick="openKCertDetail(${r.id},'${t.p.name}')">${t.photo?`<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${t.p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${t.p.day}</div></div></div>`
+          : `<div class="feed-item" style="background:${t.photo?'#eee':colors[i%4]};" onclick="openCertFeedDetail(${t.c.id})">${t.photo?`<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${t.c.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">담당 끗짱</div></div></div>`
+        ).join('')}
       </div>`;
     })()}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">📸 전체 인증 기록 <span style="font-size:11px;color:#aaa;font-weight:400;">(본인 인증 포함)</span></div>
