@@ -424,6 +424,11 @@
       <div id="bnImagePreviewWrap" style="display:none;margin-bottom:8px;">
         <img id="bnImagePreview" style="max-height:80px;border-radius:8px;display:block;">
       </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <span style="font-size:12px;color:#888;">글씨 색상:</span>
+        <button type="button" id="bnTextColorWhiteBtn" onclick="setBannerTextColor('white')" style="padding:7px 14px;border:1.5px solid #2E33BC;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;background:#2E33BC;color:#fff;">⚪ 흰색</button>
+        <button type="button" id="bnTextColorDarkBtn" onclick="setBannerTextColor('dark')" style="padding:7px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;background:#fff;color:#333;">⚫ 검정</button>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <input type="text" id="bnLink" placeholder="연결 링크 (선택, 외부 URL — 새 탭으로 열림)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
       </div>
@@ -1676,6 +1681,18 @@ function _showBannerImagePreview(url) {
   wrap.style.display = '';
 }
 let editingBannerId = null;
+let bnTextColor = 'white';
+function setBannerTextColor(color) {
+  bnTextColor = color;
+  const whiteBtn = document.getElementById('bnTextColorWhiteBtn');
+  const darkBtn = document.getElementById('bnTextColorDarkBtn');
+  whiteBtn.style.background = color === 'white' ? '#2E33BC' : '#fff';
+  whiteBtn.style.color = color === 'white' ? '#fff' : '#333';
+  whiteBtn.style.borderColor = color === 'white' ? '#2E33BC' : '#ddd';
+  darkBtn.style.background = color === 'dark' ? '#2E33BC' : '#fff';
+  darkBtn.style.color = color === 'dark' ? '#fff' : '#333';
+  darkBtn.style.borderColor = color === 'dark' ? '#2E33BC' : '#ddd';
+}
 function startEditBanner(id) {
   const b = bannerRows.find(x => x.id === id);
   if (!b) return;
@@ -1688,6 +1705,7 @@ function startEditBanner(id) {
   document.getElementById('bnOrder').value = b.sort_order;
   _showBannerImagePreview(b.image_url);
   _updateBannerRoutineImageHint();
+  setBannerTextColor(b.text_color || 'white');
   document.getElementById('bnSubmitBtn').textContent = '수정 완료';
   document.getElementById('bnCancelEditBtn').style.display = '';
   document.getElementById('bnTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1699,6 +1717,7 @@ function cancelEditBanner() {
   document.getElementById('bnOrder').value = '0';
   _showBannerImagePreview(null);
   document.getElementById('bnRoutineImageHint').style.display = 'none';
+  setBannerTextColor('white');
   document.getElementById('bnSubmitBtn').textContent = '등록하기';
   document.getElementById('bnCancelEditBtn').style.display = 'none';
 }
@@ -1709,7 +1728,7 @@ async function submitBanner() {
   const link_url = document.getElementById('bnLink').value.trim();
   const sort_order = parseInt(document.getElementById('bnOrder').value) || 0;
   if (!title) { alert('제목을 입력해주세요.'); return; }
-  const payload = { title, body: body || null, image_url: image_url || null, link_url: link_url || null, sort_order };
+  const payload = { title, body: body || null, image_url: image_url || null, link_url: link_url || null, sort_order, text_color: bnTextColor };
   const { error } = editingBannerId
     ? await sb.from('banners').update(payload).eq('id', editingBannerId)
     : await sb.from('banners').insert(payload);

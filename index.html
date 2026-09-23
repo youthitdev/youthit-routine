@@ -2142,20 +2142,54 @@ function _avatarHtml(userId, name, size, bg, color) {
 }
 let _bannerRotateIdx = 0;
 let _bannerRotateTimer = null;
-function renderHomeBanner() {
-  const el = document.getElementById('homeBannerArea');
-  if (!el) return;
+function _startBannerRotateTimer(el) {
   if (_bannerRotateTimer) { clearInterval(_bannerRotateTimer); _bannerRotateTimer = null; }
   const banners = state.banners || [];
-  if (!banners.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  _bannerRotateIdx = 0;
-  _renderBannerSlide(el);
   if (banners.length > 1) {
     _bannerRotateTimer = setInterval(() => {
       _bannerRotateIdx = (_bannerRotateIdx + 1) % (state.banners || []).length;
       _renderBannerSlide(el);
     }, 4000);
   }
+}
+// 손가락으로 좌우로 넘길 수 있게(QA 요청) — el.innerHTML은 매번 새로 그려지지만
+// el 자체는 그대로라, 리스너는 한 번만 붙이고 dataset 플래그로 중복 바인딩을 막음
+function _bindBannerSwipe(el) {
+  if (el.dataset.swipeBound) return;
+  el.dataset.swipeBound = '1';
+  let startX = 0, startY = 0, dragging = false;
+  el.addEventListener('touchstart', (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - startX, dy = t.clientY - startY;
+    const banners = state.banners || [];
+    if (banners.length > 1 && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      _bannerRotateIdx = (_bannerRotateIdx + (dx < 0 ? 1 : -1) + banners.length) % banners.length;
+      _renderBannerSlide(el);
+      _startBannerRotateTimer(el);
+    }
+  }, { passive: true });
+}
+function renderHomeBanner() {
+  const el = document.getElementById('homeBannerArea');
+  if (!el) return;
+  const banners = state.banners || [];
+  if (!banners.length) {
+    if (_bannerRotateTimer) { clearInterval(_bannerRotateTimer); _bannerRotateTimer = null; }
+    el.style.display = 'none'; el.innerHTML = ''; return;
+  }
+  _bannerRotateIdx = 0;
+  _renderBannerSlide(el);
+  _bindBannerSwipe(el);
+  _startBannerRotateTimer(el);
 }
 // 배너에 이미지가 없고 루틴에 연결돼 있으면 그 루틴의 대표 이미지를 그대로 씀
 // (깨진 이미지 URL은 _failedBannerImages에 기록해두고 제외 — 로드 실패 시 흰 배경에
@@ -2181,18 +2215,23 @@ function _renderBannerSlide(el) {
   el.style.display = 'block';
   const imgUrl = _bannerImageUrl(b);
   const pastel = BANNER_PASTELS[Math.abs(b.id||0) % BANNER_PASTELS.length];
+  // 이미지가 밝으면 흰 글씨는 안 보여서, 관리자가 배너 등록 시 흰색/검정 중 고를 수 있게 함
+  // (이미지가 없는 pastel 배경은 이미 배경색에 맞춘 글씨색을 자동으로 쓰므로 토글 대상 아님)
+  const isDark = !!imgUrl && b.text_color === 'dark';
   const bgBlock = imgUrl
     ? `<img src="${imgUrl}" onerror="_failedBannerImages.add(this.src);_renderBannerSlide(document.getElementById('homeBannerArea'));" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;">`
     : `<div style="position:absolute;inset:0;background:${pastel.bg};"></div>`;
-  const scrim = imgUrl ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 100%);"></div>` : '';
-  const textColor = imgUrl ? '#fff' : pastel.text;
-  const textShadow = imgUrl ? 'text-shadow:0 1px 3px rgba(0,0,0,0.3);' : '';
-  const dotOn = imgUrl ? '#fff' : pastel.text;
-  const dotOff = imgUrl ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.18)';
+  const scrim = !imgUrl ? '' : isDark
+    ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 40%,rgba(255,255,255,0.6) 100%);"></div>`
+    : `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,0.55) 100%);"></div>`;
+  const textColor = !imgUrl ? pastel.text : (isDark ? '#1a1a1a' : '#fff');
+  const textShadow = (imgUrl && !isDark) ? 'text-shadow:0 1px 3px rgba(0,0,0,0.3);' : '';
+  const dotOn = !imgUrl ? pastel.text : (isDark ? '#1a1a1a' : '#fff');
+  const dotOff = !imgUrl ? 'rgba(0,0,0,0.18)' : (isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.45)');
   const dots = (state.banners||[]).length>1
     ? `<div style="position:absolute;left:12px;bottom:12px;display:flex;gap:4px;">${(state.banners||[]).map((_,i)=>`<span style="width:5px;height:5px;border-radius:50%;background:${i===_bannerRotateIdx?dotOn:dotOff};"></span>`).join('')}</div>`
     : '';
-  el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="position:relative;height:75px;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};">
+  el.innerHTML = `<div ${b.link_url ? 'onclick="openHomeBanner()"' : ''} style="position:relative;height:75px;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:${b.link_url ? 'pointer' : 'default'};touch-action:pan-y;">
     ${bgBlock}
     ${scrim}
     ${dots}

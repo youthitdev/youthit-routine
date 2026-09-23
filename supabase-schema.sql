@@ -2753,3 +2753,10 @@ CREATE POLICY "avatars_select_all" ON storage.objects FOR SELECT USING (
 -- =====================================================
 CREATE POLICY "cc_update" ON cert_comments FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "pc_update" ON post_comments FOR UPDATE USING (auth.uid() = user_id);
+
+-- [마이그레이션 2026-09-23a] 배너 글씨 색상 선택 기능
+-- QA: "배너 글씨 색상을 변경할 수 있도록 해줘" — 배너에 밝은 색 이미지를 넣으면
+-- 지금까지는 항상 흰 글씨라 가독성이 떨어졌음. 관리자가 흰색/검정 중 고를 수 있게 함.
+-- =====================================================
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS text_color text NOT NULL DEFAULT 'white'
+  CHECK (text_color IN ('white', 'dark'));
