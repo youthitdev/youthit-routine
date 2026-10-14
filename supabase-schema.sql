@@ -2840,3 +2840,43 @@ CREATE OR REPLACE VIEW routine_people_count AS
     AND rp.user_id IS DISTINCT FROM r.led_by
   GROUP BY rp.routine_id;
 GRANT SELECT ON routine_people_count TO anon, authenticated;
+
+-- [마이그레이션 2026-10-14e] 통계 제외 계정 표시(profiles.exclude_from_stats)
+-- QA: 담당 끗짱(YV 민지)이 청소년 시점으로 참여해 보는 별도 청소년 계정(33ba98df…)이 있어서
+-- 역할(role)로도 담당자(led_by)로도 못 걸러져 나다움 포착 루틴이 17명(기대 16명)으로 나왔음.
+-- 관리자가 청소년 탭에서 계정마다 켜고 끄는 "통계 제외" 표시를 두고, 표시된 계정은 앱·관리자의
+-- 루틴 참여인원·완주 인원·완주율에서 빠짐(계정 자체는 그대로 청소년으로 참여·인증 가능).
+--   · youth_ids / routine_people_count 뷰에 같은 조건을 넣어 앱(로그인·비로그인)도 일관되게 맞춤
+--   · 본인이 임의로 켜고 끄지 못하도록 관리자만 변경 가능한 가드 트리거를 둠(가입 시 INSERT 포함)
+-- =====================================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS exclude_from_stats boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION guard_exclude_from_stats() RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.exclude_from_stats AND NOT is_admin() THEN
+      RAISE EXCEPTION '통계 제외 표시는 관리자만 바꿀 수 있어요';
+    END IF;
+  ELSIF NEW.exclude_from_stats IS DISTINCT FROM OLD.exclude_from_stats AND NOT is_admin() THEN
+    RAISE EXCEPTION '통계 제외 표시는 관리자만 바꿀 수 있어요';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_guard_exclude_from_stats ON profiles;
+CREATE TRIGGER trg_guard_exclude_from_stats BEFORE INSERT OR UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION guard_exclude_from_stats();
+
+CREATE OR REPLACE VIEW youth_ids AS
+  SELECT id FROM profiles WHERE role = 'youth' AND NOT exclude_from_stats;
+GRANT SELECT ON youth_ids TO authenticated;
+
+CREATE OR REPLACE VIEW routine_people_count AS
+  SELECT rp.routine_id, count(*)::int AS people
+  FROM routine_participants rp
+  JOIN profiles p ON p.id = rp.user_id
+  JOIN routines r ON r.id = rp.routine_id
+  WHERE rp.status = 'approved' AND p.role = 'youth' AND NOT p.exclude_from_stats
+    AND rp.user_id IS DISTINCT FROM r.led_by
+  GROUP BY rp.routine_id;
+GRANT SELECT ON routine_people_count TO anon, authenticated;

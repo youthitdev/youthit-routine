@@ -686,7 +686,7 @@ async function loadData() {
     (routinesByUser[p.user_id] = routinesByUser[p.user_id] || []).push(routineTitleById[p.routine_id] || '');
   });
   // 루틴 참여인원은 청소년만 셈(끗짱 제외, QA). 알림 수신 대상 안내처럼 전원이 필요한 곳은 peopleAll을 씀
-  const youthIdSet = new Set(profiles.filter(p => p.role === 'youth').map(p => p.id));
+  const youthIdSet = new Set(profiles.filter(p => p.role === 'youth' && !p.exclude_from_stats).map(p => p.id));
   // 그 루틴의 담당 끗짱(led_by)은 계정 역할이 청소년이어도 자기 루틴 인원에서 뺌
   const ledByRoutine = {};
   routines.forEach(r => { ledByRoutine[r.id] = r.led_by; });
@@ -733,7 +733,7 @@ async function loadData() {
     id: p.id, name: p.name, realName: p.real_name || '', birthDate: p.birth_date || '',
     phone: p.phone || '', sido: p.region_sido || '', sigugun: p.region_sigugun || '',
     schoolStatus: p.school_status || '', verifyStatus: p.verify_status || 'none',
-    verifyDocUrl: p.verify_doc_url || null, nadaeum: p.nadaeum || 0, avatarUrl: p.avatar_url || null,
+    verifyDocUrl: p.verify_doc_url || null, nadaeum: p.nadaeum || 0, avatarUrl: p.avatar_url || null, excludeStats: !!p.exclude_from_stats,
     routines: routinesByUser[p.id] || [], createdAt: p.created_at,
   }));
   kkRows = profiles.filter(p => p.role === 'kkutjjang').map(p => ({
@@ -1149,7 +1149,7 @@ function computeRoutineCompletion() {
   });
   // 참여인원·완주 인원·완주율은 청소년만 셈 — 끗짱이 섞이면 청소년 완주율이 왜곡됨(QA). 담당 끗짱(led_by)은
   // 계정 역할이 청소년이어도 자기 루틴에서는 제외
-  const youthIds = new Set(youthRows.map(y => y.id));
+  const youthIds = new Set(youthRows.filter(y => !y.excludeStats).map(y => y.id));
   return routineRows.filter(r => !r.archived && !r.isFree && (r.status === 'active' || r.status === 'done')).map(r => {
     const approvedUserIds = rawParticipants.filter(p => p.routine_id === r.id && p.status === 'approved' && youthIds.has(p.user_id) && p.user_id !== r.ledBy).map(p => p.user_id);
     const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * (r.completionRatio || 67) / 100));
@@ -1325,7 +1325,7 @@ function _monitoringSection(id) {
   const r = routineRows.find(x => x.id === id);
   if (!r) return null;
 
-  const youthIdSet = new Set(youthRows.map(y => y.id));
+  const youthIdSet = new Set(youthRows.filter(y => !y.excludeStats).map(y => y.id));
   const members = rawParticipants.filter(p => p.routine_id === id && p.status === 'approved' && youthIdSet.has(p.user_id) && p.user_id !== r.ledBy);
   if (!members.length) return null;
 
@@ -2065,6 +2065,7 @@ function renderYouthTable() {
     <th>참여 루틴</th>
     <th onclick="toggleSort('nadaeum')">나다움</th>
     <th onclick="toggleSort('createdAt')">가입일</th>
+    <th title="운영진 체험·테스트용 계정을 루틴 참여인원·완주율 통계에서 뺍니다">통계</th>
   </tr>`;
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -2081,8 +2082,27 @@ function renderYouthTable() {
       <td><div class="routine-tags">${r.routines.length?r.routines.map(t=>`<span class="routine-tag">${t}</span>`).join(''):'-'}</div></td>
       <td>${(r.nadaeum||0).toLocaleString()}N</td>
       <td>${(r.createdAt||'').slice(0,10)}</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="13">조건에 맞는 청소년이 없어요</td></tr>`;
+      <td>${r.excludeStats
+        ? `<button onclick="toggleStatsExclude('${r.id}')" style="padding:4px 9px;background:#FFF3CD;color:#856404;border:1px solid #f1dfa0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">통계 제외 중</button>`
+        : `<button onclick="toggleStatsExclude('${r.id}')" style="padding:4px 9px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;">제외하기</button>`}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="14">조건에 맞는 청소년이 없어요</td></tr>`;
   renderBulkBar();
+}
+
+// 운영진이 체험·테스트용으로 만든 청소년 역할 계정(예: 담당 끗짱의 별도 청소년 계정)을 루틴 참여인원·
+// 완주율 통계에서 빼는 표시. 계정 자체는 그대로라 청소년으로 로그인해 참여·인증할 수 있음
+async function toggleStatsExclude(id) {
+  const y = youthRows.find(r => r.id === id);
+  if (!y) return;
+  const next = !y.excludeStats;
+  const msg = next
+    ? `「${y.name}」 계정을 통계에서 제외할까요?\n\n· 루틴 참여인원·완주 인원·완주율(관리자·앱 모두)에서 빠져요\n· 계정은 그대로라 청소년으로 참여·인증할 수 있어요\n· 언제든 다시 넣을 수 있어요`
+    : `「${y.name}」 계정을 다시 통계에 넣을까요?`;
+  if (!confirm(msg)) return;
+  const { data, error } = await sb.from('profiles').update({ exclude_from_stats: next }).eq('id', id).select('id');
+  if (error) { alert('변경 실패: ' + error.message + '\n(마이그레이션 2026-10-14e를 돌렸는지 확인해 주세요)'); return; }
+  if (!data || data.length === 0) { alert('변경되지 않았어요. 권한을 확인해 주세요.'); return; }
+  await loadData();
 }
 
 function renderKkTable() {
