@@ -1154,6 +1154,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
+      <label id="kPostNoticeWrap" style="display:none;align-items:center;gap:8px;font-size:13px;color:#333;margin-bottom:16px;cursor:pointer;"><input type="checkbox" id="kPostIsNotice" checked style="flex-shrink:0;"><span>📢 공지로 등록 <span style="font-size:11px;color:#aaa;">(끄면 일반 글로 올라가요)</span></span></label>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
       <button onclick="cancelPostWrite('kWriteSheetBg')" style="width:100%;padding:12px;margin-top:6px;background:none;border:none;color:#888;font-size:14px;font-weight:500;cursor:pointer;">취소</button>
     </div>
@@ -4270,6 +4271,7 @@ function editPost(id) {
   } else {
     document.getElementById('kPostTitle').value = p.title;
     document.getElementById('kPostContent').value = p.content;
+    _setKNoticeToggle(p.type==='notice');
     document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('kWriteSheetBg');
   }
@@ -5729,10 +5731,18 @@ async function toggleKPostLike(id) {
 // ════════════════════════════════════════════════════════
 // 끗짱 커뮤니티 글쓰기
 // ════════════════════════════════════════════════════════
+// 관리자만 "공지로 등록" 토글이 보임(공지 종류 변경은 DB 트리거도 관리자만 허용).
+// 끄고 저장하면 일반 글(소식)로 올라가거나, 이미 올라간 공지가 일반 글로 바뀜
+function _setKNoticeToggle(isNotice) {
+  const wrap = document.getElementById('kPostNoticeWrap');
+  wrap.style.display = state.loginType==='both' ? 'flex' : 'none';
+  document.getElementById('kPostIsNotice').checked = isNotice;
+}
 function openKWriteSheet() {
   editingPostId = null;
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
+  _setKNoticeToggle(true);
   document.querySelector('#kWriteSheetBg .primary-btn').textContent = '게시하기';
   openSheet('kWriteSheetBg');
 }
@@ -5740,6 +5750,7 @@ async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
   const isAdmin = state.loginType==='both';
+  const asNotice = isAdmin && document.getElementById('kPostIsNotice').checked;
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
   // 저장이 끝나고 시트가 닫힐 때까지 버튼을 잠가둠 — 안 그러면 수정 저장 직후
@@ -5749,12 +5760,16 @@ async function kSubmitPost() {
   btn.disabled = true;
   try {
     if(editingPostId) {
-      const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
+      const payload = { title:t, content:c };
+      // 종류는 관리자만 바꿀 수 있음. 공지 → 일반 글로 바뀌면 숨김도 같이 풀어줌
+      // (숨기기 버튼은 공지에만 있어서, 숨긴 채로 일반 글이 되면 다시 보이게 할 방법이 없음)
+      if(isAdmin) { payload.type = asNotice ? 'notice' : 'kpost'; if(!asNotice) payload.hidden = false; }
+      const { error } = await sb.from('posts').update(payload).eq('id', editingPostId);
       if(error){ alert('수정 실패: '+error.message); return; }
       editingPostId = null;
     } else {
       const { error } = await sb.from('posts').insert({
-        type: isAdmin ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
+        type: asNotice ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
       });
       if(error){ alert('게시 실패: '+error.message); return; }
     }
