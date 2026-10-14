@@ -2760,3 +2760,17 @@ CREATE POLICY "pc_update" ON post_comments FOR UPDATE USING (auth.uid() = user_i
 -- =====================================================
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS text_color text NOT NULL DEFAULT 'white'
   CHECK (text_color IN ('white', 'dark'));
+
+-- [마이그레이션 2026-10-14a] 공지 숨기기
+-- QA: "숨기기나 취소버튼이 있으면 좋겠어" — 공지를 지우지 않고 잠깐 내려둘 수 있게 함.
+-- 숨긴 글은 작성자와 관리자에게만 보이고(일반 사용자·비로그인에겐 안 보임), 언제든 다시
+-- 보이게 할 수 있음. 클라이언트에서 걸러내는 건 API를 직접 부르면 뚫리므로 SELECT 정책으로 막음.
+-- 기존 SELECT 정책이 둘(posts_select: 로그인 사용자, posts_select_public: 비로그인 포함)
+-- 있어서 둘 다 지우고 하나로 합침 — 둘 중 하나라도 남으면 OR로 합쳐져 숨김이 뚫림
+-- =====================================================
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+
+DROP POLICY IF EXISTS "posts_select" ON posts;
+DROP POLICY IF EXISTS "posts_select_public" ON posts;
+CREATE POLICY "posts_select" ON posts FOR SELECT
+  USING (hidden = false OR auth.uid() = author_id OR is_admin());

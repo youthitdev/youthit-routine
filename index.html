@@ -1143,6 +1143,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="postContent" rows="4" placeholder="루틴을 하면서 어땠는지 솔직하게 적어주세요."></textarea></div>
       <div style="margin-bottom:16px;"><div class="field-label">사진 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div class="photo-upload" id="reviewPhotoUpload" style="height:120px;" onclick="document.getElementById('reviewPhotoInput').click()"><i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div></div><input type="file" id="reviewPhotoInput" accept="image/*" style="display:none;" onchange="handleReviewPhoto(event)"></div>
       <button class="primary-btn" onclick="submitPost()">후기 게시하기</button>
+      <button onclick="cancelPostWrite('reviewWriteSheetBg')" style="width:100%;padding:12px;margin-top:6px;background:none;border:none;color:#888;font-size:14px;font-weight:500;cursor:pointer;">취소</button>
     </div>
   </div>
 
@@ -1154,6 +1155,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
+      <button onclick="cancelPostWrite('kWriteSheetBg')" style="width:100%;padding:12px;margin-top:6px;background:none;border:none;color:#888;font-size:14px;font-weight:500;cursor:pointer;">취소</button>
     </div>
   </div>
 
@@ -2028,7 +2030,7 @@ async function loadPosts() {
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
   state.posts = posts.map(p => ({
-    id: p.id, type: p.type || 'review', pinned: p.pinned!==false, title: p.title, content: p.content,
+    id: p.id, type: p.type || 'review', pinned: p.pinned!==false, hidden: p.hidden===true, title: p.title, content: p.content,
     routineId: p.routine_id ?? null, photoUrl: p.photo_url || null,
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at), ts: new Date(p.created_at).getTime(),
     likes: likes.filter(l => l.post_id === p.id).length,
@@ -3459,6 +3461,7 @@ function openPostDetail(id) {
       ${p.type==='notice'
         ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
         :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
+      ${p.hidden?`<span style="background:#eee;color:#666;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:0;">숨김</span>`:''}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
     </div>
@@ -3475,6 +3478,7 @@ function openPostDetail(id) {
         <span style="font-size:14px;color:#666;">${comments.length}</span>
       </div>
       ${canDelete?`<div style="display:flex;gap:16px;margin-left:auto;">
+        ${p.type==='notice'?`<i class="ti ti-eye${p.hidden?'':'-off'}" title="${p.hidden?'다시 보이게':'숨기기'}" onclick="togglePostHidden(${p.id})" style="font-size:18px;color:${p.hidden?'#2E33BC':'#ccc'};cursor:pointer;flex-shrink:0;"></i>`:''}
         <i class="ti ti-pencil" onclick="editPost(${p.id})" style="font-size:18px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
         <i class="ti ti-trash" onclick="deletePost(${p.id})" style="font-size:18px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
       </div>`:''}
@@ -4175,11 +4179,12 @@ function _postDisplayTitle(p) {
 function _postCard(p, likeFn) {
   const isNotice=p.type==='notice';
   const canDelete=_canModerate(p.authorId);
-  return `<div onclick="openPostDetail(${p.id})" style="cursor:pointer;background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;">
+  return `<div onclick="openPostDetail(${p.id})" style="cursor:pointer;background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;${p.hidden?'opacity:0.55;':''}">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
       ${isNotice
         ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
         :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
+      ${p.hidden?`<span style="background:#eee;color:#666;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:0;">숨김</span>`:''}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
       <div style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</div>
     </div>
@@ -4199,6 +4204,7 @@ function _postCard(p, likeFn) {
         <i class="ti ti-message-circle" style="font-size:14px;color:#aaa;"></i>${(p.comments&&p.comments.length>0)?p.comments.length:'댓글'}
       </span>
       ${canDelete?`<div style="display:flex;gap:14px;margin-left:auto;">
+        ${isNotice?`<i class="ti ti-eye${p.hidden?'':'-off'}" title="${p.hidden?'다시 보이게':'숨기기'}" onclick="event.stopPropagation();togglePostHidden(${p.id})" style="font-size:16px;color:${p.hidden?'#2E33BC':'#ccc'};cursor:pointer;flex-shrink:0;"></i>`:''}
         <i class="ti ti-pencil" onclick="event.stopPropagation();editPost(${p.id})" style="font-size:16px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
         <i class="ti ti-trash" onclick="event.stopPropagation();deletePost(${p.id})" style="font-size:16px;color:#ccc;cursor:pointer;flex-shrink:0;"></i>
       </div>`:''}
@@ -4217,6 +4223,34 @@ async function deletePost(id) {
   await loadPosts();
   if(state.currentRole==='youth') renderComm(commFilter);
   else kRenderReviewTab(kReviewFilter);
+}
+// 공지 숨기기/다시 보이게 — 숨긴 글은 DB(posts_select 정책)에서 작성자·관리자에게만 내려오고
+// 나머지에겐 아예 안 보임. 숨길 때만 한 번 확인(다시 보이게 하는 건 바로)
+async function togglePostHidden(id) {
+  const p = state.posts.find(x=>x.id===id);
+  if(!p) return;
+  const next = !p.hidden;
+  if(next && !confirm('이 공지를 숨길까요?\n작성자와 관리자 외에는 볼 수 없게 되고, 언제든 다시 보이게 할 수 있어요.')) return;
+  const { data, error } = await sb.from('posts').update({ hidden: next }).eq('id', id).select('id');
+  if(error){ alert('변경 실패: '+error.message); return; }
+  if(!data || data.length===0){ alert('권한이 없거나 이미 삭제된 글이에요.'); return; }
+  await loadPosts();
+  if(state.currentRole==='youth') renderComm(commFilter);
+  else kRenderReviewTab(kReviewFilter);
+  if(currentPostDetailId===id && _isOverlayOpen('routineDetailOverlay')) openPostDetail(id);
+}
+// 글쓰기 시트의 취소 버튼 — 저장 없이 닫고, 수정하던 상태/입력값도 정리
+function cancelPostWrite(sheetId) {
+  editingPostId = null;
+  if(sheetId==='kWriteSheetBg') {
+    document.getElementById('kPostTitle').value='';
+    document.getElementById('kPostContent').value='';
+  } else {
+    document.getElementById('postContent').value='';
+    _resetReviewPhotoUpload();
+    currentReviewRoutineId = null;
+  }
+  closeSheet(sheetId);
 }
 // 게시글 수정 — 후기(review)는 청소년 글쓰기 시트, 공지(notice)는 끗짱 글쓰기 시트를
 // 기존 내용으로 채워서 재사용. submitPost()/kSubmitPost()가 editingPostId 유무로
