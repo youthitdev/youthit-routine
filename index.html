@@ -2017,7 +2017,8 @@ async function loadRoutines() {
       sb.from('routines').update({ status: effectiveStatus }).eq('id', r.id).then(() => {});
     }
     // participants는 "내가 이 루틴 참여자인가" 같은 멤버십 판정에도 쓰여서 끗짱도 그대로 두고,
-    // 인원수·완주율·오늘 인증 현황 같은 통계/표시는 youthParticipants(청소년만)를 씀
+    // 인원수·완주율·오늘 인증 현황 같은 통계/표시는 youthParticipants(청소년만, 그 루틴의 담당 끗짱은
+    // 계정 역할이 청소년이어도 제외)를 씀
     const participants = approved.map(p => ({
       userId: p.user_id, name: nameById[p.user_id] || '익명',
       cert: certOf(p.user_id), todayDone: doneToday(p.user_id),
@@ -2031,7 +2032,7 @@ async function loadRoutines() {
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
       isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
-      people: currentUser ? approved.filter(p => isYouthId(p.user_id)).length : (peopleCountById[r.id] || 0), maxPeople: r.max_people || 10, minPeople: r.min_people || null,
+      people: currentUser ? approved.filter(p => isYouthId(p.user_id) && p.user_id !== r.led_by).length : (peopleCountById[r.id] || 0), maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', certGuide: r.cert_guide || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
@@ -2040,7 +2041,7 @@ async function loadRoutines() {
       progress: _computeProgress(r),
       todayCert: currentUser ? doneToday(currentUser.id) : false,
       participants: participants,
-      youthParticipants: participants.filter(p => isYouthId(p.userId)),
+      youthParticipants: participants.filter(p => isYouthId(p.userId) && p.userId !== r.led_by),
       applicants: rParts.map(p => ({
         userId: p.user_id, name: nameById[p.user_id] || '익명',
         date: _relDate(p.joined_at), status: p.status, note: p.application_note || '',

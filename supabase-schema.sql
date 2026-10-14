@@ -2825,3 +2825,18 @@ CREATE OR REPLACE VIEW routine_people_count AS
   WHERE rp.status = 'approved' AND p.role = 'youth'
   GROUP BY rp.routine_id;
 GRANT SELECT ON routine_people_count TO anon, authenticated;
+
+-- [마이그레이션 2026-10-14d] 담당 끗짱은 자기 루틴 참여인원에서 제외
+-- QA: 나다움 포착 루틴이 청소년 기준으로 세도 17명 — 담당 끗짱(YV 민지)의 계정 역할이 youth라
+-- 역할로는 못 걸러짐. 각 루틴의 담당 끗짱(routines.led_by)은 그 루틴 인원에서 빼도록
+-- 비로그인 홈이 쓰는 routine_people_count 뷰를 다시 교체(앱·관리자는 코드에서 같은 기준으로 계산)
+-- =====================================================
+CREATE OR REPLACE VIEW routine_people_count AS
+  SELECT rp.routine_id, count(*)::int AS people
+  FROM routine_participants rp
+  JOIN profiles p ON p.id = rp.user_id
+  JOIN routines r ON r.id = rp.routine_id
+  WHERE rp.status = 'approved' AND p.role = 'youth'
+    AND rp.user_id IS DISTINCT FROM r.led_by
+  GROUP BY rp.routine_id;
+GRANT SELECT ON routine_people_count TO anon, authenticated;
