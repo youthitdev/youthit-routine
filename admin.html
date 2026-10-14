@@ -1141,8 +1141,10 @@ function computeRoutineCompletion() {
     const key = c.routine_id + '_' + c.user_id;
     certByRoutineUser[key] = (certByRoutineUser[key] || 0) + 1;
   });
+  // 참여인원·완주 인원·완주율은 청소년만 셈 — 끗짱(담당/체험 참여)이 섞이면 청소년 완주율이 왜곡됨(QA)
+  const youthIds = new Set(youthRows.map(y => y.id));
   return routineRows.filter(r => !r.archived && !r.isFree && (r.status === 'active' || r.status === 'done')).map(r => {
-    const approvedUserIds = rawParticipants.filter(p => p.routine_id === r.id && p.status === 'approved').map(p => p.user_id);
+    const approvedUserIds = rawParticipants.filter(p => p.routine_id === r.id && p.status === 'approved' && youthIds.has(p.user_id)).map(p => p.user_id);
     const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * (r.completionRatio || 67) / 100));
     const achievers = approvedUserIds.filter(uid => (certByRoutineUser[r.id + '_' + uid] || 0) >= certGoal).length;
     const rate = approvedUserIds.length ? Math.round(achievers / approvedUserIds.length * 100) : 0;
