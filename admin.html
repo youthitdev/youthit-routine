@@ -432,12 +432,16 @@
       </div>
       <div style="font-size:11px;color:#aaa;margin-bottom:8px;"><span id="bnBodyCount">0</span>/30자 — 배너가 좁아서 이보다 길면 화면에서 잘려요</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
-        <input type="url" id="bnImage" placeholder="이미지 URL (직접 입력 또는 아래에서 업로드)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <input type="url" id="bnImage" oninput="_syncBannerBgSwatches()" placeholder="이미지 URL (직접 입력 또는 아래에서 업로드)" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
         <input type="file" id="bnImageFile" accept="image/*" style="display:none;" onchange="handleBannerImageUpload(event)">
         <button type="button" onclick="document.getElementById('bnImageFile').click()" style="padding:9px 14px;background:#fff;color:#2E33BC;border:1px solid #2E33BC;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🖼️ 이미지 업로드</button>
       </div>
       <div id="bnImagePreviewWrap" style="display:none;margin-bottom:8px;">
-        <img id="bnImagePreview" style="max-height:80px;border-radius:8px;display:block;">
+        <img id="bnImagePreview" style="max-height:80px;max-width:100%;border-radius:8px;display:block;">
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:12px;color:#888;margin-bottom:6px;">기본 배경 <span style="color:#aaa;">(이미지를 안 올릴 때 골라 쓸 수 있어요 · 누르면 글씨 색상도 어울리게 바뀌어요)</span></div>
+        <div id="bnBgSwatches" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <span style="font-size:12px;color:#888;">글씨 색상:</span>
@@ -1634,6 +1638,7 @@ async function renderBannerView() {
   const { data } = await sb.from('banners').select('*').order('sort_order', { ascending: true });
   bannerRows = data || [];
   renderBannerList();
+  _renderBannerBgSwatches();
   const sel = document.getElementById('bnRoutineSelect');
   sel.innerHTML = '<option value="">루틴 선택 (선택하면 연결 링크에 자동 입력)</option>'
     + routineRows.filter(r => !r.archived).map(r => `<option value="${r.id}">${r.title} (${R_STATUS_LABEL[r.status]||r.status})</option>`).join('');
@@ -1691,6 +1696,7 @@ async function handleBannerImageUpload(e) {
   const url = sb.storage.from('banner-images').getPublicUrl(path).data.publicUrl;
   document.getElementById('bnImage').value = url;
   _showBannerImagePreview(url);
+  _syncBannerBgSwatches();
 }
 function _showBannerImagePreview(url) {
   const wrap = document.getElementById('bnImagePreviewWrap');
@@ -1700,6 +1706,38 @@ function _showBannerImagePreview(url) {
 }
 let editingBannerId = null;
 let bnTextColor = 'white';
+// 기본 배경 5장(banner-bg/, 716×150 = 배너 358×75의 2배). 이미지 URL 칸에 상대경로를 넣는 방식이라
+// DB·스토리지 변경 없이 쓰고, 앱(index.html)과 같은 폴더라 경로가 그대로 통함.
+// text는 그 배경에 어울리는 글씨색(어두운 배경만 흰 글씨)
+const BANNER_BGS = [
+  { url: 'banner-bg/bg-1.png', name: '남보라', text: 'white' },
+  { url: 'banner-bg/bg-2.png', name: '연파랑', text: 'dark' },
+  { url: 'banner-bg/bg-3.png', name: '민트', text: 'dark' },
+  { url: 'banner-bg/bg-4.png', name: '피치', text: 'dark' },
+  { url: 'banner-bg/bg-5.png', name: '라벤더', text: 'dark' },
+];
+function _renderBannerBgSwatches() {
+  document.getElementById('bnBgSwatches').innerHTML = BANNER_BGS.map((b, i) => `
+    <div id="bnBg${i}" onclick="pickBannerBg(${i})" title="${b.name}" style="cursor:pointer;text-align:center;">
+      <img src="${b.url}" style="width:86px;height:36px;object-fit:cover;border-radius:8px;display:block;border:2px solid transparent;">
+      <div style="font-size:11px;color:#888;margin-top:2px;">${b.name}</div>
+    </div>`).join('');
+  _syncBannerBgSwatches();
+}
+function _syncBannerBgSwatches() {
+  const cur = document.getElementById('bnImage').value.trim();
+  BANNER_BGS.forEach((b, i) => {
+    const el = document.getElementById('bnBg' + i);
+    if (el) el.querySelector('img').style.borderColor = (cur === b.url) ? '#2E33BC' : 'transparent';
+  });
+}
+function pickBannerBg(i) {
+  const b = BANNER_BGS[i];
+  document.getElementById('bnImage').value = b.url;
+  _showBannerImagePreview(b.url);
+  setBannerTextColor(b.text);
+  _syncBannerBgSwatches();
+}
 function setBannerTextColor(color) {
   bnTextColor = color;
   const whiteBtn = document.getElementById('bnTextColorWhiteBtn');
@@ -1724,6 +1762,7 @@ function startEditBanner(id) {
   _showBannerImagePreview(b.image_url);
   _updateBannerRoutineImageHint();
   setBannerTextColor(b.text_color || 'white');
+  _syncBannerBgSwatches();
   document.getElementById('bnSubmitBtn').textContent = '수정 완료';
   document.getElementById('bnCancelEditBtn').style.display = '';
   document.getElementById('bnTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1736,6 +1775,7 @@ function cancelEditBanner() {
   _showBannerImagePreview(null);
   document.getElementById('bnRoutineImageHint').style.display = 'none';
   setBannerTextColor('white');
+  _syncBannerBgSwatches();
   document.getElementById('bnSubmitBtn').textContent = '등록하기';
   document.getElementById('bnCancelEditBtn').style.display = 'none';
 }
