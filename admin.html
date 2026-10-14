@@ -1155,7 +1155,7 @@ function computeRoutineCompletion() {
     const certGoal = Math.max(1, Math.floor(_routineDayCount(r.startDate, r.endDate) * (r.completionRatio || 67) / 100));
     const achievers = approvedUserIds.filter(uid => (certByRoutineUser[r.id + '_' + uid] || 0) >= certGoal).length;
     const rate = approvedUserIds.length ? Math.round(achievers / approvedUserIds.length * 100) : 0;
-    return { id: r.id, title: r.title, status: r.status, period: `${r.startDate || '-'} ~ ${r.endDate || '-'}`, approvedCount: approvedUserIds.length, achievers, rate };
+    return { id: r.id, title: r.title, status: r.status, startDate: r.startDate || '', endDate: r.endDate || '', period: `${r.startDate || '-'} ~ ${r.endDate || '-'}`, approvedCount: approvedUserIds.length, achievers, rate };
   });
 }
 function toggleChartEmpty(id, isEmpty) {
@@ -1211,7 +1211,8 @@ let _lastCompletionList = [];
 function renderCompletionTable(list) {
   _lastCompletionList = list;
   const body = document.getElementById('routineCompletionBody');
-  const sorted = [...list].sort((a, b) => b.rate - a.rate);
+  // 기간의 마지막 일자(종료일)가 최신인 루틴이 위로 — 같으면 시작일이 최신인 순
+  const sorted = [...list].sort((a, b) => (b.endDate || '').localeCompare(a.endDate || '') || (b.startDate || '').localeCompare(a.startDate || ''));
   body.innerHTML = sorted.length ? sorted.map(c => `
     <tr>
       <td><input type="checkbox" onchange="toggleStatsRoutine(${c.id},this)" ${statsSelectedRoutines.has(c.id)?'checked':''}></td>
