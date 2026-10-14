@@ -2774,3 +2774,35 @@ DROP POLICY IF EXISTS "posts_select" ON posts;
 DROP POLICY IF EXISTS "posts_select_public" ON posts;
 CREATE POLICY "posts_select" ON posts FOR SELECT
   USING (hidden = false OR auth.uid() = author_id OR is_admin());
+
+-- [마이그레이션 2026-10-14b] 홈 공지(notices) 신설
+-- QA: "한끗독서처럼 공지 내용을 작성할 수 있으면 좋겠어" — 배너(짧은 제목+링크)와 별개로,
+-- 운영진이 제목·본문·보이는 기간을 적어 올리면 청소년과 끗짱의 홈 맨 위에 「📢 공지」 한 줄로 보이고
+-- 누르면 본문이 열리는 공지. 커뮤니티의 「공지」 글(posts.type='notice')과는 별개로 둠.
+--   · ends_at이 비어 있으면 내릴 때까지 계속 보임. 지난 공지는 일반 회원에게 안 보임
+--   · 읽었는지는 각자 폰(localStorage)에만 적음 — 서버는 모름
+--   · 푸시는 올릴 때 체크했을 때만 scheduled_notifications(target='all')에 넣음
+-- 읽기: 로그인한 회원(지금 보이는 공지만) / 쓰기·고치기·내리기: 관리자만
+-- =====================================================
+CREATE TABLE IF NOT EXISTS notices (
+  id         bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  title      text NOT NULL CHECK (char_length(btrim(title)) BETWEEN 1 AND 80),
+  body       text NOT NULL CHECK (char_length(btrim(body)) BETWEEN 1 AND 2000),
+  starts_at  timestamptz NOT NULL DEFAULT now(),
+  ends_at    timestamptz,
+  created_by uuid REFERENCES auth.users ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notices_active_idx ON notices (starts_at DESC);
+
+ALTER TABLE notices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS notices_read ON notices;
+CREATE POLICY notices_read ON notices FOR SELECT TO authenticated
+  USING (is_admin() OR (starts_at <= now() AND (ends_at IS NULL OR ends_at > now())));
+
+DROP POLICY IF EXISTS notices_admin ON notices;
+CREATE POLICY notices_admin ON notices FOR ALL TO authenticated
+  USING (is_admin()) WITH CHECK (is_admin());
+
+NOTIFY pgrst, 'reload schema';
