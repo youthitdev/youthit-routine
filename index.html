@@ -4371,13 +4371,15 @@ async function submitPost() {
     if(error){ if(btn){btn.disabled=false;} alert('게시 실패: '+error.message); return; }
     earnNadaeum('review');
   }
-  if(btn){btn.disabled=false;}
   currentReviewRoutineId=null;
   reviewPhotoFile=null; reviewExistingPhotoUrl=null;
   save();
   await loadPosts();
   closeSheet('writeSheetBg');
   closeSheet('reviewWriteSheetBg');
+  // 시트가 닫힌 뒤에야 버튼을 다시 켬 — loadPosts 동안 열려있는 시트에서 또 누르면
+  // (이미 editingPostId=null이라) 수정이 새 후기로 중복 등록되고 나다움도 또 지급됨
+  if(btn){btn.disabled=false;}
   document.getElementById('postContent').value='';
   renderComm(commFilter);
   // 후기 작성 직후 열려있던 루틴 상세/피드 화면이 있으면 버튼을 바로 회색으로 갱신
@@ -5706,22 +5708,31 @@ async function kSubmitPost() {
   const isAdmin = state.loginType==='both';
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
-  if(editingPostId) {
-    const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
-    if(error){ alert('수정 실패: '+error.message); return; }
-    editingPostId = null;
-  } else {
-    const { error } = await sb.from('posts').insert({
-      type: isAdmin ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
-    });
-    if(error){ alert('게시 실패: '+error.message); return; }
+  // 저장이 끝나고 시트가 닫힐 때까지 버튼을 잠가둠 — 안 그러면 수정 저장 직후
+  // editingPostId가 비워진 상태에서 한 번 더 눌렀을 때 "새 글" 분기로 들어가 복사본이 생김(QA)
+  const btn = document.querySelector('#kWriteSheetBg .primary-btn');
+  if(btn.disabled) return;
+  btn.disabled = true;
+  try {
+    if(editingPostId) {
+      const { error } = await sb.from('posts').update({ title:t, content:c }).eq('id', editingPostId);
+      if(error){ alert('수정 실패: '+error.message); return; }
+      editingPostId = null;
+    } else {
+      const { error } = await sb.from('posts').insert({
+        type: isAdmin ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
+      });
+      if(error){ alert('게시 실패: '+error.message); return; }
+    }
+    await loadPosts();
+    closeSheet('kWriteSheetBg');
+    document.getElementById('kPostTitle').value='';
+    document.getElementById('kPostContent').value='';
+    if(state.currentRole==='youth') { renderComm(commFilter); }
+    else { kResetReviewFilter(); kRenderReviewTab('all'); kRenderMy(); }
+  } finally {
+    btn.disabled = false;
   }
-  await loadPosts();
-  closeSheet('kWriteSheetBg');
-  document.getElementById('kPostTitle').value='';
-  document.getElementById('kPostContent').value='';
-  if(state.currentRole==='youth') { renderComm(commFilter); }
-  else { kResetReviewFilter(); kRenderReviewTab('all'); kRenderMy(); }
 }
 
 // ════════════════════════════════════════════════════════
