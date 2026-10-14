@@ -685,9 +685,12 @@ async function loadData() {
   rps.filter(p => p.status === 'approved').forEach(p => {
     (routinesByUser[p.user_id] = routinesByUser[p.user_id] || []).push(routineTitleById[p.routine_id] || '');
   });
-  const approvedCountByRoutine = {};
+  // 루틴 참여인원은 청소년만 셈(끗짱 제외, QA). 알림 수신 대상 안내처럼 전원이 필요한 곳은 peopleAll을 씀
+  const youthIdSet = new Set(profiles.filter(p => p.role === 'youth').map(p => p.id));
+  const approvedCountByRoutine = {}, approvedAllByRoutine = {};
   rps.filter(p => p.status === 'approved').forEach(p => {
-    approvedCountByRoutine[p.routine_id] = (approvedCountByRoutine[p.routine_id] || 0) + 1;
+    approvedAllByRoutine[p.routine_id] = (approvedAllByRoutine[p.routine_id] || 0) + 1;
+    if (youthIdSet.has(p.user_id)) approvedCountByRoutine[p.routine_id] = (approvedCountByRoutine[p.routine_id] || 0) + 1;
   });
   const pendingCountByRoutine = {};
   rps.filter(p => p.status === 'pending').forEach(p => {
@@ -710,7 +713,7 @@ async function loadData() {
 
   routineRows = routines.map(r => ({
     id: r.id, title: r.title, status: r.status, startDate: r.start_date || '', endDate: r.end_date || '',
-    maxPeople: r.max_people || 0, minPeople: r.min_people || null, people: approvedCountByRoutine[r.id] || 0,
+    maxPeople: r.max_people || 0, minPeople: r.min_people || null, people: approvedCountByRoutine[r.id] || 0, peopleAll: approvedAllByRoutine[r.id] || 0,
     pending: pendingCountByRoutine[r.id] || 0,
     coverImageUrl: r.cover_image_url || null,
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
@@ -1318,7 +1321,8 @@ function _monitoringSection(id) {
   const r = routineRows.find(x => x.id === id);
   if (!r) return null;
 
-  const members = rawParticipants.filter(p => p.routine_id === id && p.status === 'approved');
+  const youthIdSet = new Set(youthRows.map(y => y.id));
+  const members = rawParticipants.filter(p => p.routine_id === id && p.status === 'approved' && youthIdSet.has(p.user_id));
   if (!members.length) return null;
 
   const certs = rawCerts.filter(c => c.routine_id === id);
@@ -1360,7 +1364,7 @@ function renderNotifyView() {
   const sel = document.getElementById('notifyRoutine');
   const notArchived = routineRows.filter(r => !r.archived);
   sel.innerHTML = notArchived.length
-    ? notArchived.map(r => `<option value="${r.id}">${r.title} (참여 ${r.people}명)</option>`).join('')
+    ? notArchived.map(r => `<option value="${r.id}">${r.title} (참여 ${r.peopleAll}명)</option>`).join('')
     : '<option value="">루틴이 없어요</option>';
   onNotifyTargetChange();
   document.getElementById('notifyWhen').value = 'now';
@@ -1442,7 +1446,7 @@ function onNotifyTargetChange() {
   document.getElementById('notifyRoutineWrap').style.display = target === 'routine' ? 'block' : 'none';
   if (target === 'routine') {
     const r = routineRows.find(x => x.id === Number(document.getElementById('notifyRoutine').value));
-    document.getElementById('notifyRoutineHint').textContent = r ? `승인된 참여자 ${r.people}명 중, 알림을 켜둔 사람에게만 전달돼요.` : '';
+    document.getElementById('notifyRoutineHint').textContent = r ? `승인된 참여자 ${r.peopleAll}명 중, 알림을 켜둔 사람에게만 전달돼요.` : '';
   }
 }
 async function sendBroadcast() {

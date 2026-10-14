@@ -2806,3 +2806,22 @@ CREATE POLICY notices_admin ON notices FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 NOTIFY pgrst, 'reload schema';
+
+-- [마이그레이션 2026-10-14c] 루틴 참여인원·완주율을 청소년만으로 셈
+-- QA: "루틴 참여인원과 완주인원, 완주율에는 끗짱은 안 들어가면 좋겠어. 청소년으로만!"
+-- 승인된 참여자에 끗짱(체험 참여 등)이 섞여 있으면 인원·완주율이 부풀거나 왜곡됐음.
+--   · youth_ids: 앱이 "이 참여자가 청소년인가"만 알 수 있게 청소년 id만 내보내는 뷰(로그인 회원만).
+--     profiles_public에 role을 붙이면 비로그인에게도 역할이 보여서 따로 둠
+--   · routine_people_count: 비로그인 홈에서 쓰는 참여인원 "수" 뷰도 청소년만 세도록 교체
+-- =====================================================
+CREATE OR REPLACE VIEW youth_ids AS
+  SELECT id FROM profiles WHERE role = 'youth';
+GRANT SELECT ON youth_ids TO authenticated;
+
+CREATE OR REPLACE VIEW routine_people_count AS
+  SELECT rp.routine_id, count(*)::int AS people
+  FROM routine_participants rp
+  JOIN profiles p ON p.id = rp.user_id
+  WHERE rp.status = 'approved' AND p.role = 'youth'
+  GROUP BY rp.routine_id;
+GRANT SELECT ON routine_people_count TO anon, authenticated;
