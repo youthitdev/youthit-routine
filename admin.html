@@ -162,7 +162,7 @@
       <option value="rejected">반려됨</option>
     </select>
     <span class="count-badge" id="oCount"></span>
-    <span style="font-size:11.5px;color:#888;">학교밖센터 담당자 등 — 승인 후 「루틴 지정」한 루틴만 볼 수 있어요</span>
+    <span style="font-size:11.5px;color:#888;">학교밖센터 담당자 등 — 끗짱으로 가입 → 끗짱 탭에서 「참관으로 지정」 → 여기서 「루틴 지정」한 루틴만 볼 수 있어요</span>
   </div>
   <div id="obsRoutineModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;padding:16px;">
     <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:85vh;display:flex;flex-direction:column;">
@@ -2166,6 +2166,7 @@ function renderKkTable() {
     <th>지역</th>
     <th onclick="toggleSort('status')">승인상태</th>
     <th onclick="toggleSort('createdAt')">가입일</th>
+    <th title="학교밖센터 담당자 등은 끗짱으로 가입한 뒤 여기서 참관으로 지정합니다">역할</th>
   </tr>`;
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -2177,7 +2178,8 @@ function renderKkTable() {
       <td>${r.sido ? `${r.sido} ${r.sigugun||''}` : '-'}</td>
       <td><span class="pill ${STATUS_CLASS[r.status]||'pill-none'}">${STATUS_LABEL[r.status]||'-'}</span></td>
       <td>${(r.createdAt||'').slice(0,10)}</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="8">조건에 맞는 끗짱이 없어요</td></tr>`;
+      <td><button onclick="convertRole('${r.id}','observer')" style="padding:4px 9px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;">참관으로 지정</button></td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="9">조건에 맞는 끗짱이 없어요</td></tr>`;
   renderBulkBar();
 }
 
@@ -2193,6 +2195,7 @@ function renderObsTable() {
     <th onclick="toggleSort('status')">승인상태</th>
     <th>볼 수 있는 루틴</th>
     <th onclick="toggleSort('createdAt')">가입일</th>
+    <th>역할</th>
   </tr>`;
   document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -2205,8 +2208,41 @@ function renderObsTable() {
       <td><div class="routine-tags">${r.routineTitles.length ? r.routineTitles.map(t => `<span class="routine-tag">${t}</span>`).join('') : '<span style="color:#c00;font-size:12px;">지정 안 됨</span>'}
         <button onclick="openObsRoutineModal('${r.id}')" style="padding:4px 9px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;">루틴 지정</button></div></td>
       <td>${(r.createdAt||'').slice(0,10)}</td>
-    </tr>`).join('') : `<tr class="empty-row"><td colspan="8">조건에 맞는 참관 계정이 없어요</td></tr>`;
+      <td><button onclick="convertRole('${r.id}','kkutjjang')" style="padding:4px 9px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;">끗짱으로 변경</button></td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="9">조건에 맞는 참관 계정이 없어요 — 끗짱 탭에서 「참관으로 지정」하면 여기로 와요</td></tr>`;
   renderBulkBar();
+}
+// 학교밖센터 담당자 등은 끗짱으로 가입한 뒤 관리자가 참관으로 바꿔 지정함(가입 화면을 단순하게 유지).
+// 참관으로 바꾸면 그 자리에서 승인 처리되고, 이어서 「참관」 탭에서 볼 수 있는 루틴을 지정함
+async function convertRole(id, toRole) {
+  const toObs = toRole === 'observer';
+  const u = toObs ? kkRows.find(r => r.id === id) : obsRows.find(r => r.id === id);
+  if (!u) return;
+  if (toObs) {
+    const leads = routineRows.filter(r => r.ledBy === id && !r.archived);
+    if (leads.length) {
+      alert(`「${u.name}」 계정이 담당 끗짱인 루틴이 있어서 참관으로 바꿀 수 없어요.\n\n${leads.map(r => '· ' + r.title).join('\n')}\n\n루틴의 담당 끗짱을 먼저 바꿔주세요.`);
+      return;
+    }
+  }
+  const msg = toObs
+    ? `「${u.name}」 계정을 참관으로 지정할까요?\n\n· 끗짱 기능은 쓸 수 없게 돼요\n· 승인 처리돼요\n· 이어서 「참관」 탭에서 볼 수 있는 루틴을 지정해 주세요`
+    : `「${u.name}」 계정을 끗짱으로 되돌릴까요?\n\n· 지정된 루틴 목록은 지워져요\n· 끗짱 승인 상태는 그대로예요`;
+  if (!confirm(msg)) return;
+  if (toObs) {
+    const { data, error } = await sb.from('profiles').update({ role: 'observer', kkutjjang_status: 'approved', kkutjjang_reject_reason: null }).eq('id', id).select('id');
+    if (error) { alert('변경 실패: ' + error.message + '\n(마이그레이션 2026-10-15a를 돌렸는지 확인해 주세요)'); return; }
+    if (!data || data.length === 0) { alert('변경되지 않았어요. 권한을 확인해 주세요.'); return; }
+  } else {
+    const { error: delErr } = await sb.from('routine_observers').delete().eq('user_id', id);
+    if (delErr) { alert('루틴 지정 삭제 실패: ' + delErr.message); return; }
+    const { data, error } = await sb.from('profiles').update({ role: 'kkutjjang' }).eq('id', id).select('id');
+    if (error) { alert('변경 실패: ' + error.message); return; }
+    if (!data || data.length === 0) { alert('변경되지 않았어요. 권한을 확인해 주세요.'); return; }
+  }
+  selectedIds.clear();
+  await loadData();
+  if (toObs) { switchTab('observer'); setTimeout(() => openObsRoutineModal(id), 50); }
 }
 let obsModalUserId = null;
 function openObsRoutineModal(userId) {

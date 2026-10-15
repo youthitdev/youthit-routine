@@ -390,9 +390,8 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div class="role-row">
         <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
-        <button class="role-btn" id="roleBtnObs" onclick="selectSignupRole('observer')">👀 참관</button>
       </div>
-      <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
+      <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;line-height:1.5;">끗짱은 관리자 승인 후 이용할 수 있어요.<br>학교밖센터 담당자 등 참관은 끗짱으로 가입하면 관리자가 참관으로 지정해 드려요.</div>
       <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="signupRealName" class="auth-input" placeholder="이름 (실명)">
       <div class="date-field-wrap" id="signupBirthWrap">
@@ -493,9 +492,8 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div class="role-row">
         <button class="role-btn active" id="cpRoleYouth" onclick="selectCpRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="cpRoleKk" onclick="selectCpRole('kkutjjang')">💪 끗짱</button>
-        <button class="role-btn" id="cpRoleObs" onclick="selectCpRole('observer')">👀 참관</button>
       </div>
-      <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
+      <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;line-height:1.5;">끗짱은 관리자 승인 후 이용할 수 있어요.<br>학교밖센터 담당자 등 참관은 끗짱으로 가입하면 관리자가 참관으로 지정해 드려요.</div>
       <input type="text" id="cpName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
       <input type="text" id="cpRealName" class="auth-input" placeholder="이름 (실명)">
       <div class="date-field-wrap" id="cpBirthWrap">
@@ -1558,7 +1556,7 @@ async function loadProfileAndEnter() {
       school_status: meta.school_status || null,
       // 2026-09-21 유스보이스 팝업 행사일엔 현장 가입 끗짱도 바로 승인(서버 트리거
       // handle_new_user()의 로직과 동일 — 이건 트리거가 안 돌았을 때만 쓰이는 폴백)
-      kkutjjang_status: (meta.role || 'youth') === 'youth' ? 'none' : (meta.role === 'observer') ? 'pending' : (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending',
+      kkutjjang_status: (meta.role || 'youth') !== 'kkutjjang' ? 'none' : (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending',
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
     profile = created;
@@ -1755,18 +1753,12 @@ function _toggleDateLabel(el) {
   const label = document.getElementById(el.id + 'Label');
   if (label) label.style.display = el.value ? 'none' : '';
 }
-// 끗짱·참관은 관리자 승인 후 이용 — 참관(학교밖센터 담당자 등)은 지정받은 루틴만 볼 수 있음
-function _roleApprovalHint(role) {
-  return role === 'observer' ? '참관은 관리자 승인 후, 지정받은 루틴만 볼 수 있어요.' : '끗짱은 관리자 승인 후 이용할 수 있어요.';
-}
 function selectSignupRole(role) {
   signupRole = role;
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
-  document.getElementById('roleBtnObs').classList.toggle('active', role === 'observer');
   document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
-  document.getElementById('kkHint').style.display = role === 'youth' ? 'none' : '';
-  document.getElementById('kkHint').textContent = _roleApprovalHint(role);
+  document.getElementById('kkHint').style.display = role === 'kkutjjang' ? '' : 'none';
   // 9/21 현장행사 등 끗짱 가입은 빠르게 할 수 있도록, 청소년 미성년자 보호를 위해서만
   // 필요한 생년월일(만 14세 확인)·거주지역은 끗짱 가입 시 선택사항으로 뺌(QA 요청).
   // regionWrap/ageAgreeWrap은 원래 display:flex라서 ''로 되돌리면 각각 div/label의
@@ -1802,10 +1794,8 @@ function selectCpRole(role) {
   cpRole = role;
   document.getElementById('cpRoleYouth').classList.toggle('active', role === 'youth');
   document.getElementById('cpRoleKk').classList.toggle('active', role === 'kkutjjang');
-  document.getElementById('cpRoleObs').classList.toggle('active', role === 'observer');
   document.getElementById('cpYouthExtra').style.display = role === 'youth' ? '' : 'none';
-  document.getElementById('cpKkHint').style.display = role === 'youth' ? 'none' : '';
-  document.getElementById('cpKkHint').textContent = _roleApprovalHint(role);
+  document.getElementById('cpKkHint').style.display = role === 'kkutjjang' ? '' : 'none';
   // signupBirthWrap/signupRegionWrap과 같은 이유(QA 요청) — 끗짱은 생년월일/거주지역 선택사항.
   // regionWrap/ageAgreeWrap은 원래 display:flex라서 'flex'로 명시해서 되돌림
   document.getElementById('cpBirthWrap').style.display = role === 'youth' ? '' : 'none';
@@ -1824,8 +1814,7 @@ function showCompleteProfile(profile) {
   // 카카오로 시작하기 전에 회원가입 탭에서 골라뒀던 청소년/끗짱 선택을 이어받음
   const savedRole = sessionStorage.getItem('hankkut_kakao_role');
   sessionStorage.removeItem('hankkut_kakao_role');
-  const _approvalRoles = ['kkutjjang', 'observer'];
-  selectCpRole(_approvalRoles.includes(profile.role) ? profile.role : (_approvalRoles.includes(savedRole) ? savedRole : 'youth'));
+  selectCpRole(profile.role === 'kkutjjang' || savedRole === 'kkutjjang' ? 'kkutjjang' : 'youth');
   document.getElementById('completeProfileScreen').style.display = 'flex';
 }
 async function submitCompleteProfile() {
@@ -1862,7 +1851,6 @@ async function submitCompleteProfile() {
   // 2026-09-21 유스보이스 팝업 행사일엔 카카오로 가입한 끗짱도 바로 승인
   // (email 가입 폴백과 동일한 예외 — 서버 guard_kkutjjang_status 트리거에도 동일 조건 있음)
   if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending';
-  else if (cpRole === 'observer') payload.kkutjjang_status = 'pending'; // 참관은 행사일 자동승인 없이 항상 관리자 승인
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if (error) return msg('⚠️ 저장 실패: ' + error.message);
   sessionStorage.setItem('hankkut_just_signed_up', '1');
