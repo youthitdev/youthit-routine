@@ -109,6 +109,7 @@
   <div class="tabs">
     <button class="tab-btn active" id="tabYouthBtn" onclick="switchTab('youth')">청소년</button>
     <button class="tab-btn" id="tabKkBtn" onclick="switchTab('kkutjjang')">끗짱</button>
+    <button class="tab-btn" id="tabObsBtn" onclick="switchTab('observer')">참관</button>
     <button class="tab-btn" id="tabRoutineBtn" onclick="switchTab('routine')">루틴</button>
     <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 통계</button>
     <button class="tab-btn" id="tabNotifyBtn" onclick="switchTab('notify')">🔔 알림 보내기</button>
@@ -150,6 +151,29 @@
     </select>
     <span class="count-badge" id="kCount"></span>
     <button class="export-btn" onclick="exportCSV('kkutjjang')">📥 CSV 내보내기</button>
+  </div>
+
+  <div class="filter-bar" id="obsFilters" style="display:none;">
+    <input type="text" id="oSearch" placeholder="닉네임·실명·휴대폰 검색" oninput="renderTable()">
+    <select id="oStatus" onchange="renderTable()">
+      <option value="">전체 승인상태</option>
+      <option value="approved">승인됨</option>
+      <option value="pending">대기중</option>
+      <option value="rejected">반려됨</option>
+    </select>
+    <span class="count-badge" id="oCount"></span>
+    <span style="font-size:11.5px;color:#888;">학교밖센터 담당자 등 — 승인 후 「루틴 지정」한 루틴만 볼 수 있어요</span>
+  </div>
+  <div id="obsRoutineModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:85vh;display:flex;flex-direction:column;">
+      <div style="font-size:15px;font-weight:700;color:#111;margin-bottom:4px;">볼 수 있는 루틴 지정</div>
+      <div id="obsModalWho" style="font-size:12px;color:#888;margin-bottom:10px;"></div>
+      <div id="obsModalList" style="flex:1;overflow-y:auto;border:1px solid #eee;border-radius:10px;padding:6px 10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button onclick="closeObsRoutineModal()" style="padding:9px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;">취소</button>
+        <button onclick="saveObsRoutines()" style="padding:9px 16px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
+      </div>
+    </div>
   </div>
 
   <div id="routineCreateView" style="display:none;">
@@ -601,7 +625,7 @@ const REGION_DATA = {
 
 let currentUser = null;
 let currentTab = 'youth';
-let youthRows = [], kkRows = [], routineRows = [];
+let youthRows = [], kkRows = [], obsRows = [], routineRows = [];
 let rewardRows = [], redemptionRows = [];
 let editingRewardId = null;
 let bannerRows = [];
@@ -666,11 +690,12 @@ const STATUS_CLASS = { approved: 'pill-approved', pending: 'pill-pending', rejec
 
 async function loadData() {
   document.getElementById('tableBody').innerHTML = '<tr class="empty-row"><td colspan="10">불러오는 중...</td></tr>';
-  const [profRes, rpRes, routRes, certRes] = await Promise.all([
+  const [profRes, rpRes, routRes, certRes, roRes] = await Promise.all([
     sb.from('profiles').select('*'),
     sb.from('routine_participants').select('routine_id,user_id,status,application_note'),
     sb.from('routines').select('*'),
     sb.from('certifications').select('routine_id,user_id,created_at'),
+    sb.from('routine_observers').select('routine_id,user_id'), // 마이그레이션 2026-10-15a 전이면 에러 → 빈 목록
   ]);
   const profiles = profRes.data || [];
   const rps = rpRes.data || [];
@@ -743,6 +768,16 @@ async function loadData() {
     status: p.kkutjjang_status || 'none', createdAt: p.created_at,
   }));
 
+  // 참관(학교밖센터 담당자 등) — 계정별로 볼 수 있게 지정된 루틴
+  const obsRoutineIds = {};
+  (roRes.data || []).forEach(o => { (obsRoutineIds[o.user_id] = obsRoutineIds[o.user_id] || []).push(o.routine_id); });
+  obsRows = profiles.filter(p => p.role === 'observer').map(p => ({
+    id: p.id, name: p.name, realName: p.real_name || '', phone: p.phone || '', avatarUrl: p.avatar_url || null,
+    status: p.kkutjjang_status || 'none', createdAt: p.created_at,
+    routineIds: obsRoutineIds[p.id] || [],
+    routineTitles: (obsRoutineIds[p.id] || []).map(id => routineTitleById[id]).filter(Boolean),
+  }));
+
   const routineSel = document.getElementById('yRoutine');
   const uniqueTitles = [...new Set(routines.map(r => r.title))].sort();
   routineSel.innerHTML = '<option value="">전체 참여루틴</option>' + uniqueTitles.map(t => `<option value="${t}">${t}</option>`).join('');
@@ -755,6 +790,7 @@ function switchTab(tab) {
   selectedIds.clear();
   document.getElementById('tabYouthBtn').classList.toggle('active', tab === 'youth');
   document.getElementById('tabKkBtn').classList.toggle('active', tab === 'kkutjjang');
+  document.getElementById('tabObsBtn').classList.toggle('active', tab === 'observer');
   document.getElementById('tabRoutineBtn').classList.toggle('active', tab === 'routine');
   document.getElementById('tabStatsBtn').classList.toggle('active', tab === 'stats');
   document.getElementById('tabNotifyBtn').classList.toggle('active', tab === 'notify');
@@ -763,6 +799,7 @@ function switchTab(tab) {
   document.getElementById('tabNoticeBtn').classList.toggle('active', tab === 'notice');
   document.getElementById('youthFilters').style.display = tab === 'youth' ? 'flex' : 'none';
   document.getElementById('kkFilters').style.display = tab === 'kkutjjang' ? 'flex' : 'none';
+  document.getElementById('obsFilters').style.display = tab === 'observer' ? 'flex' : 'none';
   document.getElementById('routineFilters').style.display = tab === 'routine' ? 'flex' : 'none';
   document.getElementById('routineCreateView').style.display = tab === 'routine' ? 'block' : 'none';
   document.getElementById('tableWrap').style.display = (tab === 'stats' || tab === 'notify' || tab === 'reward' || tab === 'banner' || tab === 'notice') ? 'none' : 'block';
@@ -808,6 +845,15 @@ function _filteredKk() {
     return true;
   });
 }
+function _filteredObs() {
+  const q = document.getElementById('oSearch').value.trim().toLowerCase();
+  const status = document.getElementById('oStatus').value;
+  return obsRows.filter(r => {
+    if (q && !(r.name.toLowerCase().includes(q) || r.realName.toLowerCase().includes(q) || r.phone.includes(q))) return false;
+    if (status && r.status !== status) return false;
+    return true;
+  });
+}
 function _filteredRoutines() {
   const q = document.getElementById('rSearch').value.trim().toLowerCase();
   const status = document.getElementById('rStatusFilter').value;
@@ -837,6 +883,7 @@ function toggleSort(key) {
 function renderTable() {
   if (currentTab === 'youth') renderYouthTable();
   else if (currentTab === 'kkutjjang') renderKkTable();
+  else if (currentTab === 'observer') renderObsTable();
   else renderRoutineTable();
 }
 const R_STATUS_LABEL = { recruit: '모집 중', active: '진행 중', done: '완료', cancelled: '폐강' };
@@ -2134,12 +2181,79 @@ function renderKkTable() {
   renderBulkBar();
 }
 
+function renderObsTable() {
+  const rows = sortRows(_filteredObs());
+  document.getElementById('oCount').textContent = `${rows.length}명`;
+  document.getElementById('tableHead').innerHTML = `<tr>
+    <th style="width:24px;"><input type="checkbox" onchange="toggleSelectAll(this,'${currentTab}')"></th>
+    <th>사진</th>
+    <th onclick="toggleSort('name')">닉네임</th>
+    <th onclick="toggleSort('realName')">실명</th>
+    <th onclick="toggleSort('phone')">휴대폰</th>
+    <th onclick="toggleSort('status')">승인상태</th>
+    <th>볼 수 있는 루틴</th>
+    <th onclick="toggleSort('createdAt')">가입일</th>
+  </tr>`;
+  document.getElementById('tableBody').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><input type="checkbox" data-id="${r.id}" onchange="toggleSelect('${r.id}',this)" ${selectedIds.has(r.id)?'checked':''}></td>
+      <td>${_adminAvatarHtml(r)}</td>
+      <td>${r.name}</td>
+      <td>${r.realName || '-'}</td>
+      <td>${r.phone || '-'}</td>
+      <td><span class="pill ${STATUS_CLASS[r.status]||'pill-none'}">${STATUS_LABEL[r.status]||'-'}</span></td>
+      <td><div class="routine-tags">${r.routineTitles.length ? r.routineTitles.map(t => `<span class="routine-tag">${t}</span>`).join('') : '<span style="color:#c00;font-size:12px;">지정 안 됨</span>'}
+        <button onclick="openObsRoutineModal('${r.id}')" style="padding:4px 9px;background:#fff;color:#2E33BC;border:1px solid #c7cbf5;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap;">루틴 지정</button></div></td>
+      <td>${(r.createdAt||'').slice(0,10)}</td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="8">조건에 맞는 참관 계정이 없어요</td></tr>`;
+  renderBulkBar();
+}
+let obsModalUserId = null;
+function openObsRoutineModal(userId) {
+  const u = obsRows.find(r => r.id === userId);
+  if (!u) return;
+  obsModalUserId = userId;
+  document.getElementById('obsModalWho').textContent = `${u.name}${u.realName ? ' (' + u.realName + ')' : ''} — 체크한 루틴의 인증 사진·댓글만 볼 수 있어요` + (u.status === 'approved' ? '' : ' · ⚠️ 아직 승인 전이라 승인해야 보여요');
+  const list = routineRows.filter(r => !r.archived || u.routineIds.includes(r.id));
+  document.getElementById('obsModalList').innerHTML = list.length ? list.map(r => `
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 2px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f5f5;">
+      <input type="checkbox" class="obsRtChk" value="${r.id}" ${u.routineIds.includes(r.id) ? 'checked' : ''}>
+      <span style="flex:1;min-width:0;">${r.emoji || ''} ${r.title}</span>
+      <span style="font-size:11px;color:#aaa;white-space:nowrap;">${R_STATUS_LABEL[r.status] || r.status}</span>
+    </label>`).join('') : '<div style="padding:16px;text-align:center;color:#aaa;font-size:13px;">루틴이 없어요</div>';
+  document.getElementById('obsRoutineModal').style.display = 'flex';
+}
+function closeObsRoutineModal() {
+  document.getElementById('obsRoutineModal').style.display = 'none';
+  obsModalUserId = null;
+}
+async function saveObsRoutines() {
+  const userId = obsModalUserId;
+  const u = obsRows.find(r => r.id === userId);
+  if (!u) return;
+  const next = new Set([...document.querySelectorAll('#obsModalList .obsRtChk:checked')].map(c => Number(c.value)));
+  const prev = new Set(u.routineIds);
+  const toAdd = [...next].filter(id => !prev.has(id));
+  const toDel = [...prev].filter(id => !next.has(id));
+  if (!toAdd.length && !toDel.length) { closeObsRoutineModal(); return; }
+  if (toAdd.length) {
+    const { error } = await sb.from('routine_observers').insert(toAdd.map(routine_id => ({ routine_id, user_id: userId })));
+    if (error) { alert('저장 실패: ' + error.message + '\n(마이그레이션 2026-10-15a를 돌렸는지 확인해 주세요)'); return; }
+  }
+  if (toDel.length) {
+    const { error } = await sb.from('routine_observers').delete().eq('user_id', userId).in('routine_id', toDel);
+    if (error) { alert('삭제 실패: ' + error.message); return; }
+  }
+  closeObsRoutineModal();
+  await loadData();
+}
+
 function toggleSelect(id, el) {
   if (el.checked) selectedIds.add(id); else selectedIds.delete(id);
   renderBulkBar();
 }
 function toggleSelectAll(el, tab) {
-  const rows = tab === 'youth' ? _filteredYouth() : _filteredKk();
+  const rows = tab === 'youth' ? _filteredYouth() : tab === 'observer' ? _filteredObs() : _filteredKk();
   if (el.checked) rows.forEach(r => selectedIds.add(r.id));
   else rows.forEach(r => selectedIds.delete(r.id));
   renderTable();
@@ -2150,7 +2264,7 @@ function renderBulkBar() {
     bar.style.display = 'flex';
     document.getElementById('bulkCount').textContent = currentTab === 'youth'
       ? `${selectedIds.size}명 선택됨 (청소년 서류 승인/반려)`
-      : `${selectedIds.size}명 선택됨 (끗짱 가입 승인/반려)`;
+      : `${selectedIds.size}명 선택됨 (${currentTab === 'observer' ? '참관' : '끗짱'} 가입 승인/반려)`;
     document.getElementById('bulkGrantBtn').style.display = currentTab === 'youth' ? 'inline-block' : 'none';
   } else {
     bar.style.display = 'none';
@@ -2158,7 +2272,7 @@ function renderBulkBar() {
 }
 async function bulkAction(status) {
   if (selectedIds.size === 0) return;
-  const label = currentTab === 'youth' ? '청소년 서류를' : '끗짱 가입을';
+  const label = currentTab === 'youth' ? '청소년 서류를' : currentTab === 'observer' ? '참관 가입을' : '끗짱 가입을';
   const reasonField = currentTab === 'youth' ? 'verify_reject_reason' : 'kkutjjang_reject_reason';
   let reason = null;
   if (status === 'rejected') {

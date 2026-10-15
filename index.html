@@ -177,6 +177,11 @@ select:focus { outline: none; border-color: #2E33BC; }
 .sheet-bg.open { opacity: 1; pointer-events: all; }
 .sheet { background: #fff; border-radius: 20px 20px 0 0; padding: 20px 20px calc(40px + env(safe-area-inset-bottom)); width: 100%; max-width: 390px; transform: translateY(100%); transition: transform 0.25s ease; max-height: 85vh; overflow-y: auto; }
 .sheet-bg.open .sheet { transform: translateY(0); }
+/* 참관(읽기 전용) — 인증 탭·글쓰기 버튼·MY의 청소년 전용 카드는 숨김 */
+body.is-observer #nav-cert,
+body.is-observer #page-comm > button[onclick*="openCommWriteWithRoutine"],
+body.is-observer #page-my .scroll-body > :not(.profile-card):not(.menu-card):not(#switchRoleArea):not(button),
+body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none !important; }
 .sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto 16px; }
 /* 홈 공지 한 줄(한끗독서와 같은 방식) — 여럿이면 제목이 아래에서 위로 돌아감, 누르면 시트에 본문이 열림 */
 .nt-bar { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font-family: inherit; cursor: pointer; margin-bottom: 10px; background: #FFF8EA; border: 1px solid #F1DFB8; border-radius: 14px; padding: 10px 14px; }
@@ -385,6 +390,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="role-row">
         <button class="role-btn active" id="roleBtnYouth" onclick="selectSignupRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="roleBtnKk" onclick="selectSignupRole('kkutjjang')">💪 끗짱</button>
+        <button class="role-btn" id="roleBtnObs" onclick="selectSignupRole('observer')">👀 참관</button>
       </div>
       <div id="kkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="signupName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
@@ -487,6 +493,7 @@ select:focus { outline: none; border-color: #2E33BC; }
       <div class="role-row">
         <button class="role-btn active" id="cpRoleYouth" onclick="selectCpRole('youth')">🌱 청소년</button>
         <button class="role-btn" id="cpRoleKk" onclick="selectCpRole('kkutjjang')">💪 끗짱</button>
+        <button class="role-btn" id="cpRoleObs" onclick="selectCpRole('observer')">👀 참관</button>
       </div>
       <div id="cpKkHint" style="display:none;font-size:11px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;">끗짱은 관리자 승인 후 이용할 수 있어요.</div>
       <input type="text" id="cpName" class="auth-input" placeholder="닉네임 (앱에서 사용할 이름)">
@@ -1551,7 +1558,7 @@ async function loadProfileAndEnter() {
       school_status: meta.school_status || null,
       // 2026-09-21 유스보이스 팝업 행사일엔 현장 가입 끗짱도 바로 승인(서버 트리거
       // handle_new_user()의 로직과 동일 — 이건 트리거가 안 돌았을 때만 쓰이는 폴백)
-      kkutjjang_status: (meta.role || 'youth') !== 'kkutjjang' ? 'none' : (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending',
+      kkutjjang_status: (meta.role || 'youth') === 'youth' ? 'none' : (meta.role === 'observer') ? 'pending' : (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending',
     }).select().single();
     if (insertErr) { showAuthMsg('⚠️ 프로필 생성 실패: ' + insertErr.message); return; }
     profile = created;
@@ -1559,7 +1566,11 @@ async function loadProfileAndEnter() {
 
   if (!profile) { showAuthMsg('⚠️ 프로필 로드 실패. 잠시 후 다시 시도해주세요.'); return; }
   // 소셜(카카오) 최초 로그인은 기본정보가 비어있음 → 추가 정보 입력 화면으로
-  if (!profile.real_name || !profile.birth_date || !profile.phone || !profile.region_sido) {
+  // 생년월일·거주지역은 청소년만 필수 — 끗짱·참관은 가입 때 선택사항이라, 그 둘이 비었다고 매번 추가정보 화면으로 보내면 안 됨
+  const _needsBasicInfo = profile.role === 'youth'
+    ? (!profile.real_name || !profile.birth_date || !profile.phone || !profile.region_sido)
+    : (!profile.real_name || !profile.phone);
+  if (_needsBasicInfo) {
     showCompleteProfile(profile);
     return;
   }
@@ -1593,12 +1604,13 @@ async function loadProfileAndEnter() {
   const isAdmin = ADMINS.includes(currentUser.email);
   state.loginType = isAdmin ? 'both' : profile.role;
   persistState();
-  if (profile.role === 'kkutjjang' && !isAdmin && profile.kkutjjang_status !== 'approved') {
-    showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '');
+  if ((profile.role === 'kkutjjang' || profile.role === 'observer') && !isAdmin && profile.kkutjjang_status !== 'approved') {
+    showKkutjjangPending(profile.kkutjjang_status || 'pending', profile.kkutjjang_reject_reason || '', profile.role);
     return;
   }
   try { await loadRoutines(); await loadPosts(); await loadCertFeed(); await loadBanners(); await loadNotices(); await loadLetters(); await loadAvatars(); } catch(e) { console.error('데이터 로드 실패', e); }
-  enterAs(profile.role);
+  // 참관자는 청소년 화면 구조를 그대로 쓰되 읽기 전용으로 제한함(loginType='observer'로 구분, 화면 역할은 youth)
+  enterAs(profile.role === 'observer' ? 'youth' : profile.role);
   maybeShowInstallPrompt();
   _maybeCelebrateCompletion();
   refreshNotifUnreadDot();
@@ -1623,11 +1635,11 @@ async function loadProfileAndEnter() {
     const pt = pendingTab; pendingTab = null;
     history.replaceState(null, '', location.pathname);
     const isYouth = state.currentRole === 'youth';
-    const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+    const validTabs = isYouth ? (_isObserver() ? ['routine','comm','my'] : ['routine','cert','comm','my']) : ['home','routine','cert','review','my'];
     if (validTabs.includes(pt)) { isYouth ? switchTab(pt) : kSwitchTab(pt); }
   }
 }
-function showKkutjjangPending(status, reason) {
+function showKkutjjangPending(status, reason, role) {
   document.getElementById('splashScreen').classList.add('hide');
   const el = document.getElementById('kkPendingScreen');
   const isRejected = status === 'rejected';
@@ -1636,7 +1648,7 @@ function showKkutjjangPending(status, reason) {
   document.getElementById('kkPendingBody').style.whiteSpace = 'pre-wrap';
   document.getElementById('kkPendingBody').textContent = isRejected
     ? (reason ? `반려 사유: ${reason}\n\n문의사항이 있다면 아래 이메일로 연락해주세요.` : '문의사항이 있다면 아래 이메일로 연락해주세요.')
-    : '관리자 확인 후 끗짱으로 이용할 수 있어요. 조금만 기다려주세요.';
+    : (role === 'observer' ? '관리자 확인 후 참관으로 이용할 수 있어요. 조금만 기다려주세요.' : '관리자 확인 후 끗짱으로 이용할 수 있어요. 조금만 기다려주세요.');
   el.style.display = 'flex';
 }
 async function kkPendingLogout() {
@@ -1743,12 +1755,18 @@ function _toggleDateLabel(el) {
   const label = document.getElementById(el.id + 'Label');
   if (label) label.style.display = el.value ? 'none' : '';
 }
+// 끗짱·참관은 관리자 승인 후 이용 — 참관(학교밖센터 담당자 등)은 지정받은 루틴만 볼 수 있음
+function _roleApprovalHint(role) {
+  return role === 'observer' ? '참관은 관리자 승인 후, 지정받은 루틴만 볼 수 있어요.' : '끗짱은 관리자 승인 후 이용할 수 있어요.';
+}
 function selectSignupRole(role) {
   signupRole = role;
   document.getElementById('roleBtnYouth').classList.toggle('active', role === 'youth');
   document.getElementById('roleBtnKk').classList.toggle('active', role === 'kkutjjang');
+  document.getElementById('roleBtnObs').classList.toggle('active', role === 'observer');
   document.getElementById('signupYouthExtra').style.display = role === 'youth' ? '' : 'none';
-  document.getElementById('kkHint').style.display = role === 'kkutjjang' ? '' : 'none';
+  document.getElementById('kkHint').style.display = role === 'youth' ? 'none' : '';
+  document.getElementById('kkHint').textContent = _roleApprovalHint(role);
   // 9/21 현장행사 등 끗짱 가입은 빠르게 할 수 있도록, 청소년 미성년자 보호를 위해서만
   // 필요한 생년월일(만 14세 확인)·거주지역은 끗짱 가입 시 선택사항으로 뺌(QA 요청).
   // regionWrap/ageAgreeWrap은 원래 display:flex라서 ''로 되돌리면 각각 div/label의
@@ -1784,8 +1802,10 @@ function selectCpRole(role) {
   cpRole = role;
   document.getElementById('cpRoleYouth').classList.toggle('active', role === 'youth');
   document.getElementById('cpRoleKk').classList.toggle('active', role === 'kkutjjang');
+  document.getElementById('cpRoleObs').classList.toggle('active', role === 'observer');
   document.getElementById('cpYouthExtra').style.display = role === 'youth' ? '' : 'none';
-  document.getElementById('cpKkHint').style.display = role === 'kkutjjang' ? '' : 'none';
+  document.getElementById('cpKkHint').style.display = role === 'youth' ? 'none' : '';
+  document.getElementById('cpKkHint').textContent = _roleApprovalHint(role);
   // signupBirthWrap/signupRegionWrap과 같은 이유(QA 요청) — 끗짱은 생년월일/거주지역 선택사항.
   // regionWrap/ageAgreeWrap은 원래 display:flex라서 'flex'로 명시해서 되돌림
   document.getElementById('cpBirthWrap').style.display = role === 'youth' ? '' : 'none';
@@ -1804,7 +1824,8 @@ function showCompleteProfile(profile) {
   // 카카오로 시작하기 전에 회원가입 탭에서 골라뒀던 청소년/끗짱 선택을 이어받음
   const savedRole = sessionStorage.getItem('hankkut_kakao_role');
   sessionStorage.removeItem('hankkut_kakao_role');
-  selectCpRole(profile.role === 'kkutjjang' || savedRole === 'kkutjjang' ? 'kkutjjang' : 'youth');
+  const _approvalRoles = ['kkutjjang', 'observer'];
+  selectCpRole(_approvalRoles.includes(profile.role) ? profile.role : (_approvalRoles.includes(savedRole) ? savedRole : 'youth'));
   document.getElementById('completeProfileScreen').style.display = 'flex';
 }
 async function submitCompleteProfile() {
@@ -1841,6 +1862,7 @@ async function submitCompleteProfile() {
   // 2026-09-21 유스보이스 팝업 행사일엔 카카오로 가입한 끗짱도 바로 승인
   // (email 가입 폴백과 동일한 예외 — 서버 guard_kkutjjang_status 트리거에도 동일 조건 있음)
   if (cpRole === 'kkutjjang') payload.kkutjjang_status = (ADMINS.includes(currentUser.email) || _todayStr() === '2026-09-21') ? 'approved' : 'pending';
+  else if (cpRole === 'observer') payload.kkutjjang_status = 'pending'; // 참관은 행사일 자동승인 없이 항상 관리자 승인
   const { error } = await sb.from('profiles').update(payload).eq('id', currentUser.id);
   if (error) return msg('⚠️ 저장 실패: ' + error.message);
   sessionStorage.setItem('hankkut_just_signed_up', '1');
@@ -2050,6 +2072,12 @@ async function loadRoutines() {
       })),
     };
   });
+  // 참관자는 관리자가 지정한 루틴만 목록에 둠(routines 조회는 모두에게 열려 있어서 클라이언트에서 거름)
+  if (_isObserver() && currentUser) {
+    const { data: obsRows } = await sb.from('routine_observers').select('routine_id').eq('user_id', currentUser.id);
+    const obsIds = new Set((obsRows || []).map(o => o.routine_id));
+    state.routines = state.routines.filter(r => obsIds.has(r.id));
+  }
   if (currentUser) {
     state.youth.pendingRoutines = parts
       .filter(p => p.user_id === currentUser.id && p.status === 'pending')
@@ -2228,7 +2256,7 @@ async function loadLetters() {
   const userIds = [...new Set(rows.map(l => l.from_user_id))];
   const routineIds = [...new Set(rows.map(l => l.routine_id))];
   const [profRes, routRes] = await Promise.all([
-    userIds.length ? sb.from('profiles').select('id,name').in('id', userIds) : Promise.resolve({ data: [] }),
+    userIds.length ? sb.from('profiles_public').select('id,name').in('id', userIds) : Promise.resolve({ data: [] }),
     routineIds.length ? sb.from('routines').select('id,title').in('id', routineIds) : Promise.resolve({ data: [] }),
   ]);
   const nameById = {}; (profRes.data || []).forEach(p => nameById[p.id] = p.name);
@@ -2246,7 +2274,9 @@ async function loadLetters() {
 // 일부, profiles_public 사용)에는 이 맵을 아예 안 넘겨줘도 자연스럽게 노출이 안 됨
 async function loadAvatars() {
   if (!currentUser) { state.avatarById = {}; return; }
-  const { data, error } = await sb.from('profiles').select('id,avatar_url').not('avatar_url', 'is', null);
+  // profile_avatars 뷰(마이그레이션 2026-10-15a)를 우선 쓰고, 아직 없으면 예전 방식으로 폴백
+  let { data, error } = await sb.from('profile_avatars').select('id,avatar_url');
+  if (error) ({ data, error } = await sb.from('profiles').select('id,avatar_url').not('avatar_url', 'is', null));
   if (error) { console.error('프로필 사진 로드 실패', error); return; }
   const map = {};
   (data || []).forEach(p => { if (p.avatar_url) map[p.id] = p.avatar_url; });
@@ -2469,6 +2499,9 @@ function _hideGuestPrompt(tab) {
 function _guestGoLogin() {
   document.getElementById('splashScreen').classList.remove('hide');
 }
+const OBSERVER_COLOR = '#2E33BC';
+const _isObserver = () => state.loginType === 'observer';
+function _roleColor() { return _isObserver() && state.currentRole === 'youth' ? OBSERVER_COLOR : (state.currentRole === 'youth' ? '#83CA00' : '#FF006C'); }
 function applyRole(role) {
   state.currentRole = role;
   save();
@@ -2477,9 +2510,11 @@ function applyRole(role) {
   document.getElementById('kkutjjangTabs').style.display = isYouth ? 'none' : '';
   document.getElementById('youthNav').style.display = isYouth ? 'contents' : 'none';
   document.getElementById('kkutjjangNav').style.display = isYouth ? 'none' : 'contents';
-  document.getElementById('headerRoleBadge').textContent = isYouth ? '청소년' : '끗짱';
+  const obs = isYouth && _isObserver(); // 참관은 화면 구조는 청소년과 같고 읽기 전용
+  document.body.classList.toggle('is-observer', obs);
+  document.getElementById('headerRoleBadge').textContent = obs ? '참관' : (isYouth ? '청소년' : '끗짱');
   // 역할별 색상 전체 적용
-  const headerColor = isYouth ? '#83CA00' : '#FF006C';
+  const headerColor = obs ? OBSERVER_COLOR : (isYouth ? '#83CA00' : '#FF006C');
   document.getElementById('mainHeader').style.background = headerColor;
   document.getElementById('mainNav').style.borderTopColor = headerColor + '33';
   document.getElementById('themeColor').content = headerColor;
@@ -3000,7 +3035,7 @@ async function openRoutineFeed(routineId) {
   document.getElementById('feedOverlaySub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('feedOverlayTitle').textContent=r.emoji+' '+r.title;
   // 역할 색상 헤더에 직접 적용
-  const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
+  const roleColor = _roleColor();
   document.querySelector('#routineFeedOverlay .overlay-hd').style.background = roleColor;
   // 인증글 소감/좋아요/댓글은 그 루틴 참여자(또는 담당 끗짱/관리자)만 볼 수 있음 — 서버
   // (RLS)에서도 막음. 단, 사진 미리보기만은 다른 루틴 것도 볼 수 있으면 좋겠다는 요청(QA:
@@ -3010,7 +3045,8 @@ async function openRoutineFeed(routineId) {
   // 혹시 id를 알아내 직접 열려 해도 상세 화면이 쓰는 certifications 테이블 RLS가 그대로 막음
   const isParticipant = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
   const isLeaderOrAdmin = currentUser && (r.createdBy===currentUser.id || r.ledBy===currentUser.id || ADMINS.includes(currentUser.email));
-  if (!isParticipant && !isLeaderOrAdmin) {
+  // 지정받은 참관자(이 목록엔 지정된 루틴만 있음)도 인증 사진·소감·댓글을 전부 볼 수 있음 — 서버 RLS(can_observe)가 같은 기준
+  if (!isParticipant && !isLeaderOrAdmin && !_isObserver()) {
     document.getElementById('feedCertActionBtn').style.display='none';
     document.getElementById('feedCertDoneBadge').style.display='none';
     document.getElementById('feedOverlayBody').innerHTML = `
@@ -3645,6 +3681,7 @@ async function deletePostComment(postId, commentId) {
 // 아니라 인증 버튼이 있는 화면으로 아예 연결이 안 되고 있던 것)
 function _shouldOpenFeed(r) {
   if (!r || !currentUser || r.status === 'cancelled') return false;
+  if (_isObserver()) return true; // 참관자는 지정받은 루틴의 인증 피드를 봄(신청 화면 대신)
   const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
   if (!me) return false;
   return r.isFree || r.status === 'active' || r.status === 'done';
@@ -3752,6 +3789,7 @@ function selectApplyDuration(n){
 }
 function openApplyOverlay(id){
   if(!currentUser){alert('로그인이 필요해요.');return;}
+  if(_isObserver()){alert('참관 계정은 루틴에 참여 신청할 수 없어요.');return;}
   applyRoutineId=id;
   document.getElementById('applyNote').value='';
   const r=state.routines.find(x=>x.id===id);
@@ -3899,6 +3937,7 @@ function goToRecruitRoutines() {
 }
 function selectCertRoutine(id,title) { currentCertId=id; openCertForm(id,title); }
 function openCertForm(id,title) {
+  if(_isObserver()){alert('참관 계정은 인증을 올릴 수 없어요.');return;}
   currentCertId=id; certHasPhoto=false; certPhotos=[]; certPhotoWatermarked=[];
   document.getElementById('certFormTitle').textContent=title;
   const r=state.routines.find(x=>x.id===id);
@@ -4463,6 +4502,7 @@ async function handleReviewPhoto(e) {
 }
 function openCommWriteWithRoutine(routineId, type) {
   if(!currentUser){ alert('로그인이 필요해요.'); return; }
+  if(_isObserver()){ alert('참관 계정은 글을 쓸 수 없어요. 댓글과 좋아요로 응원해 주세요.'); return; }
   // 완료 루틴 목록으로 글쓰기 시트 열기 (특정 루틴 선택된 상태로)
   if(routineId) {
     const r = state.routines.find(x=>x.id===routineId);
@@ -4669,7 +4709,7 @@ function renderMy() {
   const myAvatarUrl = currentUser && state.avatarById && state.avatarById[currentUser.id];
   av.innerHTML = state.youth.avatar?`<img src="${state.youth.avatar}">`:(myAvatarUrl?`<img src="${myAvatarUrl}" onerror="_retryImgLoad(this)">`:state.youth.name[0]);
   document.getElementById('myName').textContent=state.youth.name;
-  document.getElementById('myLevelBadge').textContent=`${lv.emoji} 레벨${lv.level} · ${lv.name}`;
+  document.getElementById('myLevelBadge').textContent = _isObserver() ? '👀 참관' : `${lv.emoji} 레벨${lv.level} · ${lv.name}`;
   document.getElementById('myVerifiedBadge').style.display = state.youth.verifyStatus==='approved' ? 'inline-flex' : 'none';
   document.getElementById('myJoinDate').textContent=state.youth.joinDate;
   const bday=_birthdayInfo(state.youth.birthDate);
@@ -6497,7 +6537,7 @@ if (window.visualViewport) {
 function openOverlay(id) {
   document.getElementById(id).classList.add('open');
   // 역할 색상 헤더에 적용
-  const roleColor = state.currentRole==='youth' ? '#83CA00' : '#FF006C';
+  const roleColor = _roleColor();
   const hd = document.querySelector('#'+id+' .overlay-hd');
   if(hd) hd.style.background = roleColor;
   if(DEPTH3_OVERLAYS.includes(id)) {
@@ -6671,7 +6711,7 @@ if('serviceWorker' in navigator) {
     if (e.data.tab) {
       const tab = e.data.tab;
       const isYouth = state.currentRole === 'youth';
-      const validTabs = isYouth ? ['routine','cert','comm','my'] : ['home','routine','cert','review','my'];
+      const validTabs = isYouth ? (_isObserver() ? ['routine','comm','my'] : ['routine','cert','comm','my']) : ['home','routine','cert','review','my'];
       if (validTabs.includes(tab)) { isYouth ? switchTab(tab) : kSwitchTab(tab); }
     }
   });

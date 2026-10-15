@@ -2880,3 +2880,259 @@ CREATE OR REPLACE VIEW routine_people_count AS
     AND rp.user_id IS DISTINCT FROM r.led_by
   GROUP BY rp.routine_id;
 GRANT SELECT ON routine_people_count TO anon, authenticated;
+
+
+-- [마이그레이션 2026-10-15a] 참관(observer) 역할 신설
+-- 요청: 학교밖센터와 협업할 때 센터 담당자가 참관으로 들어오는데 줄 역할이 없음 →
+--   · 회원가입에서 '참관'을 고르면 관리자 승인 후 사용(끗짱과 같은 승인 절차 — 승인 상태 컬럼은
+--     kkutjjang_status를 그대로 재사용, 참관에도 쓰이니 이름이 다소 어색하지만 가드·승인 UI 재사용 이득이 큼)
+--   · 관리자가 계정마다 볼 수 있는 루틴을 지정(routine_observers) — 그 루틴의 인증 사진·소감·댓글·
+--     좋아요만 읽고, 댓글·좋아요는 남길 수 있음. 인증·글쓰기·루틴 신청은 DB에서 막음
+--   · 외부 기관 담당자가 들어오므로 다른 회원의 실명·휴대폰·생년월일(profiles), 신청 각오(routine_participants),
+--     다른 루틴 인증 썸네일(certifications_public), 인증 사진 목록 조회(storage)도 참관자에겐 막음
+-- =====================================================
+
+-- 1) 역할 값 — 기존 role CHECK(이름 불명)를 찾아 지우고 observer 포함해서 다시 만듦
+DO $$
+DECLARE c text;
+BEGIN
+  FOR c IN SELECT conname FROM pg_constraint
+           WHERE conrelid = 'public.profiles'::regclass AND contype = 'c'
+             AND pg_get_constraintdef(oid) ILIKE '%role%youth%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.profiles DROP CONSTRAINT %I', c);
+  END LOOP;
+END $$;
+ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('youth', 'kkutjjang', 'observer'));
+
+-- 2) 가입 트리거 — 역할 화이트리스트, 참관은 항상 승인 대기(자동승인 없음)
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE v_role text;
+BEGIN
+  v_role := CASE WHEN NEW.raw_user_meta_data->>'role' IN ('kkutjjang', 'observer')
+                 THEN NEW.raw_user_meta_data->>'role' ELSE 'youth' END;
+  INSERT INTO profiles (id, name, role, real_name, birth_date, phone, region_sido, region_sigugun, school_status, kkutjjang_status, privacy_agreed_at, marketing_agreed)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'full_name', '익명'),
+    v_role,
+    NEW.raw_user_meta_data->>'real_name',
+    NULLIF(NEW.raw_user_meta_data->>'birth_date','')::date,
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'region_sido',
+    NEW.raw_user_meta_data->>'region_sigugun',
+    NEW.raw_user_meta_data->>'school_status',
+    CASE
+      WHEN v_role = 'youth' THEN 'none'
+      WHEN v_role = 'observer' THEN 'pending'
+      WHEN NEW.email IN ('dev@youthvoice.or.kr','yv@youthvoice.or.kr') THEN 'approved'
+      WHEN (now() AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-09-21' THEN 'approved'
+      ELSE 'pending'
+    END,
+    CASE WHEN NULLIF(NEW.raw_user_meta_data->>'birth_date','') IS NOT NULL THEN now() ELSE NULL END,
+    COALESCE((NEW.raw_user_meta_data->>'marketing_agreed')::boolean, false)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3) 참관자가 볼 수 있는 루틴(관리자만 지정)
+CREATE TABLE IF NOT EXISTS routine_observers (
+  routine_id bigint NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+  user_id    uuid   NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (routine_id, user_id)
+);
+ALTER TABLE routine_observers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ro_select" ON routine_observers;
+CREATE POLICY "ro_select" ON routine_observers FOR SELECT USING (auth.uid() = user_id OR is_admin());
+DROP POLICY IF EXISTS "ro_admin_write" ON routine_observers;
+CREATE POLICY "ro_admin_write" ON routine_observers FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+
+-- 4) 헬퍼 — RLS 안에서 쓰므로 SECURITY DEFINER(profiles RLS와 순환하지 않게)
+CREATE OR REPLACE FUNCTION is_observer() RETURNS boolean AS $$
+  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'observer');
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- 승인된 참관자가, 지정받은 루틴에 한해 true
+CREATE OR REPLACE FUNCTION can_observe(rid bigint) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM routine_observers ro JOIN profiles p ON p.id = ro.user_id
+    WHERE ro.routine_id = rid AND ro.user_id = auth.uid()
+      AND p.role = 'observer' AND p.kkutjjang_status = 'approved'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION can_observe_cert(cid bigint) RETURNS boolean AS $$
+  SELECT can_observe((SELECT routine_id FROM certifications WHERE id = cid));
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION can_observe_cert_comment(cmid bigint) RETURNS boolean AS $$
+  SELECT can_observe((SELECT c.routine_id FROM cert_comments cm JOIN certifications c ON c.id = cm.cert_id WHERE cm.id = cmid));
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- 5) 읽기 — 인증·좋아요·댓글·댓글좋아요에 "지정받은 참관자" 추가
+DROP POLICY IF EXISTS "cert_select" ON certifications;
+CREATE POLICY "cert_select" ON certifications FOR SELECT USING (
+  auth.uid() = user_id
+  OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = certifications.routine_id AND status = 'approved')
+  OR auth.uid() IN (SELECT created_by FROM routines WHERE id = certifications.routine_id)
+  OR auth.uid() IN (SELECT led_by FROM routines WHERE id = certifications.routine_id)
+  OR can_observe(routine_id)
+  OR is_admin()
+);
+DROP POLICY IF EXISTS "cl_select" ON cert_likes;
+CREATE POLICY "cl_select" ON cert_likes FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM certifications c WHERE c.id = cert_likes.cert_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+      OR can_observe(c.routine_id)
+    )
+  )
+  OR is_admin()
+);
+DROP POLICY IF EXISTS "cc_select" ON cert_comments;
+CREATE POLICY "cc_select" ON cert_comments FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM certifications c WHERE c.id = cert_comments.cert_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+      OR can_observe(c.routine_id)
+    )
+  )
+  OR is_admin()
+);
+DROP POLICY IF EXISTS "ccl_select" ON cert_comment_likes;
+CREATE POLICY "ccl_select" ON cert_comment_likes FOR SELECT USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM cert_comments cm JOIN certifications c ON c.id = cm.cert_id
+    WHERE cm.id = cert_comment_likes.comment_id AND (
+      c.user_id = auth.uid()
+      OR auth.uid() IN (SELECT user_id FROM routine_participants WHERE routine_id = c.routine_id AND status = 'approved')
+      OR auth.uid() IN (SELECT created_by FROM routines WHERE id = c.routine_id)
+      OR auth.uid() IN (SELECT led_by FROM routines WHERE id = c.routine_id)
+      OR can_observe(c.routine_id)
+    )
+  )
+  OR is_admin()
+);
+
+-- 6) 쓰기 — 인증글 좋아요·댓글·댓글좋아요는 참관자가 "지정받은 루틴"에만, 커뮤니티 글쓰기는 참관자 불가
+--    (기존 insert 정책은 본인 id만 확인해서, 참관자가 REST로 아무 인증글에나 댓글을 달 수 있었을 것)
+DROP POLICY IF EXISTS "cl_insert" ON cert_likes;
+CREATE POLICY "cl_insert" ON cert_likes FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (NOT is_observer() OR can_observe_cert(cert_id))
+);
+DROP POLICY IF EXISTS "cc_insert" ON cert_comments;
+CREATE POLICY "cc_insert" ON cert_comments FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (NOT is_observer() OR can_observe_cert(cert_id))
+);
+DROP POLICY IF EXISTS "ccl_insert" ON cert_comment_likes;
+CREATE POLICY "ccl_insert" ON cert_comment_likes FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (NOT is_observer() OR can_observe_cert_comment(comment_id))
+);
+DROP POLICY IF EXISTS "posts_insert" ON posts;
+CREATE POLICY "posts_insert" ON posts FOR INSERT WITH CHECK (auth.uid() = author_id AND NOT is_observer());
+
+-- 7) 개인정보 — 참관자는 본인 프로필만, 참여 신청 기록은 지정받은 루틴만 읽음
+--    (이름은 profiles_public, 프로필 사진은 아래 profile_avatars 뷰로 계속 보임)
+DROP POLICY IF EXISTS "profiles_select" ON profiles;
+CREATE POLICY "profiles_select" ON profiles FOR SELECT
+  USING (auth.uid() IS NOT NULL AND (NOT (SELECT is_observer()) OR id = auth.uid()));
+DROP POLICY IF EXISTS "rp_select" ON routine_participants;
+CREATE POLICY "rp_select" ON routine_participants FOR SELECT
+  USING (auth.uid() IS NOT NULL AND (NOT (SELECT is_observer()) OR user_id = auth.uid() OR can_observe(routine_id)));
+
+CREATE OR REPLACE VIEW profile_avatars AS
+  SELECT id, avatar_url FROM profiles WHERE avatar_url IS NOT NULL;
+GRANT SELECT ON profile_avatars TO authenticated;
+
+-- 8) 다른 루틴 인증 썸네일 뷰와 인증 사진 파일 목록 조회 — 참관자는 지정받은 루틴만
+--    (버킷은 공개라 URL을 알면 열리지만, URL은 읽을 수 있는 인증글에서만 얻을 수 있음)
+CREATE OR REPLACE VIEW certifications_public AS
+  SELECT id, routine_id, user_id, photo_url, photo_urls, created_at
+  FROM certifications
+  WHERE NOT is_observer() OR can_observe(routine_id);
+GRANT SELECT ON certifications_public TO authenticated;
+DROP POLICY IF EXISTS "cert_photos_select_all" ON storage.objects;
+CREATE POLICY "cert_photos_select_all" ON storage.objects FOR SELECT USING (
+  bucket_id = 'cert-photos' AND NOT public.is_observer()
+);
+
+-- 9) 루틴 참여 신청은 참관 계정도 못 함
+CREATE OR REPLACE FUNCTION guard_participant_apply() RETURNS TRIGGER AS $$
+DECLARE
+  u_role text; u_verify text; r_elig text; r_start date; r_end date;
+  r_is_free boolean; r_status text;
+BEGIN
+  SELECT role, verify_status INTO u_role, u_verify FROM profiles WHERE id = NEW.user_id;
+  IF u_role IN ('kkutjjang', 'observer') THEN
+    RAISE EXCEPTION '끗짱·참관 계정은 루틴에 참여 신청할 수 없어요';
+  END IF;
+  SELECT eligibility, recruit_start_date, recruit_end_date, is_free, status
+    INTO r_elig, r_start, r_end, r_is_free, r_status FROM routines WHERE id = NEW.routine_id;
+  IF r_elig = 'out_of_school' AND COALESCE(u_verify,'none') <> 'approved' THEN
+    RAISE EXCEPTION '학교밖청소년 확인서 승인 후 신청할 수 있어요';
+  END IF;
+  IF r_is_free THEN
+    IF r_status IN ('done','cancelled') THEN
+      RAISE EXCEPTION '이 루틴은 더 이상 신청할 수 없어요';
+    END IF;
+    IF NEW.duration_days IS NULL OR NEW.duration_days NOT IN (5,15,30,66,100) THEN
+      RAISE EXCEPTION '참여 기간을 선택해주세요';
+    END IF;
+  ELSE
+    IF r_start IS NOT NULL AND CURRENT_DATE < r_start THEN
+      RAISE EXCEPTION '아직 모집 시작 전이에요';
+    END IF;
+    IF r_end IS NOT NULL AND CURRENT_DATE > r_end THEN
+      RAISE EXCEPTION '모집이 마감됐어요';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 10) 승인 알림 문구를 역할에 맞게
+CREATE OR REPLACE FUNCTION on_kkutjjang_status_notify()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.kkutjjang_status IS DISTINCT FROM OLD.kkutjjang_status AND NEW.kkutjjang_status = 'approved' THEN
+    IF NEW.role = 'observer' THEN
+      PERFORM notify_push(NEW.id, '참관 가입이 승인됐어요! 🎉', '이제 초대된 루틴을 볼 수 있어요.');
+    ELSE
+      PERFORM notify_push(NEW.id, '끗짱 가입이 승인됐어요! 🎉', '이제 루틴을 배정받아 활동할 수 있어요.');
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11) 참관자는 댓글을 달아도 나다움(포인트)이 쌓이지 않음
+CREATE OR REPLACE FUNCTION award_comment_nadaeum() RETURNS TRIGGER AS $$
+DECLARE today_count int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM profiles WHERE id = NEW.user_id AND role = 'observer') THEN
+    RETURN NEW;
+  END IF;
+  SELECT count(*) INTO today_count FROM nadaeum_log
+   WHERE user_id = NEW.user_id AND reason = '댓글 작성' AND created_at >= date_trunc('day', now());
+  IF today_count < 5 THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 1 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 1, '댓글 작성');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+NOTIFY pgrst, 'reload schema';
