@@ -3288,3 +3288,101 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS trg_participant_apply_notify_admins ON routine_participants;
 CREATE TRIGGER trg_participant_apply_notify_admins AFTER INSERT OR UPDATE OF status ON routine_participants
   FOR EACH ROW EXECUTE FUNCTION on_participant_apply_notify_admins();
+
+
+-- [마이그레이션 2026-10-17b] 루틴별 "나다움 지급" 켜기/끄기
+-- 요청: "우리가 루틴 중에 별도로 지급하는 루틴도 있어서, 나다움이 안 쌓이는 루틴도 가능하게 해줘"
+-- 지금까지는 인증당 포인트 크기만 정할 수 있고(1~1000N) 없앨 수는 없었음(자유루틴만 예외).
+--   · routines.nadaeum_enabled(기본 true) — 끄면 그 루틴의 인증·후기·인증글 댓글로는 나다움이 안 쌓임
+--   · 커뮤니티 글(루틴과 무관)의 댓글 +1N과 관리자 수동 지급은 그대로
+--   · 이미 쌓인 포인트는 건드리지 않고 앞으로 쌓이는 것만 막음
+--   · 껐다가 다시 켜면 그 뒤 인증부터 쌓이고, 완주 기준을 채우는 시점엔 그때까지의 인증 횟수로 계산됨
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS nadaeum_enabled boolean NOT NULL DEFAULT true;
+
+CREATE OR REPLACE FUNCTION on_cert_nadaeum_payout()
+RETURNS TRIGGER AS $$
+DECLARE
+  cnt int;
+  r_start date;
+  r_end date;
+  r_title text;
+  r_is_free boolean;
+  r_enabled boolean;
+  r_ratio int;
+  r_point int;
+  day_count int;
+  cert_goal int;
+  paid boolean;
+BEGIN
+  SELECT count(*) INTO cnt FROM certifications WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+  SELECT start_date, end_date, title, is_free, completion_ratio_pct, cert_point_amount, nadaeum_enabled
+    INTO r_start, r_end, r_title, r_is_free, r_ratio, r_point, r_enabled FROM routines WHERE id = NEW.routine_id;
+
+  IF r_is_free OR NOT coalesce(r_enabled, true) THEN
+    RETURN NEW; -- 자유루틴이거나 "나다움 지급"을 끈 루틴은 나다움 지급 대상이 아님
+  END IF;
+
+  day_count := GREATEST(1, COALESCE((r_end - r_start), 20) + 1);
+  cert_goal := GREATEST(1, FLOOR(day_count * r_ratio / 100.0)::int);
+
+  SELECT nadaeum_paid INTO paid FROM routine_participants WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+
+  IF paid THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + r_point WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, r_point, '루틴 인증 (완주 후 추가 인증)');
+  ELSIF cnt >= cert_goal THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + (cnt * r_point) WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, cnt * r_point, '루틴 완주 기준 달성 (인증 ' || cnt || '회 적립분 일괄 지급)');
+    UPDATE routine_participants SET nadaeum_paid = true WHERE routine_id = NEW.routine_id AND user_id = NEW.user_id;
+    PERFORM notify_push(
+      NEW.user_id,
+      '🎉 완주 기준 달성!',
+      '"' || coalesce(r_title, '루틴') || '"에서 나다움 ' || (cnt * r_point) || 'N이 지급됐어요. 상점에서 리워드로 교환해보세요!'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION award_review_nadaeum() RETURNS TRIGGER AS $$
+DECLARE inserted_id bigint; r_enabled boolean;
+BEGIN
+  IF NEW.type <> 'review' OR NEW.routine_id IS NULL THEN RETURN NEW; END IF;
+  SELECT nadaeum_enabled INTO r_enabled FROM routines WHERE id = NEW.routine_id;
+  IF NOT coalesce(r_enabled, true) THEN RETURN NEW; END IF;
+  INSERT INTO nadaeum_log(user_id, amount, reason, routine_id)
+  VALUES (NEW.author_id, 30, '후기 작성', NEW.routine_id)
+  ON CONFLICT (user_id, routine_id) WHERE reason = '후기 작성' DO NOTHING
+  RETURNING id INTO inserted_id;
+  IF inserted_id IS NOT NULL THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 30 WHERE id = NEW.author_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION award_comment_nadaeum() RETURNS TRIGGER AS $$
+DECLARE today_count int; r_enabled boolean;
+BEGIN
+  IF EXISTS (SELECT 1 FROM profiles WHERE id = NEW.user_id AND role = 'observer') THEN
+    RETURN NEW;
+  END IF;
+  IF TG_TABLE_NAME = 'cert_comments' THEN
+    SELECT r.nadaeum_enabled INTO r_enabled
+      FROM certifications c JOIN routines r ON r.id = c.routine_id WHERE c.id = NEW.cert_id;
+    IF NOT coalesce(r_enabled, true) THEN RETURN NEW; END IF;
+  END IF;
+  SELECT count(*) INTO today_count FROM nadaeum_log
+   WHERE user_id = NEW.user_id AND reason = '댓글 작성' AND created_at >= date_trunc('day', now());
+  IF today_count < 5 THEN
+    PERFORM _mark_nadaeum_trusted();
+    UPDATE profiles SET nadaeum = nadaeum + 1 WHERE id = NEW.user_id;
+    INSERT INTO nadaeum_log(user_id, amount, reason) VALUES (NEW.user_id, 1, '댓글 작성');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

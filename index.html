@@ -1012,7 +1012,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div><div class="field-label">최소 참여 인원 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rMinPeople" min="1" max="50" placeholder="미설정" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">명 미달 시 "폐강 처리" 버튼으로 폐강할 수 있어요</span></div></div>
       <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rPinned" style="width:17px;height:17px;flex-shrink:0;">📌 루틴 목록 상단에 고정</label><div class="char-end" style="color:#bbb;">체크하면 루틴탭 목록 맨 위에 항상 노출돼요</div></div>
       <div><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#111;cursor:pointer;"><input type="checkbox" id="rCameraOnly" style="width:17px;height:17px;flex-shrink:0;">📸 실시간 촬영만 허용</label><div class="char-end" style="color:#bbb;">체크하면 인증 사진을 갤러리에서 못 고르고, 그 자리에서 카메라로 찍은 사진(촬영 시각 워터마크 자동 포함)만 올릴 수 있어요</div></div>
-      <div id="rPointFieldWrap"><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
+      <div id="rPointFieldWrap"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="rNadaeumEnabled" checked onchange="onNadaeumToggle()" style="width:16px;height:16px;">✨ 나다움 포인트 지급 <span style="font-size:11px;color:#aaa;">(별도로 보상을 주는 루틴이면 끄세요)</span></label><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 방법 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><textarea id="rCertGuide" rows="3" placeholder="예) 아침에 일어나자마자 물 한 잔 마시는 사진과 함께 오늘의 다짐을 적어주세요." maxlength="200" oninput="document.getElementById('certGuideCount').textContent=this.value.length"></textarea><div class="char-end"><span id="certGuideCount">0</span>/200</div></div>
       <div><div class="field-label">인증 예시 사진 <span class="required" id="createPhotoRequiredMark">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;" id="createPhotoLockHint"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
@@ -2041,7 +2041,7 @@ async function loadRoutines() {
       coverImageUrl: r.cover_image_url || null,
       period: _fmtPeriod(r.start_date, r.end_date), startDate: r.start_date, endDate: r.end_date,
       recruitStartDate: r.recruit_start_date || null, recruitEndDate: r.recruit_end_date || null,
-      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
+      isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, nadaeumEnabled: r.nadaeum_enabled !== false, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
       people: currentUser ? approved.filter(p => isYouthId(p.user_id) && p.user_id !== r.led_by).length : (peopleCountById[r.id] || 0), maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', certGuide: r.cert_guide || '', partnerOrg: r.partner_org || null,
       eligibility: r.eligibility || 'all',
@@ -3697,7 +3697,7 @@ function openRoutineDetail(id) {
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-  ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)</div>`:''}`;
+  ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 ${r.nadaeumEnabled===false?'':` · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)`}</div>`:''}`;
   const isPending = (state.youth.pendingRoutines||[]).includes(r.id);
   const rejectReason = (state.youth.rejectedRoutines||{})[r.id];
   const isRejectedApp = !isPending && rejectReason !== undefined;
@@ -3886,7 +3886,7 @@ function renderCertTab() {
         <div style="font-size:14px;font-weight:600;color:${r.todayCert?'#aaa':'#111'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}</div>
         <div style="display:flex;align-items:center;gap:5px;margin-top:3px;">
           <span style="font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;background:${r.isFree?'#FBEAF0':'#E6F1FB'};color:${r.isFree?'#993556':'#185FA5'};flex-shrink:0;">${r.isFree?'자유루틴':'기획루틴'}</span>
-          <span style="font-size:9.5px;color:#aaa;flex-shrink:0;">${r.isFree?'포인트 없음':`인증 시 +${r.certPointAmount}N`}</span>
+          <span style="font-size:9.5px;color:#aaa;flex-shrink:0;">${(r.isFree||r.nadaeumEnabled===false)?'포인트 없음':`인증 시 +${r.certPointAmount}N`}</span>
           <span style="font-size:11px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.period}</span>
         </div>
       </div>
@@ -4093,6 +4093,13 @@ async function earnNadaeum(type) {
   }
   renderNadaeum();
 }
+// 나다움 지급을 끄면 포인트 입력칸을 잠가둠(값은 남겨둬서 다시 켜면 그대로)
+function onNadaeumToggle() {
+  const on = document.getElementById('rNadaeumEnabled').checked;
+  const inp = document.getElementById('rPointAmount');
+  inp.disabled = !on;
+  inp.style.opacity = on ? '' : '0.4';
+}
 function renderNadaeum() {
   const n=state.youth.nadaeum||0;
   const els=document.querySelectorAll('.nadaeum-val');
@@ -4296,7 +4303,7 @@ async function submitCert() {
       noteEl.textContent = '쌓이고 있어요 (완주하면 지급돼요)';
     }
   }
-  document.getElementById('certNadaeumBadge').style.display = (isYouth && !certR?.isFree) ? '' : 'none';
+  document.getElementById('certNadaeumBadge').style.display = (isYouth && !certR?.isFree && certR?.nadaeumEnabled !== false) ? '' : 'none';
   document.getElementById('certSuccess').classList.add('open');
 }
 function closeCertSuccess() {
@@ -5511,7 +5518,7 @@ function openKRoutineDetail(routineId) {
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
     ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
-    ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)</div>`:''}
+    ${!r.isFree?`<div style="background:#FFFBE6;border:1px solid #FFD600;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:12.5px;color:#7A5C00;line-height:1.5;word-break:keep-all;">✨ 총 ${_completionGoal(r).totalDays}일 중 <b>${_completionGoal(r).certGoal}일</b> 이상 인증하면 완주 인정 ${r.nadaeumEnabled===false?'':` · 완주 시 나다움 <b>+${_completionGoal(r).certGoal*r.certPointAmount}점</b> 한번에 지급(이후 인증마다 +${r.certPointAmount}점)`}</div>`:''}
     <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:8px;">
       ${isAdmin?`신청자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${applicants.length}명 / 최대 ${r.maxPeople}명)</span>`:`참여자 목록 <span style="font-size:12px;color:#888;font-weight:400;">(${approved.length}명 / 최대 ${r.maxPeople}명)</span>`}
     </div>
@@ -5632,6 +5639,7 @@ function resetCreateForm() {
   ['rName','rPartner','rDesc','rCertGuide','rRecruitStart','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   document.getElementById('rPointAmount').value=10;
+  document.getElementById('rNadaeumEnabled').checked = true; onNadaeumToggle();
   document.getElementById('rPinned').checked=false;
   document.getElementById('rCameraOnly').checked=false;
   ['nameCount','descCount','certGuideCount'].forEach(i=>document.getElementById(i).textContent='0');
@@ -5678,6 +5686,7 @@ async function openEditRoutine(routineId) {
   document.getElementById('rClosing').value = _dtLocalStr(r.closingAt);
   document.getElementById('rMeetingLink').value = r.meetingLink || '';
   document.getElementById('rPointAmount').value = r.certPointAmount || 10;
+  document.getElementById('rNadaeumEnabled').checked = r.nadaeumEnabled !== false; onNadaeumToggle();
   document.getElementById('rPinned').checked = !!r.pinned;
   document.getElementById('rCameraOnly').checked = !!r.cameraOnly;
   selectEligibility(r.eligibility || 'all');
@@ -5743,9 +5752,10 @@ function _readCreateFormCommon(){
   const leader=state.loginType==='both'?document.getElementById('rLeader').value:undefined;
   const isFree=createRoutineType==='free';
   const pointAmount=document.getElementById('rPointAmount').value;
+  const nadaeumEnabled=document.getElementById('rNadaeumEnabled').checked;
   const pinned=document.getElementById('rPinned').checked;
   const cameraOnly=document.getElementById('rCameraOnly').checked;
-  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,pointAmount,pinned,cameraOnly};
+  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,pointAmount,nadaeumEnabled,pinned,cameraOnly};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -5760,7 +5770,7 @@ function _validateCreateForm(f){
   if(!f.isFree && f.re>f.s) return '모집 마감일은 진행 시작일보다 늦을 수 없어요.';
   if(!f.p||f.p<1) return '참여 인원을 입력해주세요.';
   if(f.mp && (parseInt(f.mp)<1 || parseInt(f.mp)>parseInt(f.p))) return '최소 인원은 1명 이상, 최대 인원 이하로 입력해주세요.';
-  if(!f.isFree && (!f.pointAmount || f.pointAmount<1 || f.pointAmount>1000)) return '인증당 지급 포인트는 1~1000 사이로 입력해주세요.';
+  if(!f.isFree && f.nadaeumEnabled && (!f.pointAmount || f.pointAmount<1 || f.pointAmount>1000)) return '인증당 지급 포인트는 1~1000 사이로 입력해주세요.';
   if(!f.d) return '루틴 소개를 입력해주세요.';
   return null;
 }
@@ -5784,7 +5794,7 @@ async function submitCreateRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
+    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:(f.nadaeumEnabled?parseInt(f.pointAmount):(parseInt(f.pointAmount)||10)), nadaeum_enabled:f.nadaeumEnabled,
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
   });
@@ -5815,7 +5825,7 @@ async function submitEditRoutine(){
     kickoff_at:f.kickoff?new Date(f.kickoff).toISOString():null,
     closing_at:f.closing?new Date(f.closing).toISOString():null,
     meeting_link:f.meetLink||null,
-    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:parseInt(f.pointAmount),
+    is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:(f.nadaeumEnabled?parseInt(f.pointAmount):(parseInt(f.pointAmount)||10)), nadaeum_enabled:f.nadaeumEnabled,
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     cover_image_url:coverUrl,
   };
