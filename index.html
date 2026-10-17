@@ -206,6 +206,13 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
 .photo-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 600; opacity: 0; pointer-events: none; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; }
 .photo-lightbox.open { opacity: 1; pointer-events: all; }
 .photo-lightbox img { max-width: 92vw; max-height: 86vh; object-fit: contain; border-radius: 8px; }
+.photo-lightbox img { touch-action: pan-y; user-select: none; -webkit-user-select: none; transition: opacity 0.15s; }
+.photo-lightbox .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; display: none; align-items: center; justify-content: center; cursor: pointer; color: #fff; font-size: 18px; }
+.photo-lightbox .lb-nav.prev { left: 10px; }
+.photo-lightbox .lb-nav.next { right: 10px; }
+.photo-lightbox .lb-count { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; display: none; }
+.photo-lightbox.multi .lb-nav { display: flex; }
+.photo-lightbox.multi .lb-count { display: block; }
 .photo-lightbox .lightbox-close { position: absolute; top: 20px; right: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
 /* 완료 화면 */
@@ -1309,7 +1316,10 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
   <!-- 인증글 사진 확대 보기 -->
   <div class="photo-lightbox" id="photoLightboxBg" onclick="closeSheet('photoLightboxBg')">
     <button class="lightbox-close" onclick="event.stopPropagation();closeSheet('photoLightboxBg')"><i class="ti ti-x" style="font-size:18px;color:#fff;"></i></button>
-    <img id="photoLightboxImg" src="" onclick="event.stopPropagation()">
+    <button class="lb-nav prev" onclick="event.stopPropagation();_lbStep(-1)" aria-label="이전 사진"><i class="ti ti-chevron-left"></i></button>
+    <img id="photoLightboxImg" src="" onclick="event.stopPropagation()" draggable="false">
+    <button class="lb-nav next" onclick="event.stopPropagation();_lbStep(1)" aria-label="다음 사진"><i class="ti ti-chevron-right"></i></button>
+    <div class="lb-count" id="photoLightboxCount"></div>
   </div>
 
   <!-- 바텀시트: 배지 -->
@@ -3367,7 +3377,7 @@ function _certPhotoDisplayHtml(c) {
   // 사진은 사이즈 그대로 해줘" — 가로로 긴 사진이 200px 높이에 잘려 보이던 문제).
   // 여러 장이면 가로 스크롤 썸네일 목록이라 칸 높이를 맞춰야 해서 기존처럼 자름
   return (c.photos && c.photos.length)
-    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="openPhotoLightbox('${p}')" onerror="_retryImgLoad(this)" style="${c.photos.length>1?'width:160px;height:200px;object-fit:cover;':'width:100%;height:auto;'}border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
+    ? `<div style="display:flex;gap:6px;overflow-x:auto;">${c.photos.map(p=>`<img src="${p}" onclick="_lbOpenFromRow(this)" onerror="_retryImgLoad(this)" style="${c.photos.length>1?'width:160px;height:200px;object-fit:cover;':'width:100%;height:auto;'}border-radius:16px;flex-shrink:0;cursor:pointer;">`).join('')}</div>`
     : `<div style="background:${c.color};border-radius:16px;height:200px;display:flex;align-items:center;justify-content:center;">
         <i class="ti ti-photo" style="font-size:48px;color:rgba(0,0,0,0.15);"></i>
       </div>`;
@@ -4666,10 +4676,44 @@ function openBadgeSheet() {
   loadBadges().then(renderBadges);
 }
 function openIOSInstallSheet() { openSheet('iosInstallSheetBg'); }
-function openPhotoLightbox(url) {
-  document.getElementById('photoLightboxImg').src = url;
+// 인증글 사진이 여러 장이면 좌우로 넘겨 볼 수 있음(손가락 스와이프 + 화살표 버튼).
+// 썸네일 줄(같은 부모의 <img>들)을 그대로 목록으로 쓰기 위해 _lbOpenFromRow(this)로 연다
+let _lbList = [], _lbIdx = 0;
+function _lbRender() {
+  const img = document.getElementById('photoLightboxImg');
+  img.src = _lbList[_lbIdx];
+  document.getElementById('photoLightboxBg').classList.toggle('multi', _lbList.length > 1);
+  document.getElementById('photoLightboxCount').textContent = `${_lbIdx+1} / ${_lbList.length}`;
+  // 다음/이전 사진을 미리 받아둬서 넘길 때 깜빡이지 않게
+  [_lbIdx-1, _lbIdx+1].forEach(i => { if(_lbList[i]) new Image().src = _lbList[i]; });
+}
+function _lbStep(d) {
+  const n = _lbIdx + d;
+  if(n < 0 || n >= _lbList.length) return;
+  _lbIdx = n;
+  _lbRender();
+}
+function openPhotoLightbox(url, list) {
+  _lbList = (Array.isArray(list) && list.length) ? list : [url];
+  _lbIdx = Math.max(0, _lbList.indexOf(url));
+  _lbRender();
   openSheet('photoLightboxBg');
 }
+function _lbOpenFromRow(el) {
+  const list = Array.from(el.parentNode.querySelectorAll('img')).map(i => i.getAttribute('src'));
+  openPhotoLightbox(el.getAttribute('src'), list);
+}
+(function _bindLightboxSwipe() {
+  const bg = document.getElementById('photoLightboxBg');
+  let x0 = null, y0 = null;
+  bg.addEventListener('touchstart', e => { if(e.touches.length===1){ x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } else x0 = null; }, {passive:true});
+  bg.addEventListener('touchend', e => {
+    if(x0 === null) return;
+    const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    x0 = null;
+    if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) _lbStep(dx < 0 ? 1 : -1);
+  }, {passive:true});
+})();
 // "총 인증 수"/"소통 수" 클릭 시 내가 올린 인증글·글·댓글을 모아볼 수 있도록(QA 요청)
 // "소통 수"는 글쓰기·댓글만 집계함 — 좋아요는 여기 상세 화면에 안 나오므로
 // commCount에도 포함하지 않음(예전엔 좋아요도 카운트해서 숫자는 있는데 눌러보면
