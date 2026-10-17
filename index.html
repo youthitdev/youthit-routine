@@ -1001,7 +1001,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div id="rLeaderField" style="display:none;"><div class="field-label">담당 끗짱 <span class="required">* 필수</span></div><select id="rLeader"><option value="">담당 끗짱 선택</option></select></div>
       <div><div class="field-label">참여 대상 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rEligAll" onclick="selectEligibility('all')">청소년 누구나</button><button type="button" class="role-btn" id="rEligOos" onclick="selectEligibility('out_of_school')">학교 밖 청소년</button></div></div>
       <div><div class="field-label">루틴 타입 <span class="required">* 필수</span></div><div class="role-row"><button type="button" class="role-btn active" id="rTypeFixed" onclick="selectRoutineType('fixed')">기획루틴</button><button type="button" class="role-btn" id="rTypeFree" onclick="selectRoutineType('free')">자유루틴 (상시모집)</button></div><div class="char-end" style="color:#bbb;" id="rTypeHint">모집 기간이 정해진 일반 루틴이에요</div></div>
-      <div id="rRecruitFieldWrap"><div class="field-label">모집 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rRecruitStart" onchange="updateCreatePreview()"></div><div class="date-item"><label>마감일</label><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"></div></div><div class="char-end" style="color:#bbb;">이 기간에만 참여 신청을 받아요</div></div>
+      <div id="rRecruitFieldWrap"><div class="field-label">모집 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rRecruitStart" onchange="updateCreatePreview()"></div><div class="date-item"><label>마감일</label><input type="date" id="rRecruitEnd" onchange="updateCreatePreview()"></div></div><div class="char-end" style="color:#bbb;">이 기간에만 참여 신청을 받아요 (마감일을 진행 시작일과 같게 하면 1일차 당일에도 신청받아요)</div></div>
       <div id="rDurationFieldWrap"><div class="field-label">진행 기간 <span class="required">* 필수</span></div><div class="date-row"><div class="date-item"><label>시작일</label><input type="date" id="rStart" onchange="updateDuration();updateCreatePreview()"></div><div class="date-item"><label>종료일</label><input type="date" id="rEnd" onchange="updateDuration();updateCreatePreview()"></div></div><div id="durationBadge" style="display:none;margin-top:6px;font-size:12px;color:#185FA5;background:#E6F1FB;padding:5px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-calendar" style="font-size:12px;"></i><span id="durationText"></span></div></div>
       <div><div class="field-label">온라인 모임 (줌) <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">첫날 OT와 마지막날 클로징 모임 일시를 정해주세요.</div>
@@ -2602,7 +2602,11 @@ function _myActiveRoutines() {
 function _myUpcomingRoutines() {
   if (!currentUser) return [];
   return state.routines.filter(r => {
-    if (r.isFree || r.status !== 'recruit') return false;
+    if (r.isFree) return false;
+    // 시작 당일에도 모집 중인 루틴(active)은 승인 대기 중인 신청만 여기 보여줌 —
+    // 승인된 사람은 이미 진행 중 루틴 목록(_myActiveRoutines)에 들어감
+    if (_isLateRecruit(r)) return (r.applicants||[]).some(a=>a.userId===currentUser.id && a.status==='pending');
+    if (r.status !== 'recruit') return false;
     return (r.applicants||[]).some(a=>a.userId===currentUser.id && (a.status==='pending'||a.status==='approved'));
   });
 }
@@ -2749,7 +2753,7 @@ function renderRoutineGrid(type, q) {
   // 안보여도 될 것 같아")
   const base = type==='all' ? state.routines.filter(r=>r.status!=='cancelled')
     : type==='active' ? _myActiveRoutines()
-    : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r))
+    : type==='recruit' ? state.routines.filter(r=>r.status==='recruit' || _isFreeOpen(r) || _isLateRecruit(r))
     : state.routines.filter(r=>r.status===type);
   let filtered = base;
   if(q) {
@@ -2771,10 +2775,12 @@ function renderRoutineGrid(type, q) {
   // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 내가 참여 중인 루틴, 그 다음 모집중,
   // 그 다음 나머지 진행중 루틴 순으로 정렬 (완료는 "전체"에서 애초에 제외됨)
   const isMine = (r) => currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
-  const _rank = (r) => r.pinned ? -1 : isMine(r) ? 0 : (r.status==='recruit' || _isFreeOpen(r)) ? 1 : 2;
+  const _rank = (r) => r.pinned ? -1 : isMine(r) ? 0 : (r.status==='recruit' || _isFreeOpen(r) || _isLateRecruit(r)) ? 1 : 2;
   const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
   grid.innerHTML = sorted.map(r=>{
-    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
+    // 시작 당일에도 모집 중인 루틴은 (내가 참여자가 아니면) 모집 중 카드로 표시
+    const lateRecruit = _isLateRecruit(r) && !(currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
+    const isDone=r.status==='done', isActive=r.status==='active' && !lateRecruit, isRecruit=r.status==='recruit' || lateRecruit, isCancelled=r.status==='cancelled';
     const isPending=(state.youth.pendingRoutines||[]).includes(r.id);
     const isRejectedApp=!isPending && Object.prototype.hasOwnProperty.call(state.youth.rejectedRoutines||{}, r.id);
     const isMine=currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
@@ -2934,6 +2940,14 @@ function _dday(dateStr) {
   if(!dateStr) return null;
   const t=new Date(); t.setHours(0,0,0,0);
   return Math.round((new Date(dateStr+'T00:00:00') - t) / 86400000);
+}
+// 모집 마감일이 진행 시작일과 같게 잡힌 루틴은 1일차(시작 당일)에도 신청을 받음 —
+// 시작일이 되면 status는 'active'로 넘어가지만, 모집 기간(recruitStart~recruitEnd) 안이면
+// 아직 신청 가능한 상태로 취급. (DB guard_participant_apply도 마감일 당일까지 허용)
+function _isLateRecruit(r) {
+  if (!r || r.isFree || r.status !== 'active' || !r.recruitEndDate) return false;
+  const t = _todayStr();
+  return t <= r.recruitEndDate && (!r.recruitStartDate || t >= r.recruitStartDate);
 }
 // 자유루틴은 첫 승인으로 status가 active가 돼도 종료일 전까지는 계속 "모집중"으로 취급
 function _isFreeOpen(r) {
@@ -3688,8 +3702,8 @@ function openRoutineDetail(id) {
     ${r.eligibility==='out_of_school'?`<div style="font-size:12px;color:#fff;font-weight:600;background:#FF6B00;padding:4px 9px;border-radius:12px;">🎓 학교밖청소년 전용</div>`:''}
     ${r.partnerOrg?`<div style="font-size:12px;color:#2E33BC;font-weight:600;background:#f0f1fb;padding:4px 9px;border-radius:12px;">🤝 ${r.partnerOrg}</div>`:''}
     ${r.leaderName?`<div style="font-size:12px;color:#3B6D11;font-weight:600;background:#EAF3DE;padding:4px 9px;border-radius:12px;">🙋 ${r.leaderName} 끗짱</div>`:''}
-    ${isOpenFree?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 상시 모집</div>`:r.status==='recruit'?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
-    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${(r.status==='recruit'||isOpenFree)?'진행 '+r.period:r.period}</div>
+    ${isOpenFree?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 상시 모집</div>`:(r.status==='recruit'||_isLateRecruit(r))?`<div style="font-size:12px;color:#993556;font-weight:600;background:#FBEAF0;padding:4px 9px;border-radius:12px;">🗓 모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')}</div>`:''}
+    <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">${(r.status==='recruit'||isOpenFree||_isLateRecruit(r))?'진행 '+r.period:r.period}</div>
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">👤 ${r.people}/${r.maxPeople}</div>
     ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:13px;color:#2E33BC;background:#E6F1FB;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">🔗</div>`:''}
   </div>
@@ -3714,7 +3728,9 @@ function openRoutineDetail(id) {
       ${r.kickoffAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🚀 OT ${_fmtDT(r.kickoffAt)}</span><a href="${_gcalLink(r.title+' OT',r.kickoffAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
       ${r.closingAt?`<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#333;padding:3px 0;"><span>🎉 클로징 ${_fmtDT(r.closingAt)}</span><a href="${_gcalLink(r.title+' 클로징',r.closingAt,r.meetingLink)}" target="_blank" style="font-size:11px;color:#2E33BC;text-decoration:none;font-weight:600;flex-shrink:0;">📅 캘린더 저장</a></div>`:''}
     </div>`:'';
-  if(r.status==='recruit' || isOpenFree) body+=`
+  // 시작 당일에도 모집 중이면 신청 영역을 그대로 보여줌(이미 승인된 참여자는 아래 진행 중 영역으로)
+  const lateOpen = _isLateRecruit(r) && !isApprovedMine;
+  if(r.status==='recruit' || isOpenFree || lateOpen) body+=`
     ${meetHtml}
     ${isApprovedMine
       ? `<div style="width:100%;padding:14px;background:#EAF3DE;border-radius:12px;font-size:14px;color:#3B6D11;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
@@ -3744,7 +3760,7 @@ function openRoutineDetail(id) {
       <div style="font-size:13px;color:#888;line-height:1.6;">최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강됐어요</div>
     </div>`;
   else if(r.status==='active') body+=`
-    <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;margin-bottom:10px;">🗓 이미 시작돼서 모집이 마감됐어요</div>
+    <div style="width:100%;padding:14px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#888;text-align:center;margin-bottom:10px;">${_isLateRecruit(r)?'🗓 오늘까지 모집해요 · 지금부터 인증할 수 있어요':'🗓 이미 시작돼서 모집이 마감됐어요'}</div>
     <button onclick="_switchOverlayInstant('routineDetailOverlay', () => openRoutineFeed(${r.id}))" style="width:100%;padding:13px 8px;background:#fff;color:#2E33BC;border:1.5px solid #2E33BC;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📸 인증 사진 보기</button>`;
   else if(r.status==='done') {
     const isMyDone = currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
@@ -5318,16 +5334,17 @@ function kFilterRoutine(type,el) {
   // 거르고, 담당 루틴만 보는 홈/인증탭/통계는 계속 _kMyRoutines()로 스코핑
   const base = state.routines;
   const filtered = type==='all' ? base.filter(r=>r.status!=='done')
-    : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r))
+    : type==='recruit' ? base.filter(r=>r.status==='recruit' || _isFreeOpen(r) || _isLateRecruit(r))
     : type==='active' ? base.filter(r=>r.status==='active' && !_isFreeOpen(r))
     : base.filter(r=>r.status===type);
   // 관리자/끗짱이 고정한 루틴이 최우선, 그 다음 내가 담당한 루틴, 그 다음 모집중(자유루틴은
   // 상시 열려있는 동안 포함), 그 다음 나머지 진행중 루틴 순으로 정렬
   const isMineK = (r) => r.ledBy===currentUser?.id;
-  const _rankK = (r) => r.pinned ? -1 : isMineK(r) ? 0 : (r.status==='recruit'||_isFreeOpen(r)) ? 1 : 2;
+  const _rankK = (r) => r.pinned ? -1 : isMineK(r) ? 0 : (r.status==='recruit'||_isFreeOpen(r)||_isLateRecruit(r)) ? 1 : 2;
   const kSorted = [...filtered].sort((a,b) => _rankK(a) - _rankK(b));
   document.getElementById('kRoutineGrid').innerHTML=kSorted.map(r=>{
-    const isDone=r.status==='done', isActive=r.status==='active', isRecruit=r.status==='recruit', isCancelled=r.status==='cancelled';
+    const lateRecruit=_isLateRecruit(r);
+    const isDone=r.status==='done', isActive=r.status==='active' && !lateRecruit, isRecruit=r.status==='recruit' || lateRecruit, isCancelled=r.status==='cancelled';
     const isOpenFree=_isFreeOpen(r);
     const cardBg=isDone||isCancelled?'#f0f0f0':'#fff';
     const cardBorder=isDone||isCancelled?'#e0e0e0':isActive?'#2E33BC':'#e8e8e8';
@@ -5444,7 +5461,7 @@ function openKRoutineDetail(routineId) {
   const isOpenFree=_isFreeOpen(r);
   document.getElementById('rdSub').textContent = isOpenFree
     ? `상시 모집 · 진행 ${r.period}`
-    : r.status==='recruit'
+    : (r.status==='recruit'||_isLateRecruit(r))
     ? `모집마감 ${(r.recruitEndDate||r.startDate||'').slice(2).replace(/-/g,'.')} · 진행 ${r.period}`
     : r.period;
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
