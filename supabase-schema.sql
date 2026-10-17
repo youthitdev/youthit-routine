@@ -3136,3 +3136,155 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 NOTIFY pgrst, 'reload schema';
+
+-- [마이그레이션 2026-10-17a] 관리자 계정도 인증·댓글·새 글·참여 신청 알림을 받음
+-- 요청: "관리자계정은 루틴 인증글, 댓글 등 알림을 받으면 좋겠어서" — 지금까지 알림은 당사자(글 작성자·
+-- 같은 루틴 참여자)에게만 갔고, 운영진은 앱을 열어봐야 새 활동을 알 수 있었음.
+--   · 받는 사람: 관리자(is_admin()과 같은 이메일 2개) 전원. 본인이 한 행동은 제외하고, 이미 다른 알림을
+--     받는 입장(글 주인·부모 댓글 작성자·같은 루틴 승인 참여자)이면 중복으로 보내지 않음
+--   · 받는 일: 새 인증글 / 댓글·답글(인증글·커뮤니티 글) / 커뮤니티 새 글 / 루틴 참여 신청(승인 대기)
+--   · 방식: notify_push() 그대로 — 알림함 기록 + 푸시(건마다). 관리자 기기에서 알림 설정이 켜져 있어야 푸시가 옴
+--   · 알림 실패가 인증·댓글 등록을 막지 않도록 notify_admins 안에서 예외를 삼킴
+--   · 관리자 이메일 목록은 is_admin()·앱 ADMINS와 같은 값이라 관리자를 추가할 땐 함께 고쳐야 함
+-- =====================================================
+CREATE OR REPLACE FUNCTION admin_user_ids() RETURNS SETOF uuid AS $$
+  SELECT id FROM auth.users WHERE email IN ('dev@youthvoice.or.kr', 'yv@youthvoice.or.kr');
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION admin_user_ids() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION admin_user_ids() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION admin_user_ids() FROM anon;
+
+CREATE OR REPLACE FUNCTION notify_admins(a_title text, a_body text, a_url text, skip_ids uuid[] DEFAULT '{}')
+RETURNS void AS $$
+DECLARE aid uuid;
+BEGIN
+  FOR aid IN SELECT admin_user_ids() LOOP
+    IF NOT coalesce(aid = ANY(skip_ids), false) THEN
+      BEGIN
+        PERFORM notify_push(aid, a_title, a_body, a_url);
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'notify_admins 실패(무시): %', SQLERRM;
+      END;
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION notify_admins(text, text, text, uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION notify_admins(text, text, text, uuid[]) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION notify_admins(text, text, text, uuid[]) FROM anon;
+
+-- 새 인증글 — 작성자 본인과, 이미 "함께하는 친구가 인증했어요"를 받는 승인 참여자는 제외
+CREATE OR REPLACE FUNCTION on_cert_notify_admins() RETURNS TRIGGER AS $$
+DECLARE who text; r_title text; skip uuid[];
+BEGIN
+  SELECT name INTO who FROM profiles WHERE id = NEW.user_id;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  SELECT coalesce(array_agg(user_id), '{}') INTO skip
+    FROM routine_participants WHERE routine_id = NEW.routine_id AND status = 'approved';
+  PERFORM notify_admins(
+    '📸 ' || coalesce(who, '누군가') || '님이 인증했어요',
+    '"' || coalesce(r_title, '루틴') || '" · ' || left(coalesce(NEW.content, ''), 40),
+    '/youthit-routine/?cert=' || NEW.id,
+    skip || NEW.user_id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_cert_notify_admins ON certifications;
+CREATE TRIGGER trg_cert_notify_admins AFTER INSERT ON certifications
+  FOR EACH ROW EXECUTE FUNCTION on_cert_notify_admins();
+
+-- 인증글 댓글·답글 — 기존 알림을 받는 사람(답글이면 부모 댓글 작성자, 아니면 인증글 주인)은 제외
+CREATE OR REPLACE FUNCTION on_cert_comment_notify_admins() RETURNS TRIGGER AS $$
+DECLARE who text; cert_owner uuid; parent_author uuid; r_title text; skip uuid[];
+BEGIN
+  SELECT name INTO who FROM profiles WHERE id = NEW.user_id;
+  SELECT c.user_id, r.title INTO cert_owner, r_title
+    FROM certifications c LEFT JOIN routines r ON r.id = c.routine_id WHERE c.id = NEW.cert_id;
+  IF NEW.parent_comment_id IS NOT NULL THEN
+    SELECT user_id INTO parent_author FROM cert_comments WHERE id = NEW.parent_comment_id;
+    skip := ARRAY[NEW.user_id, parent_author];
+  ELSE
+    skip := ARRAY[NEW.user_id, cert_owner];
+  END IF;
+  PERFORM notify_admins(
+    CASE WHEN NEW.parent_comment_id IS NOT NULL THEN '💬 답글 · ' ELSE '💬 댓글 · ' END || coalesce(r_title, '루틴'),
+    coalesce(who, '누군가') || ': ' || left(coalesce(NEW.content, ''), 40),
+    '/youthit-routine/?cert=' || NEW.cert_id,
+    skip
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_cert_comment_notify_admins ON cert_comments;
+CREATE TRIGGER trg_cert_comment_notify_admins AFTER INSERT ON cert_comments
+  FOR EACH ROW EXECUTE FUNCTION on_cert_comment_notify_admins();
+
+-- 커뮤니티 글 댓글·답글 — 같은 기준
+CREATE OR REPLACE FUNCTION on_post_comment_notify_admins() RETURNS TRIGGER AS $$
+DECLARE who text; post_owner uuid; parent_author uuid; skip uuid[];
+BEGIN
+  SELECT name INTO who FROM profiles WHERE id = NEW.user_id;
+  SELECT author_id INTO post_owner FROM posts WHERE id = NEW.post_id;
+  IF NEW.parent_comment_id IS NOT NULL THEN
+    SELECT user_id INTO parent_author FROM post_comments WHERE id = NEW.parent_comment_id;
+    skip := ARRAY[NEW.user_id, parent_author];
+  ELSE
+    skip := ARRAY[NEW.user_id, post_owner];
+  END IF;
+  PERFORM notify_admins(
+    CASE WHEN NEW.parent_comment_id IS NOT NULL THEN '💬 커뮤니티 답글' ELSE '💬 커뮤니티 댓글' END,
+    coalesce(who, '누군가') || ': ' || left(coalesce(NEW.content, ''), 40),
+    '/youthit-routine/?post=' || NEW.post_id,
+    skip
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_post_comment_notify_admins ON post_comments;
+CREATE TRIGGER trg_post_comment_notify_admins AFTER INSERT ON post_comments
+  FOR EACH ROW EXECUTE FUNCTION on_post_comment_notify_admins();
+
+-- 커뮤니티 새 글(공지·소식·후기) — 작성자 본인 제외
+CREATE OR REPLACE FUNCTION on_post_notify_admins() RETURNS TRIGGER AS $$
+DECLARE who text; label text; r_title text;
+BEGIN
+  SELECT name INTO who FROM profiles WHERE id = NEW.author_id;
+  label := CASE NEW.type WHEN 'notice' THEN '공지' WHEN 'kpost' THEN '소식' ELSE '후기' END;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  PERFORM notify_admins(
+    '📝 새 ' || label || ' 글',
+    coalesce(who, '누군가') || ': ' || left(coalesce(NEW.title, r_title, NEW.content, ''), 40),
+    '/youthit-routine/?post=' || NEW.id,
+    ARRAY[NEW.author_id]
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_post_notify_admins ON posts;
+CREATE TRIGGER trg_post_notify_admins AFTER INSERT ON posts
+  FOR EACH ROW EXECUTE FUNCTION on_post_notify_admins();
+
+-- 루틴 참여 신청(승인 대기) — 신청자 본인 제외. 반려 후 다시 신청해 pending이 되는 경우도 포함
+CREATE OR REPLACE FUNCTION on_participant_apply_notify_admins() RETURNS TRIGGER AS $$
+DECLARE who text; r_title text;
+BEGIN
+  IF NEW.status <> 'pending' THEN RETURN NEW; END IF;
+  -- INSERT에는 OLD가 없으므로 UPDATE일 때만 이전 상태를 봄(이미 pending이던 행의 다른 수정은 알리지 않음)
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.status IS NOT DISTINCT FROM 'pending' THEN RETURN NEW; END IF;
+  END IF;
+  SELECT name INTO who FROM profiles WHERE id = NEW.user_id;
+  SELECT title INTO r_title FROM routines WHERE id = NEW.routine_id;
+  PERFORM notify_admins(
+    '🙋 루틴 참여 신청',
+    coalesce(who, '누군가') || '님이 "' || coalesce(r_title, '루틴') || '"에 신청했어요 (승인 대기)',
+    '/youthit-routine/?tab=routine',
+    ARRAY[NEW.user_id]
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP TRIGGER IF EXISTS trg_participant_apply_notify_admins ON routine_participants;
+CREATE TRIGGER trg_participant_apply_notify_admins AFTER INSERT OR UPDATE OF status ON routine_participants
+  FOR EACH ROW EXECUTE FUNCTION on_participant_apply_notify_admins();
