@@ -3386,3 +3386,177 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- =====================================================
+-- [마이그레이션 2026-10-19a] 멘션(@) 기능 — 인증글 댓글·커뮤니티 글 댓글·커뮤니티 글
+-- 정책(사용자 결정):
+--   · 언급 대상은 "같은 루틴 참여자"만 (그 루틴의 담당 끗짱 포함). 관리자·참관 계정은 언급 대상에서 제외
+--   · 끗짱(자기가 담당한 루틴)·관리자만 전체 언급(@전체 / @all) 가능 → 그 루틴 참여자 전원에게 알림
+--   · 루틴이 없는 글(끗짱·관리자의 소식/공지)과 그 댓글은 "내가 같은 루틴에 속한 사람들"이 대상
+--     (관리자는 모집·진행 중 루틴 참여자 전체)
+--   · 알림은 푸시 + 알림함, 새로 등록할 때만(수정 시 재알림 없음)
+--   · 이미 "댓글/답글이 달렸어요" 알림을 받는 사람(인증글·글 주인 / 답글이면 부모 댓글 작성자)은
+--     언급 알림을 따로 받지 않음(중복 방지)
+-- 클라이언트가 보낸 mentions를 서버가 다시 걸러서(풀 밖 사람·관리자·참관 제거) 저장하므로
+-- 조작된 요청으로 아무에게나 알림을 보낼 수 없음
+-- =====================================================
+ALTER TABLE cert_comments ADD COLUMN IF NOT EXISTS mentions uuid[] NOT NULL DEFAULT '{}';
+ALTER TABLE cert_comments ADD COLUMN IF NOT EXISTS mention_all boolean NOT NULL DEFAULT false;
+ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS mentions uuid[] NOT NULL DEFAULT '{}';
+ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS mention_all boolean NOT NULL DEFAULT false;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS mentions uuid[] NOT NULL DEFAULT '{}';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS mention_all boolean NOT NULL DEFAULT false;
+
+-- author가 언급할 수 있는 사람 목록(관리자·참관·본인 제외)
+CREATE OR REPLACE FUNCTION mention_pool(author uuid, r_id bigint) RETURNS uuid[] AS $$
+DECLARE
+  pool uuid[];
+  is_adm boolean;
+BEGIN
+  is_adm := author IN (SELECT admin_user_ids());
+  IF r_id IS NOT NULL THEN
+    -- 그 루틴 사람(참여자·담당 끗짱·지정 참관·관리자)이 아니면 아무도 언급할 수 없음
+    IF NOT (is_adm
+         OR EXISTS (SELECT 1 FROM routine_participants WHERE routine_id = r_id AND user_id = author AND status = 'approved')
+         OR EXISTS (SELECT 1 FROM routines WHERE id = r_id AND led_by = author)
+         OR EXISTS (SELECT 1 FROM routine_observers WHERE routine_id = r_id AND user_id = author)) THEN
+      RETURN '{}';
+    END IF;
+    SELECT coalesce(array_agg(DISTINCT u), '{}') INTO pool FROM (
+      SELECT user_id AS u FROM routine_participants WHERE routine_id = r_id AND status = 'approved'
+      UNION SELECT led_by FROM routines WHERE id = r_id AND led_by IS NOT NULL
+    ) t;
+  ELSE
+    WITH mine AS (
+      SELECT id FROM routines WHERE is_adm AND status IN ('recruit', 'active')
+      UNION SELECT routine_id FROM routine_participants WHERE NOT is_adm AND user_id = author AND status = 'approved'
+      UNION SELECT id FROM routines WHERE NOT is_adm AND led_by = author
+    ), m AS (
+      SELECT user_id AS u FROM routine_participants WHERE status = 'approved' AND routine_id IN (SELECT id FROM mine)
+      UNION SELECT led_by FROM routines WHERE id IN (SELECT id FROM mine) AND led_by IS NOT NULL
+    )
+    SELECT coalesce(array_agg(DISTINCT u), '{}') INTO pool FROM m;
+  END IF;
+  SELECT coalesce(array_agg(u), '{}') INTO pool FROM unnest(pool) AS u
+   WHERE u <> author
+     AND u NOT IN (SELECT admin_user_ids())
+     AND NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = u AND p.role = 'observer');
+  RETURN pool;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION mention_pool(uuid, bigint) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION mention_pool(uuid, bigint) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION mention_pool(uuid, bigint) FROM anon;
+
+-- 저장 직전: 보낸 mentions를 풀과 교집합으로 걸러내고, 전체 언급 권한이 없으면 mention_all을 끔
+CREATE OR REPLACE FUNCTION sanitize_mentions() RETURNS TRIGGER AS $$
+DECLARE
+  author uuid; r_id bigint; pool uuid[]; can_all boolean; a_role text;
+BEGIN
+  IF coalesce(array_length(NEW.mentions, 1), 0) = 0 AND NOT NEW.mention_all THEN
+    NEW.mentions := '{}';
+    RETURN NEW;
+  END IF;
+  IF TG_TABLE_NAME = 'cert_comments' THEN
+    author := NEW.user_id;
+    SELECT routine_id INTO r_id FROM certifications WHERE id = NEW.cert_id;
+  ELSIF TG_TABLE_NAME = 'post_comments' THEN
+    author := NEW.user_id;
+    SELECT routine_id INTO r_id FROM posts WHERE id = NEW.post_id;
+  ELSE
+    author := NEW.author_id;
+    r_id := NEW.routine_id;
+  END IF;
+  SELECT role INTO a_role FROM profiles WHERE id = author;
+  can_all := author IN (SELECT admin_user_ids())
+    OR (a_role = 'kkutjjang' AND (r_id IS NULL OR EXISTS (SELECT 1 FROM routines WHERE id = r_id AND led_by = author)));
+  pool := mention_pool(author, r_id);
+  NEW.mention_all := NEW.mention_all AND can_all;
+  SELECT coalesce(array_agg(DISTINCT m), '{}') INTO NEW.mentions FROM unnest(NEW.mentions) AS m WHERE m = ANY(pool);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION sanitize_mentions() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION sanitize_mentions() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION sanitize_mentions() FROM anon;
+
+-- 등록 직후: 언급된 사람(전체 언급이면 풀 전원)에게 푸시 + 알림함
+CREATE OR REPLACE FUNCTION notify_mentions() RETURNS TRIGGER AS $$
+DECLARE
+  author uuid; r_id bigint; who text; targets uuid[]; skip uuid[] := '{}';
+  url text; snippet text; ttl text; t uuid; item_owner uuid; parent_author uuid;
+BEGIN
+  IF coalesce(array_length(NEW.mentions, 1), 0) = 0 AND NOT NEW.mention_all THEN RETURN NEW; END IF;
+  IF TG_TABLE_NAME = 'cert_comments' THEN
+    author := NEW.user_id;
+    SELECT routine_id, user_id INTO r_id, item_owner FROM certifications WHERE id = NEW.cert_id;
+    url := '/youthit-routine/?cert=' || NEW.cert_id;
+    snippet := NEW.content;
+    IF NEW.parent_comment_id IS NOT NULL THEN
+      SELECT user_id INTO parent_author FROM cert_comments WHERE id = NEW.parent_comment_id;
+      skip := ARRAY[parent_author];
+    ELSE
+      skip := ARRAY[item_owner];
+    END IF;
+  ELSIF TG_TABLE_NAME = 'post_comments' THEN
+    author := NEW.user_id;
+    SELECT routine_id, author_id INTO r_id, item_owner FROM posts WHERE id = NEW.post_id;
+    url := '/youthit-routine/?post=' || NEW.post_id;
+    snippet := NEW.content;
+    IF NEW.parent_comment_id IS NOT NULL THEN
+      SELECT user_id INTO parent_author FROM post_comments WHERE id = NEW.parent_comment_id;
+      skip := ARRAY[parent_author];
+    ELSE
+      skip := ARRAY[item_owner];
+    END IF;
+  ELSE
+    author := NEW.author_id;
+    r_id := NEW.routine_id;
+    url := '/youthit-routine/?post=' || NEW.id;
+    snippet := coalesce(NEW.title || ' · ', '') || coalesce(NEW.content, '');
+  END IF;
+  SELECT name INTO who FROM profiles WHERE id = author;
+  targets := NEW.mentions;
+  IF NEW.mention_all THEN
+    targets := targets || mention_pool(author, r_id);
+  END IF;
+  ttl := CASE WHEN NEW.mention_all THEN '📣 ' || coalesce(who, '누군가') || '님이 모두에게 알려요'
+              ELSE '🔔 ' || coalesce(who, '누군가') || '님이 회원님을 언급했어요' END;
+  snippet := left(coalesce(snippet, ''), 60) || CASE WHEN length(coalesce(snippet, '')) > 60 THEN '…' ELSE '' END;
+  FOR t IN SELECT DISTINCT x FROM unnest(targets) AS x LOOP
+    IF t <> author AND NOT coalesce(t = ANY(skip), false) THEN
+      BEGIN
+        PERFORM notify_push(t, ttl, snippet, url);
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'notify_mentions 실패(무시): %', SQLERRM;
+      END;
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION notify_mentions() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION notify_mentions() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION notify_mentions() FROM anon;
+
+DROP TRIGGER IF EXISTS trg_cert_comments_sanitize_mentions ON cert_comments;
+CREATE TRIGGER trg_cert_comments_sanitize_mentions BEFORE INSERT ON cert_comments
+  FOR EACH ROW EXECUTE FUNCTION sanitize_mentions();
+DROP TRIGGER IF EXISTS trg_cert_comments_notify_mentions ON cert_comments;
+CREATE TRIGGER trg_cert_comments_notify_mentions AFTER INSERT ON cert_comments
+  FOR EACH ROW EXECUTE FUNCTION notify_mentions();
+
+DROP TRIGGER IF EXISTS trg_post_comments_sanitize_mentions ON post_comments;
+CREATE TRIGGER trg_post_comments_sanitize_mentions BEFORE INSERT ON post_comments
+  FOR EACH ROW EXECUTE FUNCTION sanitize_mentions();
+DROP TRIGGER IF EXISTS trg_post_comments_notify_mentions ON post_comments;
+CREATE TRIGGER trg_post_comments_notify_mentions AFTER INSERT ON post_comments
+  FOR EACH ROW EXECUTE FUNCTION notify_mentions();
+
+DROP TRIGGER IF EXISTS trg_posts_sanitize_mentions ON posts;
+CREATE TRIGGER trg_posts_sanitize_mentions BEFORE INSERT ON posts
+  FOR EACH ROW EXECUTE FUNCTION sanitize_mentions();
+DROP TRIGGER IF EXISTS trg_posts_notify_mentions ON posts;
+CREATE TRIGGER trg_posts_notify_mentions AFTER INSERT ON posts
+  FOR EACH ROW EXECUTE FUNCTION notify_mentions();

@@ -213,6 +213,13 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
 .photo-lightbox .lb-count { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; display: none; }
 .photo-lightbox.multi .lb-nav { display: flex; }
 .photo-lightbox.multi .lb-count { display: block; }
+.mention { color:#2E33BC; font-weight:600; background:#f0f1fb; border-radius:4px; padding:0 3px; }
+.mention-all { color:#FF006C; background:#FBEAF0; }
+#mentionPop { position:fixed; z-index:9999; background:#fff; border:0.5px solid #e0e0e0; border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,0.16); padding:4px; display:none; max-height:240px; overflow-y:auto; }
+#mentionPop .mn-item { display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:10px; font-size:13px; color:#111; cursor:pointer; }
+#mentionPop .mn-item:hover, #mentionPop .mn-item.on { background:#f0f1fb; }
+#mentionPop .mn-all { color:#FF006C; font-weight:700; }
+#mentionPop .mn-sub { font-size:11px; color:#aaa; margin-left:auto; }
 .photo-lightbox .lightbox-close { position: absolute; top: 20px; right: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
 /* 완료 화면 */
@@ -929,9 +936,9 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
             <i class="ti ti-camera" style="font-size:17px;color:#888;"></i>
           </label>
           <input type="file" id="rdCommentPhotoInput" accept="image/*" style="display:none;" onchange="_handleCommentPhoto(event)">
-          <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요..." maxlength="500"
+          <input type="text" id="rdCommentInput" placeholder="응원 댓글을 남겨보세요... (@로 친구 부르기)" maxlength="500" autocomplete="off"
             style="flex:1;min-width:0;border:none;background:transparent;font-size:13px;font-family:inherit;color:#111;outline:none;"
-            onkeydown="if(event.key==='Enter' && !event.isComposing)submitCommentFromBar()">
+            onkeydown="if(event.key==='Enter' && !event.isComposing && !_mentionPopOpen())submitCommentFromBar()">
           <button onclick="submitCommentFromBar()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;flex-shrink:0;">
             <i class="ti ti-send" style="font-size:18px;color:#2E33BC;"></i>
           </button>
@@ -1312,6 +1319,9 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <button class="primary-btn" style="margin-top:22px;" onclick="closeSheet('iosInstallSheetBg')">확인</button>
     </div>
   </div>
+
+  <!-- 멘션(@) 후보 팝업 -->
+  <div id="mentionPop"></div>
 
   <!-- 인증글 사진 확대 보기 -->
   <div class="photo-lightbox" id="photoLightboxBg" onclick="closeSheet('photoLightboxBg')">
@@ -2091,16 +2101,17 @@ async function loadPosts() {
     sb.from('posts').select('*').order('created_at', { ascending: false }),
     sb.from('post_likes').select('post_id,user_id'),
     sb.from('profiles_public').select('id,name'),
-    sb.from('post_comments').select('id,post_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
+    sb.from('post_comments').select('*').order('created_at', { ascending: true }),
     sb.from('post_comment_likes').select('comment_id,user_id'),
   ]);
   const posts = postRes.data || [], likes = likeRes.data || [], comments = commentRes.data || [];
   const commentLikes = commentLikeRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  Object.assign(_mnNames, nameById);
   state.posts = posts.map(p => ({
     id: p.id, type: p.type || 'review', pinned: p.pinned!==false, hidden: p.hidden===true, title: p.title, content: p.content,
-    routineId: p.routine_id ?? null, photoUrl: p.photo_url || null,
+    routineId: p.routine_id ?? null, photoUrl: p.photo_url || null, mentions: p.mentions || [], mentionAll: p.mention_all === true,
     author: nameById[p.author_id] || '익명', authorId: p.author_id, date: _relDate(p.created_at), ts: new Date(p.created_at).getTime(),
     likes: likes.filter(l => l.post_id === p.id).length,
     liked: currentUser ? likes.some(l => l.post_id === p.id && l.user_id === currentUser.id) : false,
@@ -2109,6 +2120,7 @@ async function loadPosts() {
       return {
         id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
         photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
+        mentions: cm.mentions || [], mentionAll: cm.mention_all === true,
         likes: cmLikes.length, liked: currentUser ? cmLikes.some(l => l.user_id === currentUser.id) : false,
       };
     }),
@@ -2130,7 +2142,7 @@ async function loadCertFeed() {
   const [certRes, likeRes, commentRes, profRes, commentLikeRes] = await Promise.all([
     sb.from('certifications').select('id,routine_id,user_id,content,photo_url,photo_urls,created_at').order('created_at', { ascending: false }).limit(500),
     sb.from('cert_likes').select('cert_id,user_id'),
-    sb.from('cert_comments').select('id,cert_id,user_id,content,photo_url,parent_comment_id,created_at').order('created_at', { ascending: true }),
+    sb.from('cert_comments').select('*').order('created_at', { ascending: true }),
     sb.from('profiles').select('id,name'),
     sb.from('cert_comment_likes').select('comment_id,user_id'),
   ]);
@@ -2138,6 +2150,7 @@ async function loadCertFeed() {
   const commentLikes = commentLikeRes.data || [];
   const nameById = {};
   (profRes.data || []).forEach(p => nameById[p.id] = p.name);
+  Object.assign(_mnNames, nameById);
   state.certFeed = certs.map(c => {
     const r = state.routines.find(x => x.id === c.routine_id);
     const cLikes = likes.filter(l => l.cert_id === c.id);
@@ -2146,6 +2159,7 @@ async function loadCertFeed() {
       return {
         id: cm.id, userId: cm.user_id, author: nameById[cm.user_id] || '익명', text: cm.content, ts: new Date(cm.created_at).getTime(),
         photoUrl: cm.photo_url || null, parentId: cm.parent_comment_id || null,
+        mentions: cm.mentions || [], mentionAll: cm.mention_all === true,
         likes: cmLikes.length, liked: currentUser ? cmLikes.some(l => l.user_id === currentUser.id) : false,
       };
     });
@@ -3160,6 +3174,127 @@ let editingPostId = null; // null이면 새 글 작성, 값이 있으면 해당 
 // 댓글 목록 렌더링 — 인증글/게시글 댓글 둘 다 공용으로 씀. 답글(1단계, parentId 있는
 // 댓글)은 부모 댓글 밑에 들여쓰기해서 붙이고, 답글에는 "답글달기"를 안 보여줘서 더
 // 깊은 중첩을 UI에서부터 막음(요청: 1단계까지만)
+// ── 멘션(@) ─────────────────────────────────────────────
+// 같은 루틴 참여자(+담당 끗짱)만 언급 가능, 관리자·참관 계정은 대상 아님. 끗짱(자기 루틴)·관리자는
+// @전체(@all)로 그 루틴 참여자 전원을 부를 수 있음. 서버(마이그레이션 2026-10-19a)가 보낸 id를 다시 걸러서
+// 알림을 보내므로 여기선 후보 표시/추출/강조만 담당. 본문에는 그냥 "@이름"으로 들어감
+let _mnNames = {};
+function _mentionRoutineOfComment() {
+  if(currentPostDetailId) { const p=(state.posts||[]).find(x=>x.id===currentPostDetailId); return p && typeof p.routineId==='number' ? p.routineId : null; }
+  if(currentCertDetailId) { const c=(state.certFeed||[]).find(x=>x.id===currentCertDetailId); return c && typeof c.routineId==='number' ? c.routineId : null; }
+  return null;
+}
+function _mentionCandidates(routineId) {
+  if(!currentUser) return [];
+  const me = currentUser.id, isAdm = state.loginType==='both';
+  const map = new Map();
+  const add = (id, name) => { if(id && id!==me && name && name!=='익명' && !map.has(id)) map.set(id, name); };
+  const addRoutine = r => { (r.participants||[]).forEach(p=>add(p.userId, p.name)); if(r.ledBy) add(r.ledBy, r.leaderName); };
+  const isMember = r => (r.participants||[]).some(p=>p.userId===me) || r.ledBy===me;
+  if(typeof routineId==='number') {
+    const r = (state.routines||[]).find(x=>x.id===routineId);
+    if(r && (isAdm || _isObserver() || isMember(r))) addRoutine(r);
+  } else {
+    (state.routines||[]).forEach(r => {
+      if(isAdm ? ['recruit','active'].includes(r.status) : isMember(r)) addRoutine(r);
+    });
+  }
+  return [...map].map(([id,name])=>({id,name}));
+}
+function _mentionCanAll(routineId) {
+  if(!currentUser) return false;
+  if(state.loginType==='both') return true;
+  if(state.currentRole!=='kkutjjang') return false;
+  if(typeof routineId!=='number') return true;
+  const r = (state.routines||[]).find(x=>x.id===routineId);
+  return !!r && r.ledBy===currentUser.id;
+}
+// 본문에서 실제로 언급된 사람 id와 전체 언급 여부를 뽑음 — 긴 이름부터 맞춰서 "김다"가 "김다은"에 잘못 걸리지 않게
+// 같은 이름이 둘 이상이면 팝업에서 직접 고른 사람만 인정
+function _extractMentions(text, routineId, picked) {
+  const cands = _mentionCandidates(routineId).sort((a,b)=>b.name.length-a.name.length);
+  const cnt = {}; cands.forEach(c=>cnt[c.name]=(cnt[c.name]||0)+1);
+  const ids = []; let rest = text||'';
+  cands.forEach(c => {
+    const tok = '@'+c.name;
+    if(rest.includes(tok) && (cnt[c.name]===1 || (picked && picked.has(c.id)))) { ids.push(c.id); rest = rest.split(tok).join(' '); }
+  });
+  const all = _mentionCanAll(routineId) && /@(전체|all)/i.test(rest);
+  return { ids, all };
+}
+function _mentionPayload(mn) { return (mn.ids.length || mn.all) ? { mentions: mn.ids, mention_all: mn.all } : {}; }
+// 표시용: 안전하게 이스케이프한 뒤 언급된 이름/@전체를 강조
+function _mentionHtml(text, ids, all) {
+  const esc = _escHtml(text);
+  const names = [...new Set((ids||[]).map(id=>_mnNames[id]).filter(Boolean))].sort((a,b)=>b.length-a.length)
+    .map(n=>_escHtml(n).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  const alts = names.slice();
+  if(all) alts.push('전체', 'all');
+  if(!alts.length) return esc;
+  const allSet = new Set(['전체','all']);
+  return esc.replace(new RegExp('@('+alts.join('|')+')','gi'), (m, n) =>
+    `<span class="mention${all && allSet.has(n.toLowerCase()) ? ' mention-all' : ''}">${m}</span>`);
+}
+// 입력창에 @ 팝업 붙이기 — getRoutineId()는 그때그때 "어느 루틴 기준인지"(없으면 null)
+let _mnEl = null, _mnGet = null, _mnItems = [], _mnSel = 0, _mnStart = -1;
+function _mentionPopOpen() { const p=document.getElementById('mentionPop'); return !!p && p.style.display==='block'; }
+function _mentionHide() { const p=document.getElementById('mentionPop'); if(p) p.style.display='none'; _mnItems=[]; }
+function _mentionRender() {
+  const pop = document.getElementById('mentionPop');
+  pop.innerHTML = _mnItems.map((it,i)=> it.all
+    ? `<div class="mn-item mn-all${i===_mnSel?' on':''}" data-i="${i}">📣 @전체<span class="mn-sub">참여자 모두에게 알림</span></div>`
+    : `<div class="mn-item${i===_mnSel?' on':''}" data-i="${i}">${_avatarHtml(it.id, it.name, 24, '#E6F1FB', '#2E33BC')}<span>${_escHtml(it.name)}</span></div>`).join('');
+  const r = _mnEl.getBoundingClientRect();
+  pop.style.left = '12px'; pop.style.right = '12px';
+  pop.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+  pop.style.display = 'block';
+}
+function _mentionPick(i) {
+  const it = _mnItems[i], el = _mnEl; if(!it || !el) return;
+  const pos = el.selectionStart, name = it.all ? '전체' : it.name;
+  el.value = el.value.slice(0, _mnStart) + '@' + name + ' ' + el.value.slice(pos);
+  const np = _mnStart + name.length + 2;
+  el.setSelectionRange(np, np);
+  if(!it.all) { (el._mnPicked = el._mnPicked || new Set()).add(it.id); }
+  _mentionHide();
+  el.focus();
+}
+function _mentionOnInput(el, getRoutineId) {
+  _mnEl = el; _mnGet = getRoutineId;
+  const before = el.value.slice(0, el.selectionStart);
+  const m = before.match(/(?:^|\s)@([^\s@]{0,12})$/);
+  if(!m) { _mentionHide(); return; }
+  const q = m[1].toLowerCase(), rid = getRoutineId();
+  const rank = n => n.toLowerCase().startsWith(q) ? 0 : 1;
+  const items = _mentionCandidates(rid).filter(c=>c.name.toLowerCase().includes(q))
+    .sort((a,b)=>rank(a.name)-rank(b.name) || a.name.localeCompare(b.name)).slice(0, 8);
+  if(_mentionCanAll(rid) && ('전체'.startsWith(q) || 'all'.startsWith(q))) items.unshift({ all:true });
+  if(!items.length) { _mentionHide(); return; }
+  _mnItems = items; _mnSel = 0; _mnStart = el.selectionStart - m[1].length - 1;
+  _mentionRender();
+}
+function _mentionAttach(el, getRoutineId) {
+  if(!el || el._mnBound) return;
+  el._mnBound = true;
+  el.addEventListener('input', () => _mentionOnInput(el, getRoutineId));
+  el.addEventListener('keydown', e => {
+    if(!_mentionPopOpen() || _mnEl!==el) return;
+    if(e.key==='Escape') { _mentionHide(); e.preventDefault(); }
+    else if(e.key==='ArrowDown') { _mnSel=(_mnSel+1)%_mnItems.length; _mentionRender(); e.preventDefault(); }
+    else if(e.key==='ArrowUp') { _mnSel=(_mnSel-1+_mnItems.length)%_mnItems.length; _mentionRender(); e.preventDefault(); }
+    else if((e.key==='Enter' || e.key==='Tab') && !e.isComposing) { _mentionPick(_mnSel); e.preventDefault(); }
+  });
+  el.addEventListener('blur', () => setTimeout(_mentionHide, 200));
+}
+(function _mentionInit() {
+  const pop = document.getElementById('mentionPop');
+  // mousedown에서 처리해야 입력창이 포커스를 잃기 전에(blur 전에) 선택됨
+  pop.addEventListener('mousedown', e => { e.preventDefault(); const it=e.target.closest('.mn-item'); if(it) _mentionPick(Number(it.dataset.i)); });
+  pop.addEventListener('touchstart', e => { const it=e.target.closest('.mn-item'); if(it) { e.preventDefault(); _mentionPick(Number(it.dataset.i)); } }, {passive:false});
+  _mentionAttach(document.getElementById('rdCommentInput'), _mentionRoutineOfComment);
+  _mentionAttach(document.getElementById('postContent'), () => typeof currentReviewRoutineId==='number' ? currentReviewRoutineId : null);
+  _mentionAttach(document.getElementById('kPostContent'), () => null);
+})();
 function _commentListHtml(comments, kind, entityId) {
   const top = comments.filter(cm=>!cm.parentId);
   const repliesByParent = {};
@@ -3183,7 +3318,7 @@ function _commentBubbleInnerHtml(cm, kind, entityId, isReply) {
         ${canDelete?`<i class="ti ti-trash" onclick="${deleteFn}(${entityId},${cm.id})" style="font-size:${iconSize};color:#ccc;cursor:pointer;"></i>`:''}
       </div>`:''}
     </div>
-    ${cm.text?`<div style="font-size:${isReply?'12px':'13px'};color:#333;line-height:1.5;white-space:pre-wrap;">${cm.text}</div>`:''}
+    ${cm.text?`<div style="font-size:${isReply?'12px':'13px'};color:#333;line-height:1.5;white-space:pre-wrap;">${_mentionHtml(cm.text, cm.mentions, cm.mentionAll)}</div>`:''}
     ${photoHtml}`;
 }
 function _commentRowHtml(cm, replies, kind, entityId) {
@@ -3487,10 +3622,12 @@ async function submitCommentFromBar() {
       if(photoUrl===false) return;
     }
     const parentId = _replyToCommentId;
-    const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
+    const mn = _extractMentions(text, typeof c.routineId==='number' ? c.routineId : null, input._mnPicked);
+    const { data, error } = await sb.from('cert_comments').insert({ cert_id: currentCertDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId, ..._mentionPayload(mn) }).select().single();
     if(error){ alert('댓글 등록 실패: '+error.message); return; }
     if(!c.comments) c.comments=[];
-    c.comments.push({id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, likes:0, liked:false});
+    c.comments.push({id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, mentions:data.mentions||[], mentionAll:data.mention_all===true, likes:0, liked:false});
+    input._mnPicked = new Set();
     if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
     save();
     input.value='';
@@ -3634,7 +3771,7 @@ function openPostDetail(id) {
     </div>
     <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:8px;">${_postDisplayTitle(p)}</div>
     ${p.photoUrl?`<img src="${p.photoUrl}" style="width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:14px;display:block;">`:''}
-    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;">${p.content}</div>
+    <div style="font-size:14px;color:#333;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;">${_mentionHtml(p.content, p.mentions, p.mentionAll)}</div>
     <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-top:0.5px solid #f0f0f0;border-bottom:0.5px solid #f0f0f0;margin-bottom:12px;">
       <div onclick="${likeFn}(${p.id})" data-post-like="${p.id}" data-pl-style="detail" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <i class="ti ti-heart${p.liked?'-filled':''} plHeart" style="font-size:22px;color:${p.liked?'#FF006C':'#ccc'};"></i>
@@ -3666,10 +3803,12 @@ async function _submitPostComment(text, input) {
     if(photoUrl===false) return;
   }
   const parentId = _replyToCommentId;
-  const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId }).select().single();
+  const mn = _extractMentions(text, typeof p.routineId==='number' ? p.routineId : null, input._mnPicked);
+  const { data, error } = await sb.from('post_comments').insert({ post_id: currentPostDetailId, user_id: currentUser.id, content: text, photo_url: photoUrl, parent_comment_id: parentId, ..._mentionPayload(mn) }).select().single();
   if(error){ alert('댓글 등록 실패: '+error.message); return; }
   if(!p.comments) p.comments=[];
-  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, likes:0, liked:false });
+  p.comments.push({ id:data.id, userId:currentUser.id, author:authorName, text, ts:new Date(data.created_at).getTime(), photoUrl, parentId, mentions:data.mentions||[], mentionAll:data.mention_all===true, likes:0, liked:false });
+  input._mnPicked = new Set();
   if(state.currentRole==='youth') { state.youth.commCount++; earnNadaeum('comment'); }
   save();
   input.value='';
@@ -4579,10 +4718,13 @@ async function submitPost() {
     if(error){ if(btn){btn.disabled=false;} alert('수정 실패: '+error.message); return; }
     editingPostId = null;
   } else {
+    const rRid = typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null;
+    const pcEl = document.getElementById('postContent');
     const { error } = await sb.from('posts').insert({
       type:'review', content:c, author_id:currentUser.id, photo_url:photoUrl,
-      routine_id: typeof currentReviewRoutineId==='number'?currentReviewRoutineId:null,
+      routine_id: rRid, ..._mentionPayload(_extractMentions(c, rRid, pcEl._mnPicked)),
     });
+    pcEl._mnPicked = new Set();
     if(error){ if(btn){btn.disabled=false;} alert('게시 실패: '+error.message); return; }
     earnNadaeum('review');
   }
@@ -5987,9 +6129,12 @@ async function kSubmitPost() {
       if(error){ alert('수정 실패: '+error.message); return; }
       editingPostId = null;
     } else {
+      const kcEl = document.getElementById('kPostContent');
       const { error } = await sb.from('posts').insert({
         type: asNotice ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
+        ..._mentionPayload(_extractMentions(c, null, kcEl._mnPicked)),
       });
+      kcEl._mnPicked = new Set();
       if(error){ alert('게시 실패: '+error.message); return; }
     }
     await loadPosts();
