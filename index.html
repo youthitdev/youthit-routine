@@ -2524,7 +2524,9 @@ function applyRole(role) {
   document.getElementById('kkutjjangNav').style.display = isYouth ? 'none' : 'contents';
   const obs = isYouth && _isObserver(); // 참관은 화면 구조는 청소년과 같고 읽기 전용
   document.body.classList.toggle('is-observer', obs);
-  document.getElementById('headerRoleBadge').textContent = obs ? '참관' : (isYouth ? '청소년' : '끗짱');
+  // 관리자 계정은 화면(청소년/끗짱)과 관계없이 상단에 「관리자」로 표시(한끗독서와 동일, 2026-10-20 사용자).
+  // 헤더 색은 화면 색 그대로 둬서 지금 어느 화면인지는 색으로 구분됨
+  document.getElementById('headerRoleBadge').textContent = obs ? '참관' : (state.loginType==='both' ? '관리자' : (isYouth ? '청소년' : '끗짱'));
   // 역할별 색상 전체 적용
   const headerColor = obs ? OBSERVER_COLOR : (isYouth ? '#83CA00' : '#FF006C');
   document.getElementById('mainHeader').style.background = headerColor;
@@ -3116,7 +3118,9 @@ async function openRoutineFeed(routineId) {
   const gridHtml = certs.length===0
     ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
     : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs)}</div>`;
-  document.getElementById('feedOverlayBody').innerHTML = completeActionsHtml + gridHtml;
+  const adminPeekHtml = (state.loginType==='both' && !isParticipant)
+    ? `<div style="margin:12px 16px 0;padding:9px 12px;background:#f0f1fb;border-radius:10px;font-size:12px;color:#2E33BC;font-weight:600;">👀 관리자 보기 — 참여하지 않은 루틴이에요</div>` : '';
+  document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + completeActionsHtml + gridHtml;
   const myR=state.routines.find(x=>x.id===routineId);
   _setCertFloatingBtn(myR);
   openOverlay('routineFeedOverlay');
@@ -3833,6 +3837,8 @@ async function deletePostComment(postId, commentId) {
 function _shouldOpenFeed(r) {
   if (!r || !currentUser || r.status === 'cancelled') return false;
   if (_isObserver()) return true; // 참관자는 지정받은 루틴의 인증 피드를 봄(신청 화면 대신)
+  // 관리자는 참여하지 않은 루틴도 진행 중·완료된 것이면 인증 피드를 바로 볼 수 있음(모집 중인 루틴은 소개 화면)
+  if (state.loginType==='both' && (r.isFree || r.status==='active' || r.status==='done')) return true;
   const me = (r.participants||[]).find(p=>p.userId===currentUser.id);
   if (!me) return false;
   return r.isFree || r.status === 'active' || r.status === 'done';
