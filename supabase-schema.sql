@@ -3941,3 +3941,35 @@ SELECT cron.unschedule('hankkut-slack-daily')  WHERE EXISTS (SELECT 1 FROM cron.
 SELECT cron.unschedule('hankkut-slack-weekly') WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'hankkut-slack-weekly');
 SELECT cron.schedule('hankkut-slack-daily',  '0 0 * * *',  $$SELECT send_slack_report('daily')$$);
 SELECT cron.schedule('hankkut-slack-weekly', '0 10 * * 0', $$SELECT send_slack_report('weekly')$$);
+
+
+-- =====================================================
+-- [마이그레이션 2026-10-27a] 루틴별 공지 — 담당 끗짱·관리자가 공지를 올릴 수 있게
+-- 정책(사용자 결정): 끗짱은 "자기가 담당한 루틴"의 공지만 올림(그 루틴 인증 화면 맨 위에 고정, 그 루틴 참여자에게만 보임).
+--   관리자는 전체 공지(routine_id 없음)와 루틴별 공지를 모두 올림. 공지(type='notice') 수정·숨김·삭제는 작성자와 관리자.
+-- 그동안 posts_insert 정책은 type을 따로 제한하지 않아서(앱 화면에서만 관리자 전용) 직접 요청을 보내면 누구나
+-- 공지를 올릴 수 있었음 → 새 글이 공지면 관리자이거나 "담당 루틴의 끗짱"일 때만 통과시키는 트리거를 추가.
+-- (SQL Editor·서비스 키처럼 로그인 정보가 없는 요청은 통과)
+-- 공지를 수정할 때 종류·연결 루틴을 바꾸는 건 기존 guard_post_update가 관리자만 허용하므로 그대로 둠.
+-- =====================================================
+CREATE OR REPLACE FUNCTION guard_post_insert() RETURNS TRIGGER AS $$
+DECLARE a_role text;
+BEGIN
+  IF auth.uid() IS NULL OR is_admin() THEN RETURN NEW; END IF;
+  IF NEW.type = 'notice' THEN
+    SELECT role INTO a_role FROM profiles WHERE id = auth.uid();
+    IF a_role = 'kkutjjang' AND NEW.routine_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM routines WHERE id = NEW.routine_id AND led_by = auth.uid()) THEN
+      RETURN NEW;
+    END IF;
+    RAISE EXCEPTION '공지는 관리자 또는 담당 끗짱(담당 루틴)만 올릴 수 있어요';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+REVOKE EXECUTE ON FUNCTION guard_post_insert() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION guard_post_insert() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION guard_post_insert() FROM anon;
+DROP TRIGGER IF EXISTS trg_guard_post_insert ON posts;
+CREATE TRIGGER trg_guard_post_insert BEFORE INSERT ON posts
+  FOR EACH ROW EXECUTE FUNCTION guard_post_insert();

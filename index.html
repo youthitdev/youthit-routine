@@ -1193,7 +1193,8 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
-      <label id="kPostNoticeWrap" style="display:none;align-items:center;gap:8px;font-size:13px;color:#333;margin-bottom:16px;cursor:pointer;"><input type="checkbox" id="kPostIsNotice" checked style="flex-shrink:0;"><span>📢 공지로 등록 <span style="font-size:11px;color:#aaa;">(끄면 일반 글로 올라가요)</span></span></label>
+      <label id="kPostNoticeWrap" style="display:none;align-items:center;gap:8px;font-size:13px;color:#333;margin-bottom:16px;cursor:pointer;"><input type="checkbox" id="kPostIsNotice" checked style="flex-shrink:0;" onchange="_kNoticeRoutineWrapSync()"><span>📢 공지로 등록 <span style="font-size:11px;color:#aaa;" id="kPostNoticeHint">(끄면 일반 글로 올라가요)</span></span></label>
+      <div id="kPostRoutineWrap" style="display:none;margin-bottom:16px;"><div class="field-label">공지를 보여줄 루틴</div><select id="kPostRoutine"></select><div class="char-end" style="color:#bbb;" id="kPostRoutineHint"></div></div>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
       <button onclick="cancelPostWrite('kWriteSheetBg')" style="width:100%;padding:12px;margin-top:6px;background:none;border:none;color:#888;font-size:14px;font-weight:500;cursor:pointer;">취소</button>
     </div>
@@ -2124,7 +2125,7 @@ async function loadPosts() {
         likes: cmLikes.length, liked: currentUser ? cmLikes.some(l => l.user_id === currentUser.id) : false,
       };
     }),
-  }));
+  })).filter(_canSeeRoutineNotice);
 }
 // 공지(notice)는 항상 맨 위, 그 아래로 나머지 글도 최신순 — 원래는 글쓰기 화면의
 // "목록 상단에 고정" 체크박스로 공지마다 따로 켜고 끌 수 있었는데, 체크박스 상태와
@@ -3120,7 +3121,7 @@ async function openRoutineFeed(routineId) {
     : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs)}</div>`;
   const adminPeekHtml = (state.loginType==='both' && !isParticipant)
     ? `<div style="margin:12px 16px 0;padding:9px 12px;background:#f0f1fb;border-radius:10px;font-size:12px;color:#2E33BC;font-weight:600;">👀 관리자 보기 — 참여하지 않은 루틴이에요</div>` : '';
-  document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + completeActionsHtml + gridHtml;
+  document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + _routineNoticesHtml(routineId, '12px 16px 0') + completeActionsHtml + gridHtml;
   const myR=state.routines.find(x=>x.id===routineId);
   _setCertFloatingBtn(myR);
   openOverlay('routineFeedOverlay');
@@ -3297,7 +3298,7 @@ function _mentionAttach(el, getRoutineId) {
   pop.addEventListener('touchstart', e => { const it=e.target.closest('.mn-item'); if(it) { e.preventDefault(); _mentionPick(Number(it.dataset.i)); } }, {passive:false});
   _mentionAttach(document.getElementById('rdCommentInput'), _mentionRoutineOfComment);
   _mentionAttach(document.getElementById('postContent'), () => typeof currentReviewRoutineId==='number' ? currentReviewRoutineId : null);
-  _mentionAttach(document.getElementById('kPostContent'), () => null);
+  _mentionAttach(document.getElementById('kPostContent'), () => _kNoticeRoutineId());
 })();
 function _commentListHtml(comments, kind, entityId) {
   const top = comments.filter(cm=>!cm.parentId);
@@ -3737,10 +3738,14 @@ async function deleteCertComment(certId, commentId) {
 // 커뮤니티 게시글 상세 · 댓글
 // ════════════════════════════════════════════════════════
 function openPostDetail(id) {
+  if(_renderPostDetail(id)===false) return;
+  openOverlay('routineDetailOverlay');
+}
+function _renderPostDetail(id) {
   currentPostDetailId = id;
   currentCertDetailId = null;
   const p = state.posts.find(x=>x.id===id);
-  if(!p) return;
+  if(!p) return false;
   _setCertFloatingBtn(null); // 커뮤니티 글 상세라 "오늘 인증" 버튼과 무관 — 이전 화면 상태가 남지 않게 끔
   const comments = p.comments||[];
   document.getElementById('rdSub').textContent = p.date;
@@ -3767,7 +3772,7 @@ function openPostDetail(id) {
   document.getElementById('rdBody').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
       ${p.type==='notice'
-        ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
+        ?_noticeBadgeHtml(p)
         :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
       ${p.hidden?`<span style="background:#eee;color:#666;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:0;">숨김</span>`:''}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
@@ -3795,7 +3800,7 @@ function openPostDetail(id) {
     <div id="postCommentList_${p.id}" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
       ${_commentListHtml(comments, 'post', p.id)}
     </div>`;
-  openOverlay('routineDetailOverlay');
+  return true;
 }
 async function _submitPostComment(text, input) {
   const p = state.posts.find(x=>x.id===currentPostDetailId);
@@ -3862,6 +3867,7 @@ function openRoutineDetail(id) {
     <div style="font-size:12px;color:#666;background:#f5f5f7;padding:4px 9px;border-radius:12px;">👤 ${r.people}/${r.maxPeople}</div>
     ${(r.status==='recruit'||r.status==='active')?`<div onclick="shareRoutineLink(${r.id},'${(r.title||'').replace(/'/g,"\\'")}')" style="font-size:13px;color:#2E33BC;background:#E6F1FB;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">🔗</div>`:''}
   </div>
+  ${(currentUser && ((r.participants||[]).some(p=>p.userId===currentUser.id) || state.loginType==='both' || _isObserver()))?_routineNoticesHtml(r.id,'0 0 14px'):''}
   <div style="font-size:13px;color:#888;margin-bottom:6px;">루틴 소개</div>
   <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
   ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
@@ -4495,6 +4501,46 @@ function _canModerate(authorId) {
   return currentUser.id === authorId;
 }
 // 후기는 참여한 루틴의 후기만 쓸 수 있어서, 직접 입력받는 대신 루틴명으로 제목을 대신함
+// ── 루틴별 공지 ─────────────────────────────────────────
+// 루틴 인증 화면·루틴 상세 맨 위에 고정해서 보여주는 그 루틴의 공지(type='notice' + routine_id). 최신 3개까지만,
+// 나머지는 커뮤니티 목록(공지는 항상 맨 위)에서 봄
+function _routineNotices(routineId) {
+  return (state.posts||[]).filter(p=>p.type==='notice' && p.routineId===routineId).sort((a,b)=>b.ts-a.ts);
+}
+function _routineNoticesHtml(routineId, margin) {
+  const all = _routineNotices(routineId);
+  if(!all.length) return '';
+  const list = all.slice(0, 3);
+  return `<div style="margin:${margin||'0'};display:flex;flex-direction:column;gap:6px;">
+    ${list.map(p=>`<div onclick="openRoutineNotice(${p.id})" style="display:flex;align-items:center;gap:8px;padding:11px 12px;background:#f7f8ff;border:0.5px solid #c9cbf0;border-left:3px solid #2E33BC;border-radius:12px;cursor:pointer;">
+      <span style="background:#2E33BC;color:#fff;font-size:10px;padding:2px 8px;border-radius:9px;font-weight:700;flex-shrink:0;">📢 공지</span>
+      ${p.hidden?`<span style="background:#eee;color:#666;font-size:10px;padding:2px 7px;border-radius:9px;font-weight:600;flex-shrink:0;">숨김</span>`:''}
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_escHtml(p.title||'')}</div>
+      <span style="font-size:11px;color:#bbb;flex-shrink:0;">${p.date}</span>
+      <i class="ti ti-chevron-right" style="font-size:14px;color:#bbb;flex-shrink:0;"></i>
+    </div>`).join('')}
+    ${all.length>3?`<div style="font-size:11px;color:#aaa;text-align:right;">이전 공지 ${all.length-3}개는 커뮤니티에서 볼 수 있어요</div>`:''}
+  </div>`;
+}
+function openRoutineNotice(id) {
+  _openInRoutineDetail(() => _renderPostDetail(id));
+}
+// 공지 배지 — 루틴별 공지면 어느 루틴 공지인지 같이 표시
+function _noticeBadgeHtml(p) {
+  const r = p.routineId!=null ? (state.routines||[]).find(x=>x.id===p.routineId) : null;
+  return `<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
+    + (r ? `<span style="background:#E6F1FB;color:#185FA5;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:1;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.emoji} ${_escHtml(r.title)}</span>` : '');
+}
+// 다른 루틴의 공지는 그 루틴 사람(참여자·담당 끗짱·지정 참관)과 관리자에게만 보임 — 커뮤니티에 남의 루틴 공지가 섞이지 않게
+function _canSeeRoutineNotice(p) {
+  if (p.type!=='notice' || p.routineId==null) return true;
+  if (state.loginType==='both') return true;
+  if (!currentUser) return false;
+  const r = (state.routines||[]).find(x=>x.id===p.routineId);
+  if (!r) return false;
+  if (_isObserver()) return true;
+  return r.ledBy===currentUser.id || (r.participants||[]).some(x=>x.userId===currentUser.id);
+}
 function _postDisplayTitle(p) {
   if (p.type !== 'review') return p.title;
   const r = state.routines.find(x => x.id === p.routineId);
@@ -4506,7 +4552,7 @@ function _postCard(p, likeFn) {
   return `<div onclick="openPostDetail(${p.id})" style="cursor:pointer;background:${isNotice?'linear-gradient(135deg,#f7f8ff,#fff)':'#fff'};border:0.5px solid ${isNotice?'#c9cbf0':'#eee'};${isNotice?'border-left:3px solid #2E33BC;':''}border-radius:16px;padding:14px;${p.hidden?'opacity:0.55;':''}">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
       ${isNotice
-        ?`<span style="background:#2E33BC;color:white;font-size:10px;padding:3px 9px;border-radius:10px;font-weight:600;flex-shrink:0;">📢 공지</span>`
+        ?_noticeBadgeHtml(p)
         :_avatarHtml(p.authorId, p.author, 30, _avColor(p.author), 'rgba(0,0,0,0.55)')}
       ${p.hidden?`<span style="background:#eee;color:#666;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600;flex-shrink:0;">숨김</span>`:''}
       <div style="flex:1;font-size:13px;font-weight:600;color:#111;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.author}</div>
@@ -4594,7 +4640,7 @@ function editPost(id) {
   } else {
     document.getElementById('kPostTitle').value = p.title;
     document.getElementById('kPostContent').value = p.content;
-    _setKNoticeToggle(p.type==='notice');
+    _setKNoticeToggle(p.type==='notice', p.routineId, true);
     document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('kWriteSheetBg');
   }
@@ -5604,6 +5650,7 @@ function _renderKRoutineFeed(routineId) {
     return true;
   });
   document.getElementById('rdBody').innerHTML=`
+    ${_routineNoticesHtml(routineId, '0 0 14px')}
     ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (총 ${totalDays}일 중 ${certGoal}일 이상)</div><div style="font-size:12px;color:#3B6D11;">${yParts.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
@@ -5724,6 +5771,11 @@ function openKRoutineDetail(routineId) {
       ${r.status==='done'?`<button onclick="openKReportCard(${routineId})" style="display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 완주 리포트</button>`:''}
     </div>
     ${r.status==='cancelled'?`<div style="padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:12.5px;color:#888;margin-bottom:14px;">🙏 최소 인원${r.minPeople?`(${r.minPeople}명)`:''} 미달로 폐강된 루틴이에요</div>`:''}
+    ${(r.status!=='done' && r.status!=='cancelled' && (isAdmin || r.ledBy===currentUser?.id)) ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:600;color:#111;">📢 루틴 공지 <span style="font-size:11px;color:#aaa;font-weight:400;">이 루틴 인증 화면 맨 위에 고정돼요</span></div>
+      <button onclick="openKWriteSheet(${routineId})" style="padding:6px 12px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">공지 쓰기</button>
+    </div>
+    ${_routineNoticesHtml(routineId, '0 0 16px') || '<div style="font-size:12px;color:#bbb;margin-bottom:16px;">아직 공지가 없어요</div>'}` : _routineNoticesHtml(routineId, '0 0 14px')}
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;">${r.desc}</div>
     ${r.certGuide?`<div style="font-size:13px;color:#888;margin-bottom:6px;">🎯 이렇게 인증해 주세요</div>
     <div style="font-size:14px;color:#111;line-height:1.6;margin-bottom:16px;background:#f5f5f7;border-radius:12px;padding:12px 14px;white-space:pre-wrap;">${r.certGuide}</div>`:''}
@@ -6100,16 +6152,47 @@ async function toggleKPostLike(id) {
 // ════════════════════════════════════════════════════════
 // 관리자만 "공지로 등록" 토글이 보임(공지 종류 변경은 DB 트리거도 관리자만 허용).
 // 끄고 저장하면 일반 글(소식)로 올라가거나, 이미 올라간 공지가 일반 글로 바뀜
-function _setKNoticeToggle(isNotice) {
-  const wrap = document.getElementById('kPostNoticeWrap');
-  wrap.style.display = state.loginType==='both' ? 'flex' : 'none';
-  document.getElementById('kPostIsNotice').checked = isNotice;
+// 공지는 관리자(전체 공지 또는 루틴별)와 담당 끗짱(자기 담당 루틴만)이 올림. 루틴별 공지는 그 루틴 인증 화면
+// 맨 위에 고정되고 그 루틴 참여자에게만 보임(마이그레이션 2026-10-27a). 끗짱이 이미 올린 공지를 수정할 땐
+// 종류·루틴을 바꿀 수 없어서(DB도 관리자만 허용) 토글을 숨김
+function _kNoticeRoutineOptions() {
+  const isAdmin = state.loginType==='both';
+  return (state.routines||[]).filter(r => !['done','cancelled'].includes(r.status) && (isAdmin || r.ledBy===currentUser?.id));
 }
-function openKWriteSheet() {
+function _kNoticeRoutineWrapSync() {
+  const on = document.getElementById('kPostNoticeWrap').style.display!=='none' && document.getElementById('kPostIsNotice').checked;
+  document.getElementById('kPostRoutineWrap').style.display = on ? '' : 'none';
+}
+function _kNoticeRoutineId() {
+  const wrapOn = document.getElementById('kPostRoutineWrap').style.display!=='none';
+  const v = document.getElementById('kPostRoutine').value;
+  return wrapOn && v ? Number(v) : null;
+}
+function _setKNoticeToggle(isNotice, routineId, editing) {
+  const isAdmin = state.loginType==='both';
+  const opts = _kNoticeRoutineOptions();
+  // 이미 있는 공지의 루틴이 이미 끝났어도 관리자가 수정할 땐 그대로 보이게 목록에 넣어줌
+  if (isAdmin && routineId!=null && !opts.some(r=>r.id===routineId)) { const r=(state.routines||[]).find(x=>x.id===routineId); if(r) opts.push(r); }
+  const canNotice = isAdmin || opts.length>0;
+  const hide = !canNotice || (editing && !isAdmin);
+  document.getElementById('kPostNoticeWrap').style.display = hide ? 'none' : 'flex';
+  document.getElementById('kPostIsNotice').checked = !hide && isNotice;
+  document.getElementById('kPostNoticeHint').textContent = isAdmin ? '(끄면 일반 글로 올라가요)' : '(담당 루틴 참여자에게 인증 화면 맨 위로 고정돼요)';
+  const sel = document.getElementById('kPostRoutine');
+  sel.innerHTML = (isAdmin ? '<option value="">📢 전체 공지 (모든 루틴 사람에게)</option>' : '')
+    + opts.map(r=>`<option value="${r.id}">${r.emoji} ${r.title}</option>`).join('');
+  sel.value = routineId!=null ? String(routineId) : (isAdmin ? '' : (opts[0] ? String(opts[0].id) : ''));
+  document.getElementById('kPostRoutineHint').textContent = isAdmin ? '루틴을 고르면 그 루틴 참여자에게만 보여요' : '내가 담당한 루틴 중에서 골라요';
+  _kNoticeRoutineWrapSync();
+}
+let _kWriteReturnRoutineId = null;
+function openKWriteSheet(routineId) {
   editingPostId = null;
+  _kWriteReturnRoutineId = typeof routineId==='number' ? routineId : null;
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
-  _setKNoticeToggle(true);
+  // 관리자는 예전처럼 기본이 공지, 끗짱은 기본이 일반 소식(루틴 화면의 「공지 쓰기」로 들어오면 공지)
+  _setKNoticeToggle(state.loginType==='both' || typeof routineId==='number', typeof routineId==='number' ? routineId : null, false);
   document.querySelector('#kWriteSheetBg .primary-btn').textContent = '게시하기';
   openSheet('kWriteSheetBg');
 }
@@ -6117,8 +6200,10 @@ async function kSubmitPost() {
   const t = document.getElementById('kPostTitle').value.trim();
   const c = document.getElementById('kPostContent').value.trim();
   const isAdmin = state.loginType==='both';
-  const asNotice = isAdmin && document.getElementById('kPostIsNotice').checked;
+  const asNotice = document.getElementById('kPostNoticeWrap').style.display!=='none' && document.getElementById('kPostIsNotice').checked;
+  const noticeRid = asNotice ? _kNoticeRoutineId() : null;
   if(!t||!c){ alert('제목과 내용을 입력해주세요.'); return; }
+  if(asNotice && !isAdmin && noticeRid==null){ alert('공지를 보여줄 루틴을 골라주세요.'); return; }
   if(!currentUser){alert('로그인이 필요해요.');return;}
   // 저장이 끝나고 시트가 닫힐 때까지 버튼을 잠가둠 — 안 그러면 수정 저장 직후
   // editingPostId가 비워진 상태에서 한 번 더 눌렀을 때 "새 글" 분기로 들어가 복사본이 생김(QA)
@@ -6130,7 +6215,7 @@ async function kSubmitPost() {
       const payload = { title:t, content:c };
       // 종류는 관리자만 바꿀 수 있음. 공지 → 일반 글로 바뀌면 숨김도 같이 풀어줌
       // (숨기기 버튼은 공지에만 있어서, 숨긴 채로 일반 글이 되면 다시 보이게 할 방법이 없음)
-      if(isAdmin) { payload.type = asNotice ? 'notice' : 'kpost'; if(!asNotice) payload.hidden = false; }
+      if(isAdmin) { payload.type = asNotice ? 'notice' : 'kpost'; payload.routine_id = noticeRid; if(!asNotice) payload.hidden = false; }
       const { error } = await sb.from('posts').update(payload).eq('id', editingPostId);
       if(error){ alert('수정 실패: '+error.message); return; }
       editingPostId = null;
@@ -6138,7 +6223,8 @@ async function kSubmitPost() {
       const kcEl = document.getElementById('kPostContent');
       const { error } = await sb.from('posts').insert({
         type: asNotice ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
-        ..._mentionPayload(_extractMentions(c, null, kcEl._mnPicked)),
+        routine_id: noticeRid,
+        ..._mentionPayload(_extractMentions(c, noticeRid, kcEl._mnPicked)),
       });
       kcEl._mnPicked = new Set();
       if(error){ alert('게시 실패: '+error.message); return; }
@@ -6149,6 +6235,8 @@ async function kSubmitPost() {
     document.getElementById('kPostContent').value='';
     if(state.currentRole==='youth') { renderComm(commFilter); }
     else { kResetReviewFilter(); kRenderReviewTab('all'); kRenderMy(); }
+    if(_kWriteReturnRoutineId!=null && _isOverlayOpen('routineDetailOverlay')) openKRoutineDetail(_kWriteReturnRoutineId);
+    _kWriteReturnRoutineId = null;
   } finally {
     btn.disabled = false;
   }
