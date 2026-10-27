@@ -238,6 +238,11 @@
       <textarea id="rtDesc" placeholder="루틴 소개 — 어떤 활동인지 알려주세요." maxlength="200" rows="3" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
       <textarea id="rtCertGuide" placeholder="인증 방법 (선택) — 예) 아침에 일어나자마자 물 한 잔 마시는 사진과 함께 오늘의 다짐을 적어주세요." maxlength="200" rows="2" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:inherit;"></textarea>
       <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">신청 질문 (선택) — 신청할 때 「참여 각오」 아래에서 추가로 묻는 질문이에요. 최대 5개, 답은 관리자만 볼 수 있어요</div>
+        <div id="rtQuestions"></div>
+        <button type="button" onclick="addRtQuestion()" style="padding:7px 12px;background:#fff;color:#2E33BC;border:1px dashed #2E33BC;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">+ 질문 추가</button>
+      </div>
+      <div style="margin-bottom:10px;">
         <div style="font-size:11px;color:#888;margin-bottom:4px;">인증 예시 사진 <span style="color:#c00;">*</span> — 청소년에게 어떻게 인증하면 되는지 보여주는 예시 사진</div>
         <input type="file" id="rtPhotoInput" accept="image/*" onchange="handleRoutinePhotoUpload(event)">
         <div id="rtPhotoPreviewWrap" style="display:none;margin-top:8px;"><img id="rtPhotoPreview" style="max-width:160px;max-height:100px;border-radius:8px;display:block;"></div>
@@ -634,7 +639,7 @@ let editingRewardId = null;
 let bannerRows = [];
 let sortKey = null, sortDir = 1;
 let selectedIds = new Set();
-let rawParticipants = [], rawCerts = [];
+let rawParticipants = [], rawCerts = [], rawAnswers = {};
 let profileById = {};
 let charts = {};
 
@@ -705,6 +710,10 @@ async function loadData() {
   const routines = routRes.data || [];
   rawParticipants = rps;
   rawCerts = certRes.data || [];
+  // 신청 질문 답변(관리자만 읽음). 마이그레이션 2026-10-27b 전이면 에러 → 빈 목록
+  rawAnswers = {};
+  const aaRes = await sb.from('routine_application_answers').select('routine_id,user_id,answers');
+  (aaRes.data || []).forEach(a => { rawAnswers[a.routine_id + '_' + a.user_id] = Array.isArray(a.answers) ? a.answers : []; });
   const nameById = {};
   profileById = {};
   profiles.forEach(p => { nameById[p.id] = p.name; profileById[p.id] = { name: p.name, realName: p.real_name || '', phone: p.phone || '' }; });
@@ -751,6 +760,7 @@ async function loadData() {
     archived: !!r.archived, leaderName: nameById[r.led_by] || nameById[r.created_by] || '-',
     ledBy: r.led_by || null, emoji: r.emoji || '🌱', description: r.description || '',
     certGuide: r.cert_guide || '',
+    applicationQuestions: Array.isArray(r.application_questions) ? r.application_questions.filter(q => q && q.q) : [],
     partnerOrg: r.partner_org || null, eligibility: r.eligibility || 'all',
     recruitStartDate: r.recruit_start_date || '', recruitEndDate: r.recruit_end_date || '',
     kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || '',
@@ -962,6 +972,7 @@ function closeRoutineParticipants() {
   document.getElementById('participantsModalBg').style.display = 'none';
   participantsModalRoutineId = null;
 }
+function _adminEsc(t) { return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function renderRoutineParticipants() {
   const r = routineRows.find(x => x.id === participantsModalRoutineId);
   if (!r) return;
@@ -974,6 +985,7 @@ function renderRoutineParticipants() {
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:#111;">${prof.name || '-'}${prof.realName ? ' (' + prof.realName + ')' : ''}</div>
         <div style="font-size:11px;color:#888;">${prof.phone || '연락처 없음'}${p.application_note ? ' · ' + p.application_note : ''}</div>
+        ${(rawAnswers[p.routine_id + '_' + p.user_id] || []).map(a => `<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.5;"><span style="color:#2E33BC;font-weight:600;">Q.</span> ${_adminEsc(a.q)}<br><span style="color:#FF006C;font-weight:600;">A.</span> ${_adminEsc(a.a) || '<span style="color:#bbb;">(답 없음)</span>'}</div>`).join('')}
       </div>
       <span class="pill" style="background:${p.status==='approved'?'#EAF3DE':p.status==='rejected'?'#f5f5f5':'#FFF3CD'};color:${p.status==='approved'?'#3B6D11':p.status==='rejected'?'#aaa':'#856404'};">${RP_STATUS_LABEL[p.status]||p.status}</span>
       ${p.status==='pending' ? `<button onclick="adminApproveApplicant('${p.user_id}')" style="padding:5px 10px;background:#2E33BC;color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;">승인</button><button onclick="adminRejectApplicant('${p.user_id}')" style="padding:5px 10px;background:#fff;color:#888;border:1px solid #ddd;border-radius:8px;font-size:11px;cursor:pointer;">거절</button>` : ''}
@@ -1044,8 +1056,27 @@ function populateRtLeaderSelect(selectedId) {
   sel.value = selectedId || '';
 }
 
+// 신청 질문 편집기 — [{text, required}], 저장할 땐 [{q, required}]로 바꿔 routines.application_questions에 넣음
+let rtQuestions = [];
+function renderRtQuestions() {
+  document.getElementById('rtQuestions').innerHTML = rtQuestions.map((q, i) => `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <input type="text" value="${String(q.text).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" maxlength="100" placeholder="질문 ${i+1} (예: 이 루틴에서 가장 해보고 싶은 것은?)" oninput="rtQuestions[${i}].text=this.value" style="flex:1;min-width:0;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;">
+      <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#555;flex-shrink:0;cursor:pointer;"><input type="checkbox" ${q.required?'checked':''} onchange="rtQuestions[${i}].required=this.checked">필수</label>
+      <button type="button" onclick="removeRtQuestion(${i})" style="background:none;border:none;color:#c00;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" aria-label="질문 삭제">✕</button>
+    </div>`).join('');
+}
+function addRtQuestion() {
+  if (rtQuestions.length >= 5) { alert('질문은 최대 5개까지 추가할 수 있어요.'); return; }
+  rtQuestions.push({ text: '', required: true });
+  renderRtQuestions();
+  const ins = document.querySelectorAll('#rtQuestions input[type="text"]');
+  if (ins.length) ins[ins.length - 1].focus();
+}
+function removeRtQuestion(i) { rtQuestions.splice(i, 1); renderRtQuestions(); }
 function resetRoutineForm() {
   editRoutineAdminId = null;
+  rtQuestions = []; renderRtQuestions();
   rtEmoji = '🌱'; rtCoverUrl = null;
   ['rtName','rtPartner','rtRecruitStart','rtRecruitEnd','rtStart','rtEnd','rtKickoff','rtClosing','rtMeetingLink','rtMinPeople','rtDesc','rtCertGuide'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('rtMaxPeople').value = 10;
@@ -1104,6 +1135,8 @@ function editRoutineAdmin(id) {
   document.getElementById('rtMeetingLink').value = r.meetingLink || '';
   document.getElementById('rtDesc').value = r.description || '';
   document.getElementById('rtCertGuide').value = r.certGuide || '';
+  rtQuestions = (r.applicationQuestions || []).map(q => ({ text: q.q || '', required: q.required !== false }));
+  renderRtQuestions();
   document.getElementById('rtEligibility').value = r.eligibility || 'all';
   document.getElementById('rtType').value = r.isFree ? 'free' : 'fixed';
   document.getElementById('rtPointAmount').value = r.certPointAmount || 10;
@@ -1173,6 +1206,10 @@ async function submitRoutineAdmin() {
     max_people: parseInt(maxPeople), min_people: minPeople ? parseInt(minPeople) : null,
     cover_image_url: rtCoverUrl, pinned, camera_only: cameraOnly,
   };
+  // 신청 질문 — 빈 칸은 버림. 질문이 없고 원래도 없던 루틴은 컬럼을 건드리지 않음(마이그레이션 2026-10-27b 전에도 저장되게)
+  const questions = rtQuestions.map(q => ({ q: (q.text || '').trim(), required: !!q.required })).filter(q => q.q);
+  const hadQuestions = editRoutineAdminId && ((routineRows.find(x => x.id === editRoutineAdminId) || {}).applicationQuestions || []).length > 0;
+  if (questions.length || hadQuestions) payload.application_questions = questions;
 
   const btn = document.getElementById('rtSubmitBtn');
   btn.disabled = true; btn.textContent = editRoutineAdminId ? '저장 중...' : '등록 중...';

@@ -3973,3 +3973,31 @@ REVOKE EXECUTE ON FUNCTION guard_post_insert() FROM anon;
 DROP TRIGGER IF EXISTS trg_guard_post_insert ON posts;
 CREATE TRIGGER trg_guard_post_insert BEFORE INSERT ON posts
   FOR EACH ROW EXECUTE FUNCTION guard_post_insert();
+
+
+-- =====================================================
+-- [마이그레이션 2026-10-27b] 루틴별 신청 질문 — 관리자가 루틴을 만들 때 질문을 추가
+-- 정책(사용자 결정): 신청 화면의 기존 「참여 각오 / 소감」 칸은 그대로 두고, 그 아래에 관리자가 정한 질문(여러 개,
+--   단답형, 질문마다 필수 여부)을 추가로 묻는다. 답은 관리자(와 본인)만 볼 수 있다.
+-- · routines.application_questions: [{"q":"질문","required":true}, …] (최대 5개는 화면에서 제한)
+-- · 답은 routine_participants가 아니라 별도 테이블에 둔다 — routine_participants는 로그인한 사람이면 누구나 행을
+--   읽을 수 있어서(참여 인원 계산용), 질문 답이 거기 섞이면 다른 청소년도 API로 볼 수 있게 됨.
+--   새 테이블은 본인과 관리자만 읽음.
+-- · 질문을 나중에 바꿔도 이미 받은 답이 헷갈리지 않게 답에는 질문 문구를 같이 저장: [{"q":"질문","a":"답"}, …]
+-- =====================================================
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS application_questions jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+CREATE TABLE IF NOT EXISTS routine_application_answers (
+  routine_id bigint NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+  user_id    uuid   NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  answers    jsonb  NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (routine_id, user_id)
+);
+ALTER TABLE routine_application_answers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "raa_select" ON routine_application_answers;
+CREATE POLICY "raa_select" ON routine_application_answers FOR SELECT USING (user_id = auth.uid() OR is_admin());
+DROP POLICY IF EXISTS "raa_insert" ON routine_application_answers;
+CREATE POLICY "raa_insert" ON routine_application_answers FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "raa_update" ON routine_application_answers;
+CREATE POLICY "raa_update" ON routine_application_answers FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());

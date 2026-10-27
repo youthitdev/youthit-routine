@@ -968,6 +968,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
         <div class="field-label">참여 각오 / 소감 <span class="required">* 필수</span></div>
         <textarea id="applyNote" rows="5" placeholder="이 루틴을 신청하는 이유나 각오를 10자 이상 적어주세요." maxlength="300"></textarea>
       </div>
+      <div id="applyQuestionsWrap" style="display:flex;flex-direction:column;gap:16px;"></div>
       <button class="primary-btn" onclick="submitApplyRoutine()">신청하기</button>
     </div>
   </div>
@@ -1029,6 +1030,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div id="rPointFieldWrap"><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#333;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="rNadaeumEnabled" checked onchange="onNadaeumToggle()" style="width:16px;height:16px;">✨ 나다움 포인트 지급 <span style="font-size:11px;color:#aaa;">(별도로 보상을 주는 루틴이면 끄세요)</span></label><div class="field-label">인증당 지급 포인트 <span style="font-size:11px;color:#aaa;font-weight:400;">선택, 기본 10N</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="number" id="rPointAmount" min="1" max="1000" value="10" style="width:80px;text-align:center;"><span style="font-size:12px;color:#888;">N — 인증 1회마다 지급되는 나다움 포인트예요</span></div></div>
       <div><div class="field-label">루틴 소개 <span class="required">* 필수</span></div><textarea id="rDesc" rows="4" placeholder="어떤 활동인지 알려주세요." maxlength="200" oninput="updateCreatePreview();document.getElementById('descCount').textContent=this.value.length"></textarea><div class="char-end"><span id="descCount">0</span>/200</div></div>
       <div><div class="field-label">인증 방법 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><textarea id="rCertGuide" rows="3" placeholder="예) 아침에 일어나자마자 물 한 잔 마시는 사진과 함께 오늘의 다짐을 적어주세요." maxlength="200" oninput="document.getElementById('certGuideCount').textContent=this.value.length"></textarea><div class="char-end"><span id="certGuideCount">0</span>/200</div></div>
+      <div><div class="field-label">신청 질문 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">신청할 때 「참여 각오」 아래에서 추가로 묻는 질문이에요. 최대 5개, 답은 관리자만 볼 수 있어요.</div><div id="rQuestions"></div><button type="button" onclick="addRQuestion()" style="padding:8px 14px;background:#fff;color:#2E33BC;border:1px dashed #2E33BC;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">+ 질문 추가</button></div>
       <div><div class="field-label">인증 예시 사진 <span class="required" id="createPhotoRequiredMark">* 필수</span></div><div style="font-size:11px;color:#888;margin-bottom:6px;">청소년들이 어떻게 인증해야 하는지 보여주는 예시 사진이에요.</div><div class="photo-upload" id="createPhotoUpload" onclick="document.getElementById('createPhotoInput').click()"><i class="ti ti-camera" style="font-size:28px;color:#aaa;"></i><div style="font-size:13px;color:#aaa;">예시 사진 추가</div><div style="font-size:11px;color:#FF006C;display:flex;align-items:center;gap:3px;" id="createPhotoLockHint"><i class="ti ti-lock" style="font-size:11px;"></i>사진 없이 등록 불가</div></div><input type="file" id="createPhotoInput" accept="image/*" style="display:none;" onchange="handleCreatePhoto(event)"></div>
       <div><div class="field-label">미리보기</div><div class="preview-rcard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:22px;" id="pvEmoji">🌱</span><span style="font-size:15px;font-weight:600;color:white;" id="pvName">루틴 이름을 입력해주세요</span></div><div id="pvPartner" style="display:none;font-size:11px;color:rgba(255,255,255,0.9);margin-bottom:6px;"></div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:10px;" id="pvDesc">루틴 소개를 입력하면 여기에 표시돼요.</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;" id="pvPeriod">기간 미설정</span><span style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.2);color:white;"><span id="pvPeople">10</span>명 모집</span></div></div></div>
       <button class="primary-btn" id="createSubmitBtn" onclick="submitCreateRoutine()">루틴 등록하기</button>
@@ -2025,6 +2027,12 @@ async function loadRoutines() {
   (peopleCountRes.data || []).forEach(p => peopleCountById[p.routine_id] = p.people);
   const today = _todayStr();
   const isAdmin = currentUser ? ADMINS.includes(currentUser.email) : false;
+  // 신청 질문 답변은 관리자만 읽음(마이그레이션 2026-10-27b 전이면 에러 → 빈 목록)
+  state.appAnswers = {};
+  if (isAdmin) {
+    const aaRes = await sb.from('routine_application_answers').select('routine_id,user_id,answers');
+    (aaRes.data || []).forEach(a => { state.appAnswers[a.routine_id+'_'+a.user_id] = Array.isArray(a.answers) ? a.answers : []; });
+  }
   state.routines = routines.map(r => {
     const rParts = parts.filter(p => p.routine_id === r.id);
     const rCerts = certs.filter(c => c.routine_id === r.id);
@@ -2065,6 +2073,7 @@ async function loadRoutines() {
       isFree: !!r.is_free, completionRatioPct: r.completion_ratio_pct || 67, certPointAmount: r.cert_point_amount || 10, nadaeumEnabled: r.nadaeum_enabled !== false, pinned: !!r.pinned, cameraOnly: !!r.camera_only,
       people: currentUser ? approved.filter(p => isYouthId(p.user_id) && p.user_id !== r.led_by).length : (peopleCountById[r.id] || 0), maxPeople: r.max_people || 10, minPeople: r.min_people || null,
       desc: r.description || '', certGuide: r.cert_guide || '', partnerOrg: r.partner_org || null,
+      applicationQuestions: Array.isArray(r.application_questions) ? r.application_questions.filter(q=>q && q.q) : [],
       eligibility: r.eligibility || 'all',
       kickoffAt: r.kickoff_at || null, closingAt: r.closing_at || null, meetingLink: r.meeting_link || null,
       certCount: rCerts.length, avgRate: 0, createdBy: r.created_by, ledBy: r.led_by || null,
@@ -3961,6 +3970,10 @@ function openApplyOverlay(id){
   applyDuration=null;
   document.querySelectorAll('#applyDurationRow .role-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('applyDurationFieldWrap').style.display = (r&&r.isFree)?'':'none';
+  // 관리자가 이 루틴에 추가한 신청 질문(단답)
+  document.getElementById('applyQuestionsWrap').innerHTML = ((r&&r.applicationQuestions)||[]).map((q,i)=>`
+    <div><div class="field-label">${_escHtml(q.q)} ${q.required!==false?'<span class="required">* 필수</span>':'<span style="font-size:11px;color:#aaa;font-weight:400;">선택</span>'}</div>
+    <textarea id="applyQ_${i}" rows="2" maxlength="200" placeholder="짧게 적어주세요."></textarea></div>`).join('');
   openOverlay('applyRoutineOverlay');
 }
 async function submitApplyRoutine(){
@@ -3973,12 +3986,26 @@ async function submitApplyRoutine(){
     return;
   }
   if(r && r.isFree && !applyDuration){ alert('참여 기간을 선택해주세요.'); return; }
+  // 신청 질문 답 모으기 — 필수인데 비어 있으면 막음
+  const qs = (r&&r.applicationQuestions)||[];
+  const answers = [];
+  for(let i=0;i<qs.length;i++){
+    const a = (document.getElementById('applyQ_'+i)||{value:''}).value.trim();
+    if(qs[i].required!==false && !a){ alert(`「${qs[i].q}」에 답해주세요.`); return; }
+    answers.push({ q:qs[i].q, a });
+  }
   const _today = _todayStr();
   if(r && !r.isFree && r.recruitStartDate && _today < r.recruitStartDate){ alert('아직 모집 시작 전이에요.'); return; }
   if(r && !r.isFree && r.recruitEndDate && _today > r.recruitEndDate){ alert('모집이 마감됐어요.'); return; }
   if((state.youth.pendingRoutines||[]).includes(id)) return;
   const btn=document.querySelector('#applyRoutineOverlay .primary-btn');
   if(btn){btn.disabled=true;btn.textContent='신청 중...';}
+  // 답을 먼저 저장 — 실패하면 신청 자체를 막아서 "필수 답 없는 신청"이 생기지 않게 함
+  if(answers.length){
+    const { error: aErr } = await sb.from('routine_application_answers').upsert(
+      { routine_id:id, user_id:currentUser.id, answers, updated_at:new Date().toISOString() }, { onConflict:'routine_id,user_id' });
+    if(aErr){ if(btn){btn.disabled=false;btn.textContent='신청하기';} alert('신청 질문 답을 저장하지 못했어요: '+aErr.message); return; }
+  }
   const { error } = await sb.from('routine_participants').upsert({
     routine_id:id, user_id:currentUser.id, status:'pending', application_note:note, reject_reason:null,
     duration_days: r&&r.isFree ? applyDuration : null,
@@ -5734,6 +5761,7 @@ function openKRoutineDetail(routineId) {
                 :`<span style="font-size:11px;padding:3px 9px;border-radius:10px;background:#f5f5f5;color:#aaa;">✗ 거절</span>`}
               </div>
               ${a.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:#555;line-height:1.5;white-space:pre-wrap;">💬 ${a.note}</div>`:''}
+              ${((state.appAnswers||{})[routineId+'_'+a.userId]||[]).map(x=>`<div style="margin-top:6px;padding:8px 10px;background:#f0f1fb;border-radius:8px;font-size:12px;color:#333;line-height:1.5;"><div style="color:#2E33BC;font-weight:600;">${_escHtml(x.q)}</div><div style="white-space:pre-wrap;">${_escHtml(x.a)||'<span style="color:#aaa;">(답 없음)</span>'}</div></div>`).join('')}
               ${a.status==='rejected'&&a.rejectReason?`<div style="margin-top:6px;padding:8px 10px;background:#FBEAF0;border-radius:8px;font-size:11px;color:#993556;line-height:1.5;white-space:pre-wrap;">거절 사유: ${a.rejectReason}</div>`:''}
             </div>`).join('')}
         </div>`)
@@ -5896,7 +5924,26 @@ async function populateLeaderSelect(selectedId) {
     if(selectedId) sel.value = selectedId;
   }
 }
+// 신청 질문 편집기 — [{text, required}] (저장할 땐 [{q, required}])
+let createQuestions = [];
+function renderRQuestions() {
+  document.getElementById('rQuestions').innerHTML = createQuestions.map((q, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <input type="text" value="${_escHtml(q.text).replace(/"/g,'&quot;')}" maxlength="100" placeholder="질문 ${i+1} (예: 이 루틴에서 가장 해보고 싶은 것은?)" oninput="createQuestions[${i}].text=this.value" style="flex:1;min-width:0;">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#555;flex-shrink:0;cursor:pointer;"><input type="checkbox" ${q.required?'checked':''} onchange="createQuestions[${i}].required=this.checked" style="width:15px;height:15px;">필수</label>
+      <button type="button" onclick="removeRQuestion(${i})" style="background:none;border:none;color:#c00;font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;" aria-label="질문 삭제">✕</button>
+    </div>`).join('');
+}
+function addRQuestion() {
+  if(createQuestions.length>=5){ alert('질문은 최대 5개까지 추가할 수 있어요.'); return; }
+  createQuestions.push({ text:'', required:true });
+  renderRQuestions();
+  const ins=document.querySelectorAll('#rQuestions input[type="text"]');
+  if(ins.length) ins[ins.length-1].focus();
+}
+function removeRQuestion(i) { createQuestions.splice(i,1); renderRQuestions(); }
 function resetCreateForm() {
+  createQuestions=[]; renderRQuestions();
   ['rName','rPartner','rDesc','rCertGuide','rRecruitStart','rRecruitEnd','rStart','rEnd','rKickoff','rClosing','rMeetingLink','rLeader','rMinPeople'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('rPeople').value=10;
   document.getElementById('rPointAmount').value=10;
@@ -5943,6 +5990,8 @@ async function openEditRoutine(routineId) {
   document.getElementById('rMinPeople').value = r.minPeople || '';
   document.getElementById('rDesc').value = r.desc || '';
   document.getElementById('rCertGuide').value = r.certGuide || '';
+  createQuestions = (r.applicationQuestions||[]).map(q=>({ text:q.q||'', required:q.required!==false }));
+  renderRQuestions();
   document.getElementById('rKickoff').value = _dtLocalStr(r.kickoffAt);
   document.getElementById('rClosing').value = _dtLocalStr(r.closingAt);
   document.getElementById('rMeetingLink').value = r.meetingLink || '';
@@ -6016,7 +6065,8 @@ function _readCreateFormCommon(){
   const nadaeumEnabled=document.getElementById('rNadaeumEnabled').checked;
   const pinned=document.getElementById('rPinned').checked;
   const cameraOnly=document.getElementById('rCameraOnly').checked;
-  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,pointAmount,nadaeumEnabled,pinned,cameraOnly};
+  const questions=createQuestions.map(q=>({ q:(q.text||'').trim(), required:!!q.required })).filter(q=>q.q);
+  return {n,d,certGuide,partner,rs,re,s,e,p,mp,kickoff,closing,meetLink,leader,isFree,pointAmount,nadaeumEnabled,pinned,cameraOnly,questions};
 }
 function _validateCreateForm(f){
   if(!f.n) return '루틴 이름을 입력해주세요.';
@@ -6058,6 +6108,7 @@ async function submitCreateRoutine(){
     is_free:f.isFree, completion_ratio_pct:67, cert_point_amount:f.isFree?10:(f.nadaeumEnabled?parseInt(f.pointAmount):(parseInt(f.pointAmount)||10)), nadaeum_enabled:f.nadaeumEnabled,
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     status:'recruit', created_by:currentUser.id, led_by:f.leader||currentUser.id, cover_image_url:coverUrl,
+    ...(f.questions.length ? { application_questions:f.questions } : {}),
   });
   if(btn){btn.disabled=false;btn.textContent='루틴 등록하기';}
   if(error){ alert('루틴 등록 실패: '+error.message); return; }
@@ -6090,6 +6141,8 @@ async function submitEditRoutine(){
     recruit_start_date:f.isFree?null:f.rs, recruit_end_date:f.isFree?null:f.re, start_date:f.isFree?null:f.s, end_date:f.isFree?null:f.e, max_people:parseInt(f.p), min_people:f.mp?parseInt(f.mp):null, pinned:f.pinned, camera_only:f.cameraOnly,
     cover_image_url:coverUrl,
   };
+  { const hadQ=((state.routines.find(x=>x.id===editRoutineId)||{}).applicationQuestions||[]).length>0;
+    if(f.questions.length || hadQ) payload.application_questions = f.questions; }
   if(state.loginType==='both') payload.led_by = f.leader;
   const routineId = editRoutineId;
   const { data, error } = await sb.from('routines').update(payload).eq('id', routineId).select('id');
