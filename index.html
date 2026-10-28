@@ -3038,6 +3038,31 @@ function _setCertFloatingBtn(r) {
 // opts.locked: 참여하지 않은 루틴의 미리보기 모드(QA: "다른 루틴게시글도 볼 수 있으면
 // 좋겠다 - 단, 썸네일까지는 가능하지만 클릭하여 내용은 볼 수 없도록") — 사진만 보여주고
 // 이름·소감·좋아요·댓글은 숨기고 클릭도 막음(상세 화면은 어차피 서버 RLS로도 막혀있음)
+// 루틴 인증 화면의 「전체 인증 기록」 섹션 — 제목 옆 「오늘 N건」과 「내 인증만」 토글(청소년·끗짱 화면 공용).
+// kind: 'Y'(청소년 피드) | 'K'(끗짱 피드). 필터 상태는 화면을 새로 열 때만 초기화(인증 상세에 다녀와도 유지)
+let _feedMineOnly = false;
+function _feedSectionHtml(routineId, kind) {
+  const r = state.routines.find(x=>x.id===routineId);
+  const done = !!r && r.status==='done';
+  const all = (state.certFeed||[]).filter(c=>c.routineId===routineId);
+  const todayN = all.filter(c=>_isToday(c.ts)).length;
+  const certs = _feedMineOnly ? all.filter(c=>currentUser && c.userId===currentUser.id) : all;
+  const notices = _routineNotices(routineId);
+  const on = _feedMineOnly;
+  const head = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+    <div style="font-size:13px;font-weight:600;color:#111;">📸 ${done?'그동안의 인증 기록':'전체 인증 기록'}${done?'':` <span style="font-size:11px;color:#2E33BC;font-weight:600;margin-left:4px;">오늘 ${todayN}건</span>`}</div>
+    <button onclick="toggleFeedMine(${routineId},'${kind}')" style="flex-shrink:0;padding:5px 11px;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on?'#2E33BC':'#ddd'};background:${on?'#2E33BC':'#fff'};color:${on?'#fff':'#666'};">${on?'✓ ':''}내 인증만</button>
+  </div>`;
+  const emptyText = on ? '아직 내가 올린 인증이 없어요' : (kind==='Y' ? '🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾' : '아직 인증글이 없어요');
+  const empty = `<div style="padding:${kind==='Y'&&!on?'48px':'32px'} 16px;text-align:center;color:#aaa;font-size:${kind==='Y'&&!on?'14px':'13px'};line-height:1.6;">${emptyText}</div>`;
+  if (!certs.length && !notices.length) return head + empty;
+  return head + _certFeedGridHtml(certs, { notices }) + (certs.length===0 ? empty : '');
+}
+function toggleFeedMine(routineId, kind) {
+  _feedMineOnly = !_feedMineOnly;
+  const el = document.getElementById('feedSection'+kind);
+  if (el) el.innerHTML = _feedSectionHtml(routineId, kind);
+}
 // 공지 칸 — 인증글 칸과 같은 크기·모양으로 그리드 맨 앞에 고정(📢 공지 배지, 사진이 없으면 제목이 큰 글씨로)
 function _noticeTileHtml(p) {
   const hasPhoto = !!p.photoUrl;
@@ -3100,6 +3125,7 @@ function _certFeedGridHtml(certs, opts) {
 }
 async function openRoutineFeed(routineId) {
   currentFeedRoutineId=routineId;
+  _feedMineOnly = false;
   const r=state.routines.find(x=>x.id===routineId);
   document.getElementById('feedOverlaySub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('feedOverlayTitle').textContent=r.emoji+' '+r.title;
@@ -3154,12 +3180,8 @@ async function openRoutineFeed(routineId) {
         <button onclick="openReportCard(${r.id})" style="flex:1;padding:11px 8px;background:#fff;color:#3B6D11;border:1.5px solid #83CA00;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">📤 공유</button>
       </div>` : ''}
     </div>
-    <div style="padding:4px 16px 0;font-size:13px;font-weight:600;color:#111;">📸 그동안의 인증 기록</div>
   ` : '';
-  const notices = _routineNotices(routineId);
-  const gridHtml = (certs.length===0 && notices.length===0)
-    ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
-    : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs, { notices })}</div>`;
+  const gridHtml = `<div id="feedSectionY" style="padding:12px 16px 16px;">${_feedSectionHtml(routineId, 'Y')}</div>`;
   const adminPeekHtml = (state.loginType==='both' && !isParticipant)
     ? `<div style="margin:12px 16px 0;padding:9px 12px;background:#f0f1fb;border-radius:10px;font-size:12px;color:#2E33BC;font-weight:600;">👀 관리자 보기 — 참여하지 않은 루틴이에요</div>` : '';
   document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + completeActionsHtml + gridHtml;
@@ -5686,6 +5708,7 @@ function kFilterRoutine(type,el) {
   }).join('');
 }
 function openKRoutineFeed(routineId) {
+  _feedMineOnly = false;
   _openInRoutineDetail(() => _renderKRoutineFeed(routineId));
 }
 function _renderKRoutineFeed(routineId) {
@@ -5695,54 +5718,14 @@ function _renderKRoutineFeed(routineId) {
   const yParts=_youthParts(r);
   const achievers=yParts.filter(p=>p.cert>=certGoal).length;
   const rate=yParts.length?Math.round(achievers/yParts.length*100):0;
-  const colors=['#B5D4F4','#C0DD97','#FAC775','#F4C0D1'];
   document.getElementById('rdSub').textContent=r.period+' · '+r.people+'명 참여';
   document.getElementById('rdTitle').textContent=r.emoji+' '+r.title;
-  // 담당 끗짱(또는 관리자)은 정식 참여자(routine_participants)가 아니어도 자기 루틴에
-  // 바로 인증할 수 있어서, 참여자 목록만 기준으로 그리면 본인 인증이 "오늘 인증 현황"
-  // 그리드에서 빠지고 아래 "전체 인증 기록"에만 보이는 문제가 있었음 — 참여자 목록에
-  // 없는 사람이 오늘 인증한 경우 별도 타일로 추가해서 그리드에도 같이 보이게 함
-  const certs=(state.certFeed||[]).filter(c=>c.routineId===routineId);
-  const participantIds=new Set(yParts.map(p=>p.userId));
-  const seenExtra=new Set();
-  const extraTodayCerts=certs.filter(c=>{
-    if(participantIds.has(c.userId) || seenExtra.has(c.userId) || !_isToday(c.ts)) return false;
-    seenExtra.add(c.userId);
-    return true;
-  });
   document.getElementById('rdBody').innerHTML=`
     ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (총 ${totalDays}일 중 ${certGoal}일 이상)</div><div style="font-size:12px;color:#3B6D11;">${yParts.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
     </div>`}
-    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">오늘 인증 현황</div>
-    ${(()=>{
-      const doneParticipants=yParts.filter(p=>p.todayDone);
-      if(doneParticipants.length===0 && extraTodayCerts.length===0){
-        return `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;margin-bottom:20px;">🐈 지나가던 고양이가<br>오늘의 첫 인증글을 기다리는 중... 🐾</div>`;
-      }
-      // 타일 순서가 참여자 목록 순서(사실상 무작위)를 따라가서 최신순이 아닌 것처럼
-      // 보인다는 피드백(QA) — 참여자든 담당 끗짱(extra)이든 구분 없이 실제 인증 시각
-      // 기준으로 합쳐서 정렬(최신순), 나머지 "전체 인증 기록"과 기준을 통일함
-      const tiles = [
-        ...doneParticipants.map(p=>{
-          const todayCert=certs.filter(c=>c.userId===p.userId && _isToday(c.ts)).sort((a,b)=>b.ts-a.ts)[0];
-          return { ts: todayCert?todayCert.ts:0, photo: todayCert && todayCert.photos && todayCert.photos[0], isParticipant:true, p };
-        }),
-        ...extraTodayCerts.map(c=>({ ts:c.ts, photo:c.photos && c.photos[0], isParticipant:false, c })),
-      ].sort((a,b)=>b.ts-a.ts);
-      return `<div class="feed-grid" style="margin-bottom:20px;">
-        ${tiles.map((t,i)=>t.isParticipant
-          ? `<div class="feed-item" style="background:${t.photo?'#eee':colors[i%4]};" onclick="openKCertDetail(${r.id},'${t.p.name}')">${t.photo?`<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${t.p.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">${t.p.day}</div></div></div>`
-          : `<div class="feed-item" style="background:${t.photo?'#eee':colors[i%4]};" onclick="openCertFeedDetail(${t.c.id})">${t.photo?`<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:''}<div class="feed-overlay"><div style="font-size:11px;color:white;font-weight:500;">${t.c.name}</div><div style="font-size:10px;color:rgba(255,255,255,0.8);">담당 끗짱</div></div></div>`
-        ).join('')}
-      </div>`;
-    })()}
-    <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">📸 전체 인증 기록 <span style="font-size:11px;color:#aaa;font-weight:400;">(본인 인증 포함)</span></div>
-    ${(()=>{ const notices=_routineNotices(routineId);
-      return (certs.length===0 && notices.length===0)
-        ? `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;">아직 인증글이 없어요</div>`
-        : _certFeedGridHtml(certs, { notices }); })()}`;
+    <div id="feedSectionK">${_feedSectionHtml(routineId, 'K')}</div>`;
 }
 // 미인증 청소년에게 응원 보내기 (하루에 한 명당 한 번, DB unique 제약으로 방지)
 async function sendPoke(routineId, toUserId, name) {
