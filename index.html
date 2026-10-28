@@ -1195,6 +1195,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
       <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:16px;">커뮤니티 글쓰기</div>
       <div style="margin-bottom:12px;"><div class="field-label">제목</div><input type="text" id="kPostTitle" placeholder="제목을 입력해주세요" maxlength="50"></div>
       <div style="margin-bottom:16px;"><div class="field-label">내용</div><textarea id="kPostContent" rows="4" placeholder="청소년들에게 전하고 싶은 이야기를 적어주세요."></textarea></div>
+      <div style="margin-bottom:16px;"><div class="field-label">사진 <span style="font-size:11px;color:#aaa;font-weight:400;">선택</span></div><div class="photo-upload" id="kPostPhotoUpload" style="height:120px;" onclick="document.getElementById('kPostPhotoInput').click()"><i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div></div><input type="file" id="kPostPhotoInput" accept="image/*" style="display:none;" onchange="handleKPostPhoto(event)"></div>
       <label id="kPostNoticeWrap" style="display:none;align-items:center;gap:8px;font-size:13px;color:#333;margin-bottom:16px;cursor:pointer;"><input type="checkbox" id="kPostIsNotice" checked style="flex-shrink:0;" onchange="_kNoticeRoutineWrapSync()"><span>📢 공지로 등록 <span style="font-size:11px;color:#aaa;" id="kPostNoticeHint">(끄면 일반 글로 올라가요)</span></span></label>
       <div id="kPostRoutineWrap" style="display:none;margin-bottom:16px;"><div class="field-label">공지를 보여줄 루틴</div><select id="kPostRoutine"></select><div class="char-end" style="color:#bbb;" id="kPostRoutineHint"></div></div>
       <button class="primary-btn" onclick="kSubmitPost()">게시하기</button>
@@ -3037,9 +3038,39 @@ function _setCertFloatingBtn(r) {
 // opts.locked: 참여하지 않은 루틴의 미리보기 모드(QA: "다른 루틴게시글도 볼 수 있으면
 // 좋겠다 - 단, 썸네일까지는 가능하지만 클릭하여 내용은 볼 수 없도록") — 사진만 보여주고
 // 이름·소감·좋아요·댓글은 숨기고 클릭도 막음(상세 화면은 어차피 서버 RLS로도 막혀있음)
+// 공지 칸 — 인증글 칸과 같은 크기·모양으로 그리드 맨 앞에 고정(📢 공지 배지, 사진이 없으면 제목이 큰 글씨로)
+function _noticeTileHtml(p) {
+  const hasPhoto = !!p.photoUrl;
+  const likes = p.likes||0, cmts = (p.comments||[]).length;
+  return `<div onclick="openRoutineNotice(${p.id})" style="border-radius:12px;overflow:hidden;border:1px solid #c9cbf0;cursor:pointer;background:#fff;">
+    <div style="aspect-ratio:1;background:${hasPhoto?'#eee':'linear-gradient(135deg,#2E33BC,#6F74E8)'};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+      ${hasPhoto?`<img src="${p.photoUrl}" onerror="_retryImgLoad(this)" style="width:100%;height:100%;object-fit:cover;">`
+        :`<div style="padding:30px 14px 36px;font-size:15px;font-weight:700;color:#fff;line-height:1.45;text-align:center;word-break:keep-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${_escHtml(p.title||'')}</div>`}
+      <span style="position:absolute;top:8px;left:8px;background:#2E33BC;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:9px;">📢 공지</span>
+      ${p.hidden?`<span style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.9);color:#666;font-size:10px;font-weight:600;padding:3px 7px;border-radius:9px;">숨김</span>`:''}
+      <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.85) 100%);padding:14px 8px 7px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="font-size:11px;color:white;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,0.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_escHtml(p.author||'')}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.9);font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.9);flex-shrink:0;">${p.date||''}</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:8px 10px;">
+      ${hasPhoto?`<div style="font-size:12px;font-weight:700;color:#111;line-height:1.4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:2px;">${_escHtml(p.title||'')}</div>`:''}
+      <div style="font-size:12px;color:#333;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${_escHtml(p.content||'')}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;"><i class="ti ti-heart" style="font-size:13px;color:#ccc;"></i>${likes}</div>
+        <div style="display:flex;align-items:center;gap:3px;font-size:11px;color:#aaa;"><i class="ti ti-message-circle" style="font-size:13px;"></i>${cmts}</div>
+        <span style="font-size:10px;color:#ccc;margin-left:auto;">${timeAgo(p.ts)}</span>
+      </div>
+    </div>
+  </div>`;
+}
 function _certFeedGridHtml(certs, opts) {
   const locked = !!(opts && opts.locked);
+  const noticeTiles = (!locked && opts && opts.notices) ? opts.notices.map(_noticeTileHtml).join('') : '';
   return `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;">
+      ${noticeTiles}
       ${certs.map(c=>`
         <div ${locked?'':`onclick="openCertFeedDetail(${c.id})"`} style="border-radius:12px;overflow:hidden;border:0.5px solid #e8e8e8;${locked?'cursor:default;':'cursor:pointer;'}background:#fff;">
           <div style="aspect-ratio:1;background:${c.photos&&c.photos[0]?'#eee':c.color};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
@@ -3125,12 +3156,13 @@ async function openRoutineFeed(routineId) {
     </div>
     <div style="padding:4px 16px 0;font-size:13px;font-weight:600;color:#111;">📸 그동안의 인증 기록</div>
   ` : '';
-  const gridHtml = certs.length===0
+  const notices = _routineNotices(routineId);
+  const gridHtml = (certs.length===0 && notices.length===0)
     ? `<div style="padding:48px 16px;text-align:center;color:#aaa;font-size:14px;line-height:1.6;">🐈 지나가던 고양이가<br>첫 인증글을 기다리는 중... 🐾</div>`
-    : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs)}</div>`;
+    : `<div style="padding:12px 16px 16px;">${_certFeedGridHtml(certs, { notices })}</div>`;
   const adminPeekHtml = (state.loginType==='both' && !isParticipant)
     ? `<div style="margin:12px 16px 0;padding:9px 12px;background:#f0f1fb;border-radius:10px;font-size:12px;color:#2E33BC;font-weight:600;">👀 관리자 보기 — 참여하지 않은 루틴이에요</div>` : '';
-  document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + _routineNoticesHtml(routineId, '12px 16px 0') + completeActionsHtml + gridHtml;
+  document.getElementById('feedOverlayBody').innerHTML = adminPeekHtml + completeActionsHtml + gridHtml;
   const myR=state.routines.find(x=>x.id===routineId);
   _setCertFloatingBtn(myR);
   openOverlay('routineFeedOverlay');
@@ -4668,6 +4700,8 @@ function editPost(id) {
     document.getElementById('kPostTitle').value = p.title;
     document.getElementById('kPostContent').value = p.content;
     _setKNoticeToggle(p.type==='notice', p.routineId, true);
+    _resetKPostPhoto();
+    if(p.photoUrl) { kPostExistingPhotoUrl = p.photoUrl; _showKPostPhoto(p.photoUrl); }
     document.querySelector('#kWriteSheetBg .primary-btn').textContent = '수정 완료';
     openSheet('kWriteSheetBg');
   }
@@ -5677,7 +5711,6 @@ function _renderKRoutineFeed(routineId) {
     return true;
   });
   document.getElementById('rdBody').innerHTML=`
-    ${_routineNoticesHtml(routineId, '0 0 14px')}
     ${r.isFree ? '' : `<div style="background:#EAF3DE;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div><div style="font-size:12px;color:#3B6D11;margin-bottom:2px;">완주 기준 (총 ${totalDays}일 중 ${certGoal}일 이상)</div><div style="font-size:12px;color:#3B6D11;">${yParts.length}명 중 <strong>${achievers}명</strong> 완주 달성 중</div></div>
       <div style="font-size:28px;font-weight:600;color:#3B6D11;">${rate}%</div>
@@ -5706,9 +5739,10 @@ function _renderKRoutineFeed(routineId) {
       </div>`;
     })()}
     <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:8px;">📸 전체 인증 기록 <span style="font-size:11px;color:#aaa;font-weight:400;">(본인 인증 포함)</span></div>
-    ${certs.length===0
-      ? `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;">아직 인증글이 없어요</div>`
-      : _certFeedGridHtml(certs)}`;
+    ${(()=>{ const notices=_routineNotices(routineId);
+      return (certs.length===0 && notices.length===0)
+        ? `<div style="padding:32px 16px;text-align:center;color:#aaa;font-size:13px;line-height:1.6;">아직 인증글이 없어요</div>`
+        : _certFeedGridHtml(certs, { notices }); })()}`;
 }
 // 미인증 청소년에게 응원 보내기 (하루에 한 명당 한 번, DB unique 제약으로 방지)
 async function sendPoke(routineId, toUserId, name) {
@@ -6238,9 +6272,33 @@ function _setKNoticeToggle(isNotice, routineId, editing) {
   document.getElementById('kPostRoutineHint').textContent = isAdmin ? '루틴을 고르면 그 루틴 참여자에게만 보여요' : '내가 담당한 루틴 중에서 골라요';
   _kNoticeRoutineWrapSync();
 }
+// 끗짱 글쓰기(공지·소식) 사진 1장 — 후기 사진(reviewPhotoFile)과 같은 방식
+let kPostPhotoFile = null, kPostExistingPhotoUrl = null;
+function _resetKPostPhoto() {
+  kPostPhotoFile = null; kPostExistingPhotoUrl = null;
+  const pu = document.getElementById('kPostPhotoUpload');
+  pu.className = 'photo-upload';
+  pu.innerHTML = `<i class="ti ti-camera" style="font-size:24px;color:#aaa;"></i><div style="font-size:12px;color:#aaa;">사진 추가 (선택)</div>`;
+  pu.onclick = () => document.getElementById('kPostPhotoInput').click();
+  document.getElementById('kPostPhotoInput').value = '';
+}
+function _showKPostPhoto(url) {
+  const pu = document.getElementById('kPostPhotoUpload');
+  pu.className = 'photo-upload has-photo';
+  pu.innerHTML = `<img class="photo-prev-img" src="${url}"><div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.5);border-radius:20px;padding:3px 9px;font-size:11px;color:white;">변경</div>`;
+  pu.onclick = () => document.getElementById('kPostPhotoInput').click();
+}
+async function handleKPostPhoto(e) {
+  const f = e.target.files[0]; if(!f) return;
+  if(!f.type.startsWith('image/')) { alert('사진 파일만 첨부할 수 있어요.'); e.target.value=''; return; }
+  try { kPostPhotoFile = await _resizeImageFile(f, 1280, 0.82); }
+  catch(err) { alert('사진을 불러오지 못했어요.'); e.target.value=''; return; }
+  _showKPostPhoto(kPostPhotoFile);
+}
 let _kWriteReturnRoutineId = null;
 function openKWriteSheet(routineId) {
   editingPostId = null;
+  _resetKPostPhoto();
   _kWriteReturnRoutineId = typeof routineId==='number' ? routineId : null;
   document.getElementById('kPostTitle').value='';
   document.getElementById('kPostContent').value='';
@@ -6264,8 +6322,18 @@ async function kSubmitPost() {
   if(btn.disabled) return;
   btn.disabled = true;
   try {
+    // 새로 고른 사진이 있으면 올려서 주소를 받아옴(없으면 기존 사진 그대로)
+    let postPhotoUrl = kPostExistingPhotoUrl;
+    if(kPostPhotoFile) {
+      const blob = _dataURLtoBlob(kPostPhotoFile);
+      const path = `${currentUser.id}/post_${Date.now()}.jpg`;
+      const { error: upErr } = await sb.storage.from('cert-photos').upload(path, blob, { contentType: blob.type });
+      if(upErr){ alert('사진 업로드 실패: '+upErr.message); return; }
+      postPhotoUrl = sb.storage.from('cert-photos').getPublicUrl(path).data.publicUrl;
+    }
     if(editingPostId) {
       const payload = { title:t, content:c };
+      if(kPostPhotoFile) payload.photo_url = postPhotoUrl;
       // 종류는 관리자만 바꿀 수 있음. 공지 → 일반 글로 바뀌면 숨김도 같이 풀어줌
       // (숨기기 버튼은 공지에만 있어서, 숨긴 채로 일반 글이 되면 다시 보이게 할 방법이 없음)
       if(isAdmin) { payload.type = asNotice ? 'notice' : 'kpost'; payload.routine_id = noticeRid; if(!asNotice) payload.hidden = false; }
@@ -6276,7 +6344,7 @@ async function kSubmitPost() {
       const kcEl = document.getElementById('kPostContent');
       const { error } = await sb.from('posts').insert({
         type: asNotice ? 'notice' : 'kpost', title:t, content:c, author_id:currentUser.id,
-        routine_id: noticeRid,
+        routine_id: noticeRid, ...(postPhotoUrl ? { photo_url: postPhotoUrl } : {}),
         ..._mentionPayload(_extractMentions(c, noticeRid, kcEl._mnPicked)),
       });
       kcEl._mnPicked = new Set();
@@ -6290,6 +6358,7 @@ async function kSubmitPost() {
     else { kResetReviewFilter(); kRenderReviewTab('all'); kRenderMy(); }
     if(_kWriteReturnRoutineId!=null && _isOverlayOpen('routineDetailOverlay')) openKRoutineDetail(_kWriteReturnRoutineId);
     _kWriteReturnRoutineId = null;
+    _resetKPostPhoto();
   } finally {
     btn.disabled = false;
   }
