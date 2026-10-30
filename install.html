@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>한끗루틴 설치하기</title>
+<meta name="theme-color" content="#2E33BC">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #2E33BC; color: #111; min-height: 100vh; display: flex; justify-content: center; }
+  .wrap { width: 100%; max-width: 420px; padding: 36px 20px calc(36px + env(safe-area-inset-bottom)); }
+  .hero { text-align: center; color: #fff; margin-bottom: 22px; }
+  .hero .logo { width: 72px; height: 72px; border-radius: 18px; margin-bottom: 14px; }
+  .hero h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+  .hero p { font-size: 14px; opacity: 0.85; line-height: 1.5; }
+  .card { background: #fff; border-radius: 20px; padding: 22px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+  .step { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+  .step:last-child { margin-bottom: 0; }
+  .num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #E6F1FB; color: #185FA5; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .txt { flex: 1; font-size: 14px; line-height: 1.55; color: #333; }
+  .txt small { display: block; margin-top: 4px; font-size: 12px; color: #888; }
+  .warn { background: #FFF8E1; border-radius: 12px; padding: 14px; font-size: 13px; color: #856404; line-height: 1.6; margin-bottom: 16px; }
+  .btn { display: block; width: 100%; padding: 16px; border: none; border-radius: 14px; background: #2E33BC; color: #fff; font-size: 16px; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; font-family: inherit; }
+  .btn.light { background: #fff; color: #2E33BC; border: 1.5px solid #2E33BC; margin-top: 10px; font-size: 14px; padding: 13px; }
+  .small-btn { margin-top: 8px; padding: 8px 14px; background: #fff; border: 1px solid #e5d29a; border-radius: 10px; font-size: 12px; font-weight: 600; color: #856404; cursor: pointer; font-family: inherit; }
+  .foot { text-align: center; font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.6; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <img class="logo" src="icon-192.png" alt="한끗루틴">
+    <h1>한끗루틴 설치하기</h1>
+    <p>홈 화면에 추가하면 앱처럼 바로 열고<br>인증·응원 알림도 놓치지 않아요</p>
+  </div>
+
+  <!-- 앱 안 브라우저(카톡 등) -->
+  <div class="card hidden" id="inApp">
+    <div class="warn"><b id="inAppName"></b> 안에서는 설치할 수 없어요.<br>아래 버튼으로 인터넷 앱(<span id="inAppTarget"></span>)에서 다시 열어주세요.</div>
+    <button class="btn" id="inAppBtn" onclick="openExternal()">인터넷 앱으로 열기</button>
+    <div class="txt" style="margin-top:14px;"><small id="inAppSteps"></small></div>
+  </div>
+
+  <!-- 아이폰 -->
+  <div class="card hidden" id="ios">
+    <div class="warn hidden" id="iosNotSafari"><b>아이폰은 Safari에서만 설치할 수 있어요.</b><br>Safari를 열고 이 주소를 붙여넣어 주세요.<br><button class="small-btn" onclick="copyAddress()">📋 주소 복사하기</button></div>
+    <h2>아이폰 · 3단계</h2>
+    <div class="step"><div class="num">1</div><div class="txt">Safari 하단의 <b>공유 버튼</b> ⬆️을 눌러요</div></div>
+    <div class="step"><div class="num">2</div><div class="txt">메뉴를 아래로 내려서 <b>"홈 화면에 추가"</b> ➕를 선택해요</div></div>
+    <div class="step"><div class="num">3</div><div class="txt">오른쪽 위 <b>"추가"</b>를 누르면 끝!<small>홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요.</small></div></div>
+  </div>
+
+  <!-- 안드로이드 -->
+  <div class="card hidden" id="android">
+    <h2>안드로이드 · 3단계</h2>
+    <div class="step"><div class="num">1</div><div class="txt">크롬 오른쪽 위 <b>⋮ 메뉴</b>를 눌러요</div></div>
+    <div class="step"><div class="num">2</div><div class="txt"><b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b>를 선택해요</div></div>
+    <div class="step"><div class="num">3</div><div class="txt"><b>"설치"</b>를 누르면 끝!<small>홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요.</small></div></div>
+  </div>
+
+  <!-- 컴퓨터 등 -->
+  <div class="card hidden" id="desktop">
+    <h2>휴대폰에서 열어주세요</h2>
+    <div class="txt">이 페이지 주소를 휴대폰에서 열면 설치 방법이 나와요.<br>아이폰은 <b>Safari</b>, 안드로이드는 <b>크롬</b>에서 열어주세요.</div>
+    <button class="small-btn" style="margin-top:12px;" onclick="copyAddress()">📋 주소 복사하기</button>
+  </div>
+
+  <a class="btn light" href="./">한끗루틴 열어보기</a>
+  <div class="foot">설치 없이 이대로 써도 괜찮아요. 홈 화면에 추가하면<br>더 편하고 알림을 받을 수 있어요.</div>
+</div>
+<script>
+  var ua = navigator.userAgent;
+  var isIOS = /iPad|iPhone|iPod/.test(ua);
+  var isAndroid = /Android/.test(ua);
+  var inApp = /KAKAOTALK/i.test(ua) ? '카카오톡' : /Instagram/i.test(ua) ? '인스타그램' : /NAVER\(inapp/i.test(ua) ? '네이버' : /FBAN|FBAV/i.test(ua) ? '페이스북' : /\bLine\//i.test(ua) ? '라인' : null;
+  var isSafari = isIOS && /WebKit/.test(ua) && !/CriOS|FxiOS/.test(ua) && !inApp;
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function openExternal() {
+    var url = location.href.split('#')[0];
+    if (/KAKAOTALK/i.test(ua)) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return; }
+    if (isAndroid) {
+      try { var u = new URL(url); location.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;package=com.android.chrome;end'; return; } catch (e) {}
+    }
+    alert(isIOS ? '화면의 ⋯ 메뉴에서 「Safari에서 열기」를 눌러주세요.' : '화면의 ⋮ 메뉴에서 「다른 브라우저로 열기」를 눌러주세요.');
+  }
+  function copyAddress() {
+    var url = location.href.split('#')[0].split('?')[0];
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { alert('주소를 복사했어요. Safari(또는 크롬)에 붙여넣어 열어주세요.'); }, function () { prompt('이 주소를 복사해 주세요', url); });
+    } else { prompt('이 주소를 복사해 주세요', url); }
+  }
+  if (inApp) {
+    document.getElementById('inAppName').textContent = inApp;
+    document.getElementById('inAppTarget').textContent = isIOS ? 'Safari' : '크롬';
+    var canAuto = /KAKAOTALK/i.test(ua) || isAndroid;
+    document.getElementById('inAppBtn').style.display = canAuto ? '' : 'none';
+    document.getElementById('inAppSteps').innerHTML = canAuto ? '버튼이 안 되면: 화면의 ⋮ 메뉴 → 「다른 브라우저로 열기」' : '화면의 ⋯ 메뉴 → 「Safari에서 열기」';
+    show('inApp');
+  }
+  if (isIOS) { if (!isSafari && !inApp) show('iosNotSafari'); show('ios'); }
+  else if (isAndroid) { show('android'); }
+  else { show('desktop'); }
+</script>
+</body>
+</html>

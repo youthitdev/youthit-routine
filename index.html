@@ -559,6 +559,16 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
   </div>
 
   <!-- 가입 직후 1회, 홈 화면 추가 안내 (iOS/안드로이드 분기) -->
+  <!-- 카카오톡·인스타 등 앱 안 브라우저로 열렸을 때: 홈 화면 추가가 안 되니 인터넷 앱으로 다시 열게 안내 -->
+  <div class="splash" id="inAppBrowserScreen" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;z-index:9500;">
+    <div style="font-size:56px;margin-bottom:16px;">🙏</div>
+    <div style="font-size:21px;font-weight:800;color:#fff;margin-bottom:8px;">지금은 설치할 수 없어요</div>
+    <div id="inAppBrowserMsg" style="font-size:14px;color:rgba(255,255,255,0.85);line-height:1.6;margin-bottom:24px;max-width:300px;"></div>
+    <button id="inAppOpenBtn" onclick="openInExternalBrowser()" style="width:100%;max-width:320px;padding:18px;border:none;border-radius:16px;background:#fff;color:#2E33BC;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:16px;">인터넷 앱으로 열기</button>
+    <div id="inAppBrowserSteps" style="background:rgba(255,255,255,0.16);border:1.5px solid rgba(255,255,255,0.3);border-radius:16px;padding:16px 18px;margin-bottom:22px;max-width:320px;color:#fff;font-size:13px;line-height:1.6;"></div>
+    <button onclick="dismissInAppNotice()" style="background:none;border:none;color:rgba(255,255,255,0.65);font-size:13px;text-decoration:underline;cursor:pointer;">그냥 둘러볼게요</button>
+  </div>
+
   <div class="splash" id="installPromptScreen" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;">
     <div style="font-size:60px;margin-bottom:18px;">🌱</div>
     <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px;">홈 화면에 추가해두세요</div>
@@ -599,6 +609,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
           <!-- 홍보 배너 (관리자 등록, 없으면 숨김) -->
           <div id="homeNoticeArea" style="display:none;"></div>
           <div id="homeBannerArea" style="display:none;"></div>
+          <div id="installBannerArea"></div>
           <div id="pushNudgeArea" style="margin-top:10px;"></div>
         </div>
         <div style="display:flex;align-items:center;padding-top:12px;">
@@ -716,6 +727,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
           <div class="menu-card">
             <div class="menu-item" onclick="openBadgeSheet()"><div class="menu-left"><div class="menu-icon" style="background:#FFF8E1;"><i class="ti ti-award" style="font-size:15px;color:#B8860B;"></i></div>배지</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
+            <div class="menu-item install-menu-item" onclick="openInstallGuide()"><div class="menu-left"><div class="menu-icon" style="background:#f0f1fb;"><i class="ti ti-device-mobile" style="font-size:15px;color:#2E33BC;"></i></div>홈 화면에 앱 설치하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openSheet('accountSheetBg')"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="window.open('http://pf.kakao.com/_kTGuxj','_blank')"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
           </div>
@@ -850,6 +862,7 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
 
           <div class="menu-card">
             <div class="menu-item" onclick="openNotifSetting()"><div class="menu-left"><div class="menu-icon" style="background:#E6F1FB;"><i class="ti ti-bell" style="font-size:15px;color:#185FA5;"></i></div>알림 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
+            <div class="menu-item install-menu-item" onclick="openInstallGuide()"><div class="menu-left"><div class="menu-icon" style="background:#f0f1fb;"><i class="ti ti-device-mobile" style="font-size:15px;color:#2E33BC;"></i></div>홈 화면에 앱 설치하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openSheet('accountSheetBg')"><div class="menu-left"><div class="menu-icon" style="background:#EAF3DE;"><i class="ti ti-lock" style="font-size:15px;color:#3B6D11;"></i></div>계정 설정</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="openOverlay('inquiryOverlay')"><div class="menu-left"><div class="menu-icon" style="background:#FBEAF0;"><i class="ti ti-help" style="font-size:15px;color:#993556;"></i></div>문의하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
             <div class="menu-item" onclick="window.open('https://secure.donus.org/youthvoice/pay/step1_direct?dontype=25&period=pledge','_blank')"><div class="menu-left"><div class="menu-icon" style="background:#FFF3CD;"><i class="ti ti-heart" style="font-size:15px;color:#856404;"></i></div>후원하기</div><i class="ti ti-chevron-right" style="font-size:15px;color:#aaa;"></i></div>
@@ -1296,31 +1309,14 @@ body.is-observer #page-my .menu-item[onclick*="openBadgeSheet"] { display: none 
     </div>
   </div>
 
-  <!-- 바텀시트: 아이폰 홈 화면에 추가 가이드 -->
+  <!-- 바텀시트: 홈 화면에 앱 설치 안내 (아이폰·안드로이드·앱 안 브라우저를 구분해서 보여줌) -->
   <div class="sheet-bg" id="iosInstallSheetBg" onclick="closeSheet('iosInstallSheetBg')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
-      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:4px;">📲 홈 화면에 추가하기</div>
-      <div style="font-size:12px;color:#888;margin-bottom:18px;line-height:1.5;">앱처럼 쓰고, 승인·응원 알림도 놓치지 않아요</div>
-      <div style="display:flex;flex-direction:column;gap:16px;">
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">1</div>
-          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">Safari 하단의 <b>공유 버튼</b>을 눌러요
-            <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:10px;padding:7px 12px;font-size:16px;">⬆️<span style="font-size:11px;color:#888;">공유</span></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">2</div>
-          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">메뉴를 아래로 내려서 <b>"홈 화면에 추가"</b>를 선택해요
-            <div style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:10px;padding:7px 12px;font-size:13px;">➕ 홈 화면에 추가</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">3</div>
-          <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">오른쪽 위 <b>"추가"</b>를 누르면 끝!<br>홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요</div>
-        </div>
-      </div>
-      <button class="primary-btn" style="margin-top:22px;" onclick="closeSheet('iosInstallSheetBg')">확인</button>
+      <div style="font-size:16px;font-weight:600;color:#111;margin-bottom:4px;">📲 홈 화면에 앱 설치하기</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px;line-height:1.5;">앱처럼 바로 열고, 승인·응원 알림도 놓치지 않아요</div>
+      <div id="installGuideBody"></div>
+      <button class="primary-btn" style="margin-top:20px;" onclick="closeSheet('iosInstallSheetBg')">확인</button>
     </div>
   </div>
 
@@ -1477,6 +1473,108 @@ async function triggerAndroidInstall() {
 function closeInstallPrompt() {
   document.getElementById('installPromptScreen').style.display = 'none';
 }
+
+// ── 설치 안내 개선(2026-10-30) ─────────────────────────────────
+// 설치가 어렵다는 피드백 — 특히 카카오톡으로 받은 링크는 카톡 안 브라우저에서 열려서 「홈 화면에 추가」가 아예 안 됨.
+// ① 앱 안 브라우저(카톡·인스타·네이버 등)로 열리면 인터넷 앱으로 다시 열게 안내 ② 기기별 설치 안내 시트
+// ③ MY 메뉴·홈 안내 줄로 언제든 다시 볼 수 있게. install.html은 같은 안내만 모은 공유용 페이지
+function _inAppBrowserName() {
+  const ua = navigator.userAgent;
+  if (/KAKAOTALK/i.test(ua)) return '카카오톡';
+  if (/Instagram/i.test(ua)) return '인스타그램';
+  if (/NAVER\(inapp/i.test(ua)) return '네이버';
+  if (/FBAN|FBAV/i.test(ua)) return '페이스북';
+  if (/\bLine\//i.test(ua)) return '라인';
+  return null;
+}
+function openInExternalBrowser() {
+  const url = location.href.split('#')[0];
+  if (/KAKAOTALK/i.test(navigator.userAgent)) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return; }
+  if (_isAndroid()) {
+    try { const u = new URL(url); location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=com.android.chrome;end`; return; } catch(e) {}
+  }
+  alert(_isIOS() ? '화면의 ⋯ 메뉴에서 「Safari에서 열기」를 눌러주세요.' : '화면의 ⋮ 메뉴에서 「다른 브라우저로 열기」를 눌러주세요.');
+}
+function dismissInAppNotice() {
+  try { sessionStorage.setItem('hkr-inapp-dismissed', '1'); } catch(e) {}
+  document.getElementById('inAppBrowserScreen').style.display = 'none';
+}
+function _maybeShowInAppNotice() {
+  const name = _inAppBrowserName();
+  if (!name || _isStandalone()) return;
+  try { if (sessionStorage.getItem('hkr-inapp-dismissed') === '1') return; } catch(e) {}
+  // 카카오 로그인 등 돌아오는 주소(인증 코드가 붙은 주소)에서는 로그인 흐름을 끊지 않도록 띄우지 않음
+  if (/[?&]code=|access_token|error_description/.test(location.search + location.hash)) return;
+  document.getElementById('inAppBrowserMsg').innerHTML = `${name} 안에서는 홈 화면에 추가할 수 없어요.<br>아래 버튼을 눌러 ${_isIOS() ? '<b>Safari</b>로' : '<b>크롬</b>(인터넷 앱)으로'} 열어주세요.`;
+  const canAuto = /KAKAOTALK/i.test(navigator.userAgent) || _isAndroid();
+  document.getElementById('inAppOpenBtn').style.display = canAuto ? '' : 'none';
+  document.getElementById('inAppBrowserSteps').innerHTML = canAuto
+    ? `버튼이 안 되면<br><b>화면의 ⋮ 메뉴 → 「다른 브라우저로 열기」</b>`
+    : `<b>화면의 ⋯ 메뉴 → 「Safari에서 열기」</b>를 눌러주세요`;
+  document.getElementById('inAppBrowserScreen').style.display = 'flex';
+}
+function _igStep(n, html) {
+  return `<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;">
+    <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">${n}</div>
+    <div style="flex:1;font-size:13px;color:#333;line-height:1.5;">${html}</div></div>`;
+}
+function copyAppAddress() {
+  const url = location.href.split('#')[0].split('?')[0];
+  const done = () => alert('주소를 복사했어요. Safari(또는 크롬)에 붙여넣어 열어주세요.');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => prompt('이 주소를 복사해 주세요', url));
+  else prompt('이 주소를 복사해 주세요', url);
+}
+function _installGuideHtml() {
+  if (_isStandalone()) return `<div style="padding:18px 0;text-align:center;font-size:14px;color:#3B6D11;font-weight:600;">이미 홈 화면에서 쓰고 있어요 🎉</div>`;
+  const name = _inAppBrowserName();
+  if (name) return `<div style="background:#FFF8E1;border-radius:12px;padding:14px;font-size:13px;color:#856404;line-height:1.6;margin-bottom:14px;"><b>${name} 안에서는 설치할 수 없어요.</b><br>인터넷 앱으로 열고 나서 다시 눌러주세요.</div>
+    <button class="primary-btn" onclick="openInExternalBrowser()">인터넷 앱으로 열기</button>`;
+  if (_isIOS()) {
+    const notSafari = !_isIOSSafari();
+    return (notSafari ? `<div style="background:#FFF8E1;border-radius:12px;padding:14px;font-size:13px;color:#856404;line-height:1.6;margin-bottom:14px;"><b>아이폰은 Safari에서만 설치할 수 있어요.</b><br>지금 열린 앱 대신 Safari를 열고 이 주소를 붙여넣어 주세요.
+        <button onclick="copyAppAddress()" style="margin-top:8px;display:block;padding:8px 14px;background:#fff;border:1px solid #e5d29a;border-radius:10px;font-size:12px;font-weight:600;color:#856404;cursor:pointer;">📋 주소 복사하기</button></div>` : '')
+      + _igStep(1, `Safari 하단의 <b>공유 버튼</b> <span style="font-size:15px;">⬆️</span>을 눌러요`)
+      + _igStep(2, `메뉴를 아래로 내려서 <b>"홈 화면에 추가"</b> ➕를 선택해요`)
+      + _igStep(3, `오른쪽 위 <b>"추가"</b>를 누르면 끝!<br><span style="font-size:12px;color:#888;">홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요.</span>`);
+  }
+  if (_isAndroid()) {
+    return (_deferredInstallPrompt ? `<button class="primary-btn" style="margin-bottom:14px;" onclick="closeSheet('iosInstallSheetBg');triggerAndroidInstall()">앱 설치하기</button><div style="font-size:12px;color:#888;text-align:center;margin-bottom:12px;">위 버튼이 안 되면 아래 방법으로 해주세요</div>` : '')
+      + _igStep(1, `크롬 오른쪽 위 <b>⋮ 메뉴</b>를 눌러요`)
+      + _igStep(2, `<b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b>를 선택해요`)
+      + _igStep(3, `<b>"설치"</b>를 누르면 끝!<br><span style="font-size:12px;color:#888;">홈 화면에 생긴 🌱 아이콘으로 들어오면 알림도 켤 수 있어요.</span>`);
+  }
+  return `<div style="font-size:13px;color:#333;line-height:1.6;">휴대폰에서 이 주소를 열어주세요.<br>아이폰은 <b>Safari</b>, 안드로이드는 <b>크롬</b>에서 열면 설치 방법이 나와요.</div>
+    <button onclick="copyAppAddress()" style="margin-top:10px;padding:9px 14px;background:#f5f5f7;border:none;border-radius:10px;font-size:12px;font-weight:600;color:#333;cursor:pointer;">📋 주소 복사하기</button>`;
+}
+function openInstallGuide() {
+  document.getElementById('installGuideBody').innerHTML = _installGuideHtml();
+  openSheet('iosInstallSheetBg');
+}
+// 예전 이름(푸시 안내 등에서 호출) 그대로 유지
+function openIOSInstallSheet() { openInstallGuide(); }
+// MY 메뉴의 설치 줄은 이미 설치해서 쓰는 중이면 숨김
+function _syncInstallMenu() {
+  document.querySelectorAll('.install-menu-item').forEach(el => { el.style.display = _isStandalone() ? 'none' : ''; });
+}
+// 홈 맨 위 안내 줄 — 설치 안 한 폰에서 7일에 한 번만
+function renderInstallBanner() {
+  const el = document.getElementById('installBannerArea');
+  if (!el) return;
+  let until = 0; try { until = Number(localStorage.getItem('hkr-install-banner-until')) || 0; } catch(e) {}
+  const show = currentUser && !_isStandalone() && (_isIOS() || _isAndroid()) && !_inAppBrowserName() && Date.now() > until;
+  el.innerHTML = show ? `<div style="margin-top:10px;display:flex;align-items:center;gap:10px;background:#f0f1fb;border:1px solid #d9dbf5;border-radius:14px;padding:11px 12px;">
+      <div style="font-size:20px;">📲</div>
+      <div style="flex:1;min-width:0;font-size:12.5px;color:#333;line-height:1.45;"><b>홈 화면에 설치해두면</b> 앱처럼 바로 열려요</div>
+      <button onclick="openInstallGuide()" style="flex-shrink:0;padding:7px 11px;background:#2E33BC;color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">방법 보기</button>
+      <button onclick="dismissInstallBanner()" aria-label="닫기" style="flex-shrink:0;background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 2px;">✕</button>
+    </div>` : '';
+}
+function dismissInstallBanner() {
+  try { localStorage.setItem('hkr-install-banner-until', String(Date.now() + 7*86400000)); } catch(e) {}
+  const el = document.getElementById('installBannerArea'); if (el) el.innerHTML = '';
+}
+_maybeShowInAppNotice();
+_syncInstallMenu();
 
 const REGION_DATA = {
   '서울특별시': ['종로구','중구','용산구','성동구','광진구','동대문구','중랑구','성북구','강북구','도봉구','노원구','은평구','서대문구','마포구','양천구','강서구','구로구','금천구','영등포구','동작구','관악구','서초구','강남구','송파구','강동구'],
@@ -2683,6 +2781,7 @@ function openMyCompleted() {
   openOverlay('myCompletedOverlay');
 }
 function renderRoutineBanners() {
+  renderInstallBanner();
   renderNadaeum();
   updateHeaderStreakBadge();
   renderNoticeBars();
