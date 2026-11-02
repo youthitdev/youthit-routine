@@ -1,10 +1,12 @@
-const CACHE_NAME = 'hankkut-routine-v5';
+const CACHE_NAME = 'hankkut-routine-v6';
 const ASSETS = [
   '/youthit-routine/',
   '/youthit-routine/index.html',
   '/youthit-routine/manifest.json',
   '/youthit-routine/icon-192.png',
-  '/youthit-routine/icon-512.png'
+  '/youthit-routine/icon-512.png',
+  '/youthit-routine/tabler-icons/tabler-icons.css',
+  '/youthit-routine/tabler-icons/tabler-icons-subset.woff2'
 ];
 
 self.addEventListener('install', e => {
