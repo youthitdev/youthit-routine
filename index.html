@@ -2913,8 +2913,15 @@ function renderRoutineGrid(type, q) {
   // 그 다음 나머지 진행중 루틴 순으로 정렬 (완료는 "전체"에서 애초에 제외됨)
   const isMine = (r) => currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
   const _rank = (r) => r.pinned ? -1 : isMine(r) ? 0 : (r.status==='recruit' || _isFreeOpen(r) || _isLateRecruit(r)) ? 1 : 2;
-  const sorted = [...filtered].sort((a,b) => _rank(a) - _rank(b));
-  grid.innerHTML = sorted.map(r=>{
+  // 「전체」는 구역(지금 모집 중 / 진행 중 / 완료)으로 나눠 보여줌(한끗독서와 같은 방식, 2026-11-02) —
+  // 구역 안에서는 고정 → 내가 참여한 루틴 → 나머지 순서. 다른 필터는 기존 순서 그대로
+  const _sectioned = type==='all';
+  const _mineOf = (r) => !!currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id);
+  const _groupOf = (r) => r.status==='done' ? 'done'
+    : (r.status==='recruit' || _isFreeOpen(r) || (_isLateRecruit(r) && !_mineOf(r))) ? 'open' : 'run';
+  const _rank2 = (r) => r.pinned ? -1 : _mineOf(r) ? 0 : 1;
+  const sorted = [...filtered].sort((a,b) => (_sectioned ? _rank2(a)-_rank2(b) : _rank(a)-_rank(b)));
+  const _cards = sorted.map(r=>{
     // 시작 당일에도 모집 중인 루틴은 (내가 참여자가 아니면) 모집 중 카드로 표시
     const lateRecruit = _isLateRecruit(r) && !(currentUser && (r.participants||[]).some(p=>p.userId===currentUser.id));
     const isDone=r.status==='done', isActive=r.status==='active' && !lateRecruit, isRecruit=r.status==='recruit' || lateRecruit, isCancelled=r.status==='cancelled';
@@ -2929,7 +2936,10 @@ function renderRoutineGrid(type, q) {
     const cardBorder=effDone||isCancelled?'#e8e8e8':(isActive&&isMine)?'#2E33BC':isPending?'#FFD600':isRejectedApp?'#f4a8c0':'#e8e8e8';
     const bw=(isActive&&isMine&&!myDone)||isPending||isRejectedApp?'1.5px':'0.5px';
     const tc=effDone||isCancelled?'#aaa':'#111';
-    const sl=isCancelled?'폐강':myDone?'완주':isActive?(isMine?'참여 중':(isOpenFree?'상시 모집':'진행 중')):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':(isOpenFree?'상시 모집':'모집 중')):'완주';
+    const sl0=isCancelled?'폐강':myDone?'완주':isActive?(isMine?'참여 중':(isOpenFree?'상시 모집':'진행 중')):isRecruit?(isPending?'⏳ 승인 대기':isRejectedApp?'거절됨':(isOpenFree?'상시 모집':'모집 중')):'완주';
+    // 「모집 중」「진행 중」「상시 모집」 칩은 색·모양이 같아 헷갈린다는 피드백(2026-11-02) — 위의 구역 제목과 카드 아래 D-day가 대신 말해줌.
+    // 내 상태(참여 중·승인 대기·거절됨·완주·폐강)는 구역으로 알 수 없어서 그대로 둠
+    const sl=['모집 중','진행 중','상시 모집'].includes(sl0)?'':sl0;
     const bb=isCancelled?'#f0f0f0':myDone?'#f0f0f0':isActive?(isMine?'#2E33BC':'#E6F1FB'):isRecruit?(isPending?'#FFF3CD':isRejectedApp?'#FBEAF0':'#E6F1FB'):'#f0f0f0';
     const bc=isCancelled?'#aaa':myDone?'#aaa':isActive?(isMine?'#fff':'#185FA5'):isRecruit?(isPending?'#856404':isRejectedApp?'#993556':'#185FA5'):'#aaa';
     // D-day (자유루틴이 아직 열려있으면 D-day 대신 "상시 모집" 표시)
@@ -2974,7 +2984,7 @@ function renderRoutineGrid(type, q) {
         ${coverInner}
         <div class="rc-scrim"></div>
         ${r.coverImageUrl?`<div class="rc-emoji">${r.emoji}</div>`:''}
-        <span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>
+        ${sl?`<span class="rc-status" style="background:${bb};color:${bc};">${sl}</span>`:''}
         <span class="rc-people">👤 ${peopleTxt}</span>
         ${r.eligibility==='out_of_school'?`<span style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(255,107,0,0.92);color:#fff;">🎓 학교밖 전용</span>`:''}
       </div>
@@ -2991,11 +3001,28 @@ function renderRoutineGrid(type, q) {
         ${bottom}${nickHtml}
       </div>
     </div>`;
-  }).join('') || `<div style="grid-column:1/-1;padding:44px 16px;text-align:center;">
+  });
+  const _emptyAll = `<div style="grid-column:1/-1;padding:44px 16px;text-align:center;">
       <div style="font-size:32px;margin-bottom:10px;">🌱</div>
       <div style="font-size:14px;font-weight:600;color:#555;margin-bottom:4px;">아직 등록된 루틴이 없어요</div>
       <div style="font-size:12px;color:#aaa;">곧 새로운 루틴이 열릴 거예요!</div>
     </div>`;
+  if (!_sectioned || sorted.length===0) { grid.innerHTML = _cards.join('') || _emptyAll; return; }
+  const _hd = (title, n, hint, first) => `<div style="grid-column:1/-1;margin:${first?'2px':'14px'} 0 0;">
+      <div style="display:flex;align-items:center;gap:7px;"><b style="font-size:15px;font-weight:800;color:#111;letter-spacing:-0.3px;">${title}</b><span style="font-size:11.5px;font-weight:800;color:#fff;background:#6BA600;border-radius:99px;padding:1px 8px;">${n}</span></div>
+      ${hint?`<div style="font-size:11.5px;color:#999;margin-top:3px;">${hint}</div>`:''}
+    </div>`;
+  const groups = { open:[], run:[], done:[] };
+  sorted.forEach((r,i)=>groups[_groupOf(r)].push(_cards[i]));
+  let html = '';
+  // 모집 중 구역은 비어 있어도 제목을 둠 — "지금 신청할 수 있는 게 없다"는 것도 알려줘야 함(검색 중이 아닐 때)
+  if (groups.open.length || !q) {
+    html += _hd('지금 모집 중인 루틴', groups.open.length, '', true)
+      + (groups.open.length ? groups.open.join('') : `<div style="grid-column:1/-1;padding:22px 16px;text-align:center;font-size:12.5px;color:#aaa;line-height:1.6;">지금 열린 루틴이 없어요.<br>곧 새 루틴이 올라올 거예요.</div>`);
+  }
+  if (groups.run.length) html += _hd('진행 중인 루틴', groups.run.length, '모집이 끝나서 새로 신청할 수는 없어요.', !html) + groups.run.join('');
+  if (groups.done.length) html += _hd('완료된 루틴', groups.done.length, '', !html) + groups.done.join('');
+  grid.innerHTML = html;
 }
 function _fmtDT(iso) {
   if(!iso) return '';
